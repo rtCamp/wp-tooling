@@ -1,0 +1,10 @@
+/node_modules/
+/coverage/
+/build/
+/dist/
+*.log
+npm-debug.log*
+.idea/
+.vscode/settings.json
+.DS_Store
+Thumbs.db
