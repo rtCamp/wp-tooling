@@ -1,0 +1,162 @@
+/**
+ * Tests for the spinner primitive.
+ */
+'use strict';
+
+const { spinner } = require('../../src/ui/spinner/index');
+
+let writtenOutput;
+
+beforeEach(() => {
+	writtenOutput = [];
+	jest.spyOn(process.stdout, 'write').mockImplementation((text) => {
+		writtenOutput.push(text);
+		return true;
+	});
+	jest.useFakeTimers();
+});
+
+afterEach(() => {
+	jest.useRealTimers();
+});
+
+describe('spinner', () => {
+	it('should return an object with start, succeed, fail, update methods', () => {
+		const s = spinner('Test');
+		expect(typeof s.start).toBe('function');
+		expect(typeof s.succeed).toBe('function');
+		expect(typeof s.fail).toBe('function');
+		expect(typeof s.update).toBe('function');
+	});
+
+	describe('non-TTY mode', () => {
+		beforeEach(() => {
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: false,
+				configurable: true,
+			});
+		});
+
+		afterEach(() => {
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: undefined,
+				configurable: true,
+			});
+		});
+
+		it('should print plain text on start in non-TTY', () => {
+			const s = spinner('Installing…');
+			s.start();
+
+			const output = writtenOutput.join('');
+			expect(output).toContain('Installing…');
+		});
+
+		it('should print succeed message in non-TTY', () => {
+			const s = spinner('Working…');
+			s.start();
+			writtenOutput = [];
+			s.succeed('Done!');
+
+			const output = writtenOutput.join('');
+			expect(output).toContain('Done!');
+			expect(output).toContain('+');
+		});
+
+		it('should print fail message in non-TTY', () => {
+			const s = spinner('Working…');
+			s.start();
+			writtenOutput = [];
+			s.fail('Error!');
+
+			const output = writtenOutput.join('');
+			expect(output).toContain('Error!');
+			expect(output).toContain('x');
+		});
+	});
+
+	describe('TTY mode', () => {
+		beforeEach(() => {
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: true,
+				configurable: true,
+			});
+		});
+
+		afterEach(() => {
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: undefined,
+				configurable: true,
+			});
+		});
+
+		it('should animate frames on an interval', () => {
+			const s = spinner('Loading…');
+			s.start();
+
+			jest.advanceTimersByTime(80 * 3);
+
+			// Should have written multiple frames.
+			expect(writtenOutput.length).toBeGreaterThanOrEqual(3);
+			s.succeed();
+		});
+
+		it('should stop animation on succeed', () => {
+			const s = spinner('Loading…');
+			s.start();
+
+			jest.advanceTimersByTime(80);
+			s.succeed('All done');
+
+			const callCount = writtenOutput.length;
+			jest.advanceTimersByTime(80 * 10);
+
+			// No new writes after succeed.
+			expect(writtenOutput.length).toBe(callCount);
+		});
+
+		it('should stop animation on fail', () => {
+			const s = spinner('Loading…');
+			s.start();
+
+			jest.advanceTimersByTime(80);
+			s.fail('Oops');
+
+			const callCount = writtenOutput.length;
+			jest.advanceTimersByTime(80 * 10);
+
+			expect(writtenOutput.length).toBe(callCount);
+		});
+
+		it('should update text while running', () => {
+			const s = spinner('Phase 1');
+			s.start();
+
+			jest.advanceTimersByTime(80);
+			s.update('Phase 2');
+			jest.advanceTimersByTime(80);
+
+			const output = writtenOutput.join('');
+			expect(output).toContain('Phase 2');
+			s.succeed();
+		});
+	});
+
+	it('should default to current text when succeed is called without args', () => {
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: false,
+			configurable: true,
+		});
+		const s = spinner('Default text');
+		s.start();
+		writtenOutput = [];
+		s.succeed();
+
+		const output = writtenOutput.join('');
+		expect(output).toContain('Default text');
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: undefined,
+			configurable: true,
+		});
+	});
+});
