@@ -218,7 +218,7 @@ async function plainCheckboxTree({ message, groups }) {
  * @return {Promise<string[]>} Array of selected item labels.
  */
 async function checkboxTree({ message, groups } = {}) {
-	if (isTTY()) {
+	if (isTTY() && process.stdin.isTTY) {
 		return interactiveCheckboxTree({ message, groups });
 	}
 	return plainCheckboxTree({ message, groups });

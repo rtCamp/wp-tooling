@@ -81,7 +81,7 @@ async function confirm({ message, defaultValue = false } = {}) {
  * @return {Promise<string>} The entered password.
  */
 async function password({ message, mask = '*' } = {}) {
-	if (!isTTY()) {
+	if (!isTTY() || !process.stdin.isTTY) {
 		return readLine(`${message}: `);
 	}
 

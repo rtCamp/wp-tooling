@@ -89,12 +89,90 @@ function showCursor() {
 }
 
 /**
+ * Shared line buffer for non-TTY stdin.
+ *
+ * When stdin is piped, a single readline interface reads all lines up-front
+ * into a queue. Sequential `readLine` calls consume from that queue so no
+ * data is lost between calls.
+ */
+let _lineQueue = null;
+let _lineQueueClosed = false;
+
+/**
+ * Ensure the shared non-TTY line queue is initialised.
+ *
+ * @return {{ shift: Function, onLine: Function, closed: boolean }} The line queue.
+ */
+function _getLineQueue() {
+	if (_lineQueue) {
+		return _lineQueue;
+	}
+
+	const lines = [];
+	const waiters = [];
+	let closed = false;
+
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		terminal: false,
+	});
+
+	rl.on('line', (line) => {
+		if (waiters.length > 0) {
+			waiters.shift()(line);
+		} else {
+			lines.push(line);
+		}
+	});
+
+	rl.once('close', () => {
+		closed = true;
+		_lineQueueClosed = true;
+		// Resolve any remaining waiters with empty string.
+		while (waiters.length > 0) {
+			waiters.shift()('');
+		}
+	});
+
+	_lineQueue = {
+		shift() {
+			return new Promise((resolve) => {
+				if (lines.length > 0) {
+					resolve(lines.shift());
+				} else if (closed) {
+					resolve('');
+				} else {
+					waiters.push(resolve);
+				}
+			});
+		},
+		get closed() {
+			return _lineQueueClosed;
+		},
+	};
+
+	return _lineQueue;
+}
+
+/**
  * Read a single line from stdin.
+ *
+ * In TTY mode a fresh readline interface asks the user a question.
+ * In non-TTY (piped) mode a shared line queue is used so that
+ * successive calls do not discard buffered input.
  *
  * @param {string} prompt - Prompt text shown to the user.
  * @return {Promise<string>} The line entered by the user.
  */
 function readLine(prompt) {
+	// Non-TTY: use the shared line queue.
+	if (!process.stdin.isTTY) {
+		write(prompt);
+		return _getLineQueue().shift();
+	}
+
+	// TTY: interactive question per call.
 	return new Promise((resolve) => {
 		const rl = readline.createInterface({
 			input: process.stdin,

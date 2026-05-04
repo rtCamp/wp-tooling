@@ -157,7 +157,7 @@ async function plainSelect({ message, choices, multiple }) {
  * @return {Promise<string[]>} Array of selected labels.
  */
 async function checkbox({ message, choices } = {}) {
-	if (isTTY()) {
+	if (isTTY() && process.stdin.isTTY) {
 		return interactiveSelect({ message, choices, multiple: true });
 	}
 	return plainSelect({ message, choices, multiple: true });
@@ -172,7 +172,7 @@ async function checkbox({ message, choices } = {}) {
  * @return {Promise<string>} The selected label.
  */
 async function radio({ message, choices } = {}) {
-	if (isTTY()) {
+	if (isTTY() && process.stdin.isTTY) {
 		return interactiveSelect({ message, choices, multiple: false });
 	}
 	return plainSelect({ message, choices, multiple: false });
