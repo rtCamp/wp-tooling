@@ -1,63 +1,70 @@
 {
-    "name": "@rtcamp/wp-tooling",
-    "version": "0.1.0",
-    "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
-    "license": "GPL-2.0-or-later",
-    "author": "rtCamp",
-    "homepage": "https://github.com/rtCamp/wp-tooling#readme",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/rtCamp/wp-tooling.git"
-    },
-    "bugs": {
-        "url": "https://github.com/rtCamp/wp-tooling/issues"
-    },
-    "publishConfig": {
-        "registry": "https://npm.pkg.github.com",
-        "access": "restricted"
-    },
-    "engines": {
-        "node": ">=22"
-    },
-    "bin": {
-        "wp-tooling": "./bin/wp-tooling.js"
-    },
-    "exports": {
-        "./ui": "./src/ui/index.js",
-        "./scaffolds": "./src/scaffolds/index.js",
-        "./release": "./src/release/index.js",
-        "./hooks": "./src/hooks/index.js",
-        "./ci": "./src/ci/index.js",
-        "./version-monitor": "./src/version-monitor/index.js",
-        "./eslint-config": "./src/lint/eslint.js",
-        "./stylelint-config": "./src/lint/stylelint.js"
-    },
-    "files": [
-        "bin",
-        "src",
-        "README.md",
-        "LICENSE"
-    ],
-    "scripts": {
-        "lint": "eslint src tests",
-        "lint:fix": "eslint src tests --fix",
-        "test": "jest",
-        "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage",
-        "check": "npm run lint && npm test"
-    },
-    "dependencies": {},
-    "devDependencies": {
-        "@wordpress/eslint-plugin": "^22.0.0",
-        "eslint": "8.57.1",
-        "jest": "^29.7.0"
-    },
-    "keywords": [
-        "rtcamp",
-        "wordpress",
-        "tooling",
-        "scaffolding",
-        "tty",
-        "cli"
-    ]
+  "name": "@rtcamp/wp-tooling",
+  "version": "0.1.0",
+  "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
+  "license": "GPL-2.0-or-later",
+  "author": "rtCamp",
+  "homepage": "https://github.com/rtCamp/wp-tooling#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rtCamp/wp-tooling.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rtCamp/wp-tooling/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "wp-tooling": "./bin/wp-tooling.js"
+  },
+  "exports": {
+    "./ui": "./src/ui/index.js",
+    "./scaffolds": "./src/scaffolds/index.js",
+    "./release": "./src/release/index.js",
+    "./hooks": "./src/hooks/index.js",
+    "./ci": "./src/ci/index.js",
+    "./version-monitor": "./src/version-monitor/index.js",
+    "./eslint-config": "./src/lint/eslint.js",
+    "./stylelint-config": "./src/lint/stylelint.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "check": "npm run lint && npm test"
+  },
+  "peerDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
+    "@wordpress/eslint-plugin": "^25.1.0",
+    "@wordpress/stylelint-config": "^23.37.0",
+    "eslint": "^10.0.0",
+    "eslint-plugin-jest": "^29.15.2",
+    "stylelint": "^16.8.2",
+    "stylelint-scss": "^6.4.0"
+  },
+  "devDependencies": {
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "rtcamp",
+    "wordpress",
+    "tooling",
+    "scaffolding",
+    "tty",
+    "cli"
+  ]
 }
