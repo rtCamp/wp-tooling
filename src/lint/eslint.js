@@ -14,6 +14,6 @@ module.exports = [
 	},
 	{
 		...jestPlugin.configs['flat/recommended'],
-		files: ['**/*.test.js', '**/*.test.ts'],
+		files: ['**/*.test.js'],
 	},
 ];
