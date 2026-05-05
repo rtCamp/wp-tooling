@@ -9,7 +9,7 @@
  */
 class CancelledError extends Error {
 	constructor() {
-		super( 'Prompt cancelled by user.' );
+		super('Prompt cancelled by user.');
 		this.name = 'CancelledError';
 	}
 }

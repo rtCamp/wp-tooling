@@ -9,7 +9,7 @@
 
 ## Summary
 
-The TTY UI kit is the interactive terminal layer every skeleton's setup wizard and add-module flow depend on. It is consumed via `@rtcamp/wp-tooling/ui`. Built entirely on Node.js built-ins (readline, process.stdout, process.stdin) — zero runtime dependencies. Provides eight public primitives: Wizard, text, confirm, password, checkbox, radio, checkboxTree, and spinner.
+The TTY UI kit is the interactive terminal layer every skeleton's setup wizard and add-module flow depend on. It is consumed via `@rtcamp/wp-tooling/ui`. Built entirely on Node.js built-ins (readline, process.stdout, process.stdin) — zero runtime dependencies. Provides nine public exports: Wizard, text, confirm, password, checkbox, radio, checkboxTree, spinner, and CancelledError.
 
 ---
 
@@ -23,6 +23,7 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - [2026-05-05] `checkboxTree` returns selections in display order, not toggle order.
 - [2026-05-05] Spinner guards against multiple intervals when `start()` called twice.
 - [2026-05-05] Wizard validates `steps` is an array, defaults to empty array on `undefined`, and omits ANSI formatting in non-TTY.
+- [2026-05-05] `CancelledError` added -- thrown on Ctrl+C in any TTY prompt or select.
 - [2026-05-05] `checkboxTree` returns empty array for empty groups without prompting.
 
 ---
@@ -43,6 +44,7 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - `src/ui/selects/flat.js` -- new (checkbox, radio)
 - `src/ui/selects/tree.js` -- new (checkboxTree)
 - `src/ui/spinner/index.js` -- new (spinner with TTY/non-TTY modes)
+- `src/ui/errors.js` -- new (CancelledError class)
 - `src/ui/wizard/index.js` -- new (Wizard class)
 - `tests/ui/prompts.test.js` -- new
 - `tests/ui/selects.test.js` -- new
@@ -69,6 +71,7 @@ $ npm run check
  PASS  tests/ui/selects.test.js
   checkbox (non-TTY)
     ✓ should return selected items by number
+    ✓ should return unique selections in display order
     ✓ should handle empty input gracefully
   radio (non-TTY)
     ✓ should return a single selected item
@@ -76,8 +79,11 @@ $ npm run check
   flat select validation
     ✓ should throw when checkbox choices is missing
     ✓ should throw when radio choices is empty
+  flat select (TTY) -- Ctrl+C
+    ✓ should reject with CancelledError on Ctrl+C
   checkboxTree (non-TTY)
     ✓ should return selected items from groups by number
+    ✓ should return unique selections in display order
     ✓ should handle empty selection
     ✓ should throw when groups is missing
     ✓ should throw when groups is null
@@ -127,9 +133,10 @@ $ npm run check
     ✓ should default to false when no defaultValue
   password
     ✓ should fall back to readLine in non-TTY
+    ✓ should reject with CancelledError on Ctrl+C
 
 Test Suites: 4 passed, 4 total
-Tests:       42 passed, 42 total
+Tests:       46 passed, 46 total
 Snapshots:   0 total
 Time:        0.197 s, estimated 1 s
 Ran all test suites.
@@ -139,9 +146,10 @@ Ran all test suites.
 
 ## Notes for the reviewer
 
-- All eight exports exposed from barrel: Wizard, text, confirm, password, checkbox, radio, checkboxTree, spinner.
+- Nine exports from barrel: Wizard, text, confirm, password, checkbox, radio, checkboxTree, spinner, CancelledError.
 - Non-TTY fallbacks tested for all primitives.
 - Input validation tested for `checkbox`, `radio`, and `checkboxTree`.
+- Ctrl+C (`CancelledError`) tested for TTY prompts and selects.
 - No banned dependencies used.
 - ASCII-only symbols throughout -- no Unicode emojis.
 - Stub files for other sub-exports (scaffolds, release, hooks, ci, version-monitor, lint) are not included; those belong to their own issues.
