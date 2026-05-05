@@ -31,7 +31,13 @@ describe('spinner', () => {
 	});
 
 	describe('non-TTY mode', () => {
+		let stdoutTTYDescriptor;
+
 		beforeEach(() => {
+			stdoutTTYDescriptor = Object.getOwnPropertyDescriptor(
+				process.stdout,
+				'isTTY'
+			);
 			Object.defineProperty(process.stdout, 'isTTY', {
 				value: false,
 				configurable: true,
@@ -39,10 +45,15 @@ describe('spinner', () => {
 		});
 
 		afterEach(() => {
-			Object.defineProperty(process.stdout, 'isTTY', {
-				value: undefined,
-				configurable: true,
-			});
+			if (stdoutTTYDescriptor) {
+				Object.defineProperty(
+					process.stdout,
+					'isTTY',
+					stdoutTTYDescriptor
+				);
+			} else {
+				delete process.stdout.isTTY;
+			}
 		});
 
 		it('should print plain text on start in non-TTY', () => {
@@ -77,7 +88,13 @@ describe('spinner', () => {
 	});
 
 	describe('TTY mode', () => {
+		let stdoutTTYDescriptor;
+
 		beforeEach(() => {
+			stdoutTTYDescriptor = Object.getOwnPropertyDescriptor(
+				process.stdout,
+				'isTTY'
+			);
 			Object.defineProperty(process.stdout, 'isTTY', {
 				value: true,
 				configurable: true,
@@ -85,10 +102,15 @@ describe('spinner', () => {
 		});
 
 		afterEach(() => {
-			Object.defineProperty(process.stdout, 'isTTY', {
-				value: undefined,
-				configurable: true,
-			});
+			if (stdoutTTYDescriptor) {
+				Object.defineProperty(
+					process.stdout,
+					'isTTY',
+					stdoutTTYDescriptor
+				);
+			} else {
+				delete process.stdout.isTTY;
+			}
 		});
 
 		it('should animate frames on an interval', () => {
@@ -158,20 +180,32 @@ describe('spinner', () => {
 	});
 
 	it('should default to current text when succeed is called without args', () => {
+		const stdoutTTYDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdout,
+			'isTTY'
+		);
 		Object.defineProperty(process.stdout, 'isTTY', {
 			value: false,
 			configurable: true,
 		});
-		const s = spinner('Default text');
-		s.start();
-		writtenOutput = [];
-		s.succeed();
+		try {
+			const s = spinner('Default text');
+			s.start();
+			writtenOutput = [];
+			s.succeed();
 
-		const output = writtenOutput.join('');
-		expect(output).toContain('Default text');
-		Object.defineProperty(process.stdout, 'isTTY', {
-			value: undefined,
-			configurable: true,
-		});
+			const output = writtenOutput.join('');
+			expect(output).toContain('Default text');
+		} finally {
+			if (stdoutTTYDescriptor) {
+				Object.defineProperty(
+					process.stdout,
+					'isTTY',
+					stdoutTTYDescriptor
+				);
+			} else {
+				delete process.stdout.isTTY;
+			}
+		}
 	});
 });

@@ -11,6 +11,7 @@ const { text, confirm, password } = require('./prompts/index');
 const { checkbox, radio } = require('./selects/flat');
 const { checkboxTree } = require('./selects/tree');
 const { spinner } = require('./spinner/index');
+const { CancelledError } = require('./errors');
 
 module.exports = {
 	// Wizard
@@ -25,4 +26,6 @@ module.exports = {
 	checkboxTree,
 	// Spinner
 	spinner,
+	// Errors
+	CancelledError,
 };

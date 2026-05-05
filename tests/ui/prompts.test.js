@@ -4,6 +4,7 @@
 'use strict';
 
 const { text, confirm, password } = require('../../src/ui/prompts/index');
+const { CancelledError } = require('../../src/ui/errors');
 
 // Mock terminal module to control readLine responses.
 jest.mock('../../src/ui/core/terminal', () => {
@@ -100,5 +101,38 @@ describe('password', () => {
 
 		const result = await password({ message: 'Password' });
 		expect(result).toBe('secret123');
+	});
+
+	it('should reject with CancelledError on Ctrl+C', async () => {
+		terminal.isTTY.mockReturnValue(true);
+
+		const stdinDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdin,
+			'isTTY'
+		);
+		Object.defineProperty(process.stdin, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
+
+		let keypressHandler;
+		terminal.onKeypress.mockImplementation((handler) => {
+			keypressHandler = handler;
+			return () => {};
+		});
+
+		try {
+			const p = password({ message: 'Password:' });
+
+			keypressHandler(null, { name: 'c', ctrl: true });
+
+			await expect(p).rejects.toThrow(CancelledError);
+		} finally {
+			if (stdinDescriptor) {
+				Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+			} else {
+				delete process.stdin.isTTY;
+			}
+		}
 	});
 });

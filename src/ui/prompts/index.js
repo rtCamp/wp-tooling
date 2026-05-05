@@ -13,6 +13,7 @@ const {
 	writeLine,
 	onKeypress,
 } = require('../core/terminal');
+const { CancelledError } = require('../errors');
 
 /**
  * Prompt the user for a text value.
@@ -88,7 +89,7 @@ async function password({ message, mask = '*' } = {}) {
 	const prompt = `${ANSI.cyan}?${ANSI.reset} ${ANSI.bold}${message}${ANSI.reset} `;
 	write(prompt);
 
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		let value = '';
 
 		const cleanup = onKeypress((ch, key) => {
@@ -107,11 +108,11 @@ async function password({ message, mask = '*' } = {}) {
 				return;
 			}
 
-			// Ctrl+C -- exit gracefully.
+			// Ctrl+C -- cancel prompt.
 			if (key && key.ctrl && key.name === 'c') {
 				cleanup();
 				writeLine();
-				process.exit(130);
+				reject(new CancelledError());
 			}
 
 			if (ch) {

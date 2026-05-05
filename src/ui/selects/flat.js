@@ -16,6 +16,7 @@ const {
 	onKeypress,
 	readLine,
 } = require('../core/terminal');
+const { CancelledError } = require('../errors');
 
 /**
  * Validate select choices input.
@@ -49,7 +50,7 @@ function validateChoices(choices, apiName) {
  * @return {Promise<string[]|string>} Selected value(s). Array for multi, string for single.
  */
 function interactiveSelect({ message, choices, multiple }) {
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		hideCursor();
 
 		let cursor = 0;
@@ -133,7 +134,7 @@ function interactiveSelect({ message, choices, multiple }) {
 			} else if (key.ctrl && key.name === 'c') {
 				cleanup();
 				showCursor();
-				process.exit(130);
+				reject(new CancelledError());
 			}
 		});
 	});
@@ -164,10 +165,12 @@ async function plainSelect({ message, choices, multiple }) {
 		.map((s) => parseInt(s.trim(), 10) - 1)
 		.filter((i) => i >= 0 && i < choices.length);
 
+	const normalizedIndices = [...new Set(indices)].sort((a, b) => a - b);
+
 	if (multiple) {
-		return indices.map((i) => choices[i]);
+		return normalizedIndices.map((i) => choices[i]);
 	}
-	return choices[indices[0]] || choices[0];
+	return choices[normalizedIndices[0]] || choices[0];
 }
 
 /**

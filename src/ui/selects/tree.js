@@ -16,6 +16,7 @@ const {
 	onKeypress,
 	readLine,
 } = require('../core/terminal');
+const { CancelledError } = require('../errors');
 
 /**
  * Validate grouped checkboxTree input.
@@ -74,7 +75,7 @@ function buildRows(groups) {
  * @return {Promise<string[]>} Selected item labels.
  */
 function interactiveCheckboxTree({ message, groups }) {
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		hideCursor();
 
 		const rows = buildRows(groups);
@@ -199,7 +200,7 @@ function interactiveCheckboxTree({ message, groups }) {
 			} else if (key.ctrl && key.name === 'c') {
 				cleanup();
 				showCursor();
-				process.exit(130);
+				reject(new CancelledError());
 			}
 		});
 	});
@@ -231,8 +232,9 @@ async function plainCheckboxTree({ message, groups }) {
 		.split(',')
 		.map((s) => parseInt(s.trim(), 10) - 1)
 		.filter((i) => i >= 0 && i < allItems.length);
+	const normalizedIndices = [...new Set(indices)].sort((a, b) => a - b);
 
-	return indices.map((i) => allItems[i]);
+	return normalizedIndices.map((i) => allItems[i]);
 }
 
 /**

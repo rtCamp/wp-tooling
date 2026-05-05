@@ -5,6 +5,7 @@
 
 const { checkbox, radio } = require('../../src/ui/selects/flat');
 const { checkboxTree } = require('../../src/ui/selects/tree');
+const { CancelledError } = require('../../src/ui/errors');
 
 // Mock terminal module.
 jest.mock('../../src/ui/core/terminal', () => {
@@ -33,6 +34,17 @@ beforeEach(() => {
 describe('checkbox (non-TTY)', () => {
 	it('should return selected items by number', async () => {
 		terminal.readLine.mockResolvedValueOnce('1, 3');
+
+		const result = await checkbox({
+			message: 'Pick items',
+			choices: ['alpha', 'beta', 'gamma'],
+		});
+
+		expect(result).toEqual(['alpha', 'gamma']);
+	});
+
+	it('should return unique selections in display order', async () => {
+		terminal.readLine.mockResolvedValueOnce('3, 1, 1');
 
 		const result = await checkbox({
 			message: 'Pick items',
@@ -101,9 +113,67 @@ describe('flat select validation', () => {
 	});
 });
 
+describe('flat select (TTY) -- Ctrl+C', () => {
+	it('should reject with CancelledError on Ctrl+C', async () => {
+		terminal.isTTY.mockReturnValue(true);
+
+		const stdinDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdin,
+			'isTTY'
+		);
+		Object.defineProperty(process.stdin, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
+
+		let keypressHandler;
+		terminal.onKeypress.mockImplementation((handler) => {
+			keypressHandler = handler;
+			return () => {};
+		});
+
+		try {
+			const p = checkbox({
+				message: 'Pick items',
+				choices: ['alpha', 'beta'],
+			});
+
+			keypressHandler(null, { name: 'c', ctrl: true });
+
+			await expect(p).rejects.toThrow(CancelledError);
+		} finally {
+			if (stdinDescriptor) {
+				Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+			} else {
+				delete process.stdin.isTTY;
+			}
+		}
+	});
+});
+
 describe('checkboxTree (non-TTY)', () => {
 	it('should return selected items from groups by number', async () => {
 		terminal.readLine.mockResolvedValueOnce('1, 4');
+
+		const result = await checkboxTree({
+			message: 'Select modules',
+			groups: [
+				{
+					label: 'Utilities',
+					items: ['cache', 'logger', 'transients'],
+				},
+				{
+					label: 'Integrations',
+					items: ['algolia', 'action-scheduler'],
+				},
+			],
+		});
+
+		expect(result).toEqual(['cache', 'algolia']);
+	});
+
+	it('should return unique selections in display order', async () => {
+		terminal.readLine.mockResolvedValueOnce('4, 1, 1');
 
 		const result = await checkboxTree({
 			message: 'Select modules',
@@ -223,6 +293,42 @@ describe('checkboxTree (TTY)', () => {
 				'cache',
 				'scheduler',
 			]);
+		} finally {
+			if (stdinDescriptor) {
+				Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+			} else {
+				delete process.stdin.isTTY;
+			}
+		}
+	});
+
+	it('should reject with CancelledError on Ctrl+C', async () => {
+		terminal.isTTY.mockReturnValue(true);
+
+		const stdinDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdin,
+			'isTTY'
+		);
+		Object.defineProperty(process.stdin, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
+
+		let keypressHandler;
+		terminal.onKeypress.mockImplementation((handler) => {
+			keypressHandler = handler;
+			return () => {};
+		});
+
+		try {
+			const p = checkboxTree({
+				message: 'Select modules',
+				groups: [{ label: 'Utilities', items: ['cache', 'logger'] }],
+			});
+
+			keypressHandler(null, { name: 'c', ctrl: true });
+
+			await expect(p).rejects.toThrow(CancelledError);
 		} finally {
 			if (stdinDescriptor) {
 				Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);

@@ -138,31 +138,41 @@ describe('Wizard', () => {
 	});
 
 	it('should omit ANSI formatting in non-TTY mode', async () => {
+		const stdoutTTYDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdout,
+			'isTTY'
+		);
 		Object.defineProperty(process.stdout, 'isTTY', {
 			value: false,
 			configurable: true,
 		});
+		try {
+			const wizard = new Wizard([
+				{
+					name: 'Step A',
+					run: async () => {},
+				},
+			]);
 
-		const wizard = new Wizard([
-			{
-				name: 'Step A',
-				run: async () => {},
-			},
-		]);
+			await wizard.run();
 
-		await wizard.run();
+			const output = process.stdout.write.mock.calls
+				.map(([text]) => String(text))
+				.join('');
 
-		const output = process.stdout.write.mock.calls
-			.map(([text]) => String(text))
-			.join('');
-
-		expect(output).toContain('> [1/1] Step A');
-		expect(output).not.toMatch(/\x1b\[/);
-
-		Object.defineProperty(process.stdout, 'isTTY', {
-			value: undefined,
-			configurable: true,
-		});
+			expect(output).toContain('> [1/1] Step A');
+			expect(output).not.toMatch(/\x1b\[/);
+		} finally {
+			if (stdoutTTYDescriptor) {
+				Object.defineProperty(
+					process.stdout,
+					'isTTY',
+					stdoutTTYDescriptor
+				);
+			} else {
+				delete process.stdout.isTTY;
+			}
+		}
 	});
 
 	it('should propagate step errors', async () => {
