@@ -101,6 +101,20 @@ describe('spinner', () => {
 			s.succeed();
 		});
 
+		it('should not create multiple intervals when start is called twice', () => {
+			const setIntervalSpy = jest.spyOn(global, 'setInterval');
+			try {
+				const s = spinner('Loading…');
+				s.start();
+				s.start();
+
+				expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+				s.succeed();
+			} finally {
+				setIntervalSpy.mockRestore();
+			}
+		});
+
 		it('should stop animation on succeed', () => {
 			const s = spinner('Loading…');
 			s.start();

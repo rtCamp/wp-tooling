@@ -28,6 +28,9 @@ function spinner(text) {
 		 * @return {void}
 		 */
 		start() {
+			if (timer) {
+				return;
+			}
 			if (!isTTY()) {
 				write(`${currentText}\n`);
 				return;
@@ -54,8 +57,10 @@ function spinner(text) {
 			}
 			if (isTTY()) {
 				clearLine();
+				write(`${ANSI.green}+${ANSI.reset} ${label}\n`);
+			} else {
+				write(`+ ${label}\n`);
 			}
-			write(`${ANSI.green}+${ANSI.reset} ${label}\n`);
 		},
 
 		/**
@@ -72,8 +77,10 @@ function spinner(text) {
 			}
 			if (isTTY()) {
 				clearLine();
+				write(`${ANSI.red}x${ANSI.reset} ${label}\n`);
+			} else {
+				write(`x ${label}\n`);
 			}
-			write(`${ANSI.red}x${ANSI.reset} ${label}\n`);
 		},
 
 		/**
