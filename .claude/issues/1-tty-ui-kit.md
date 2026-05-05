@@ -19,6 +19,11 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - [2026-05-04] All UI primitives degrade gracefully in non-TTY (CI) environments.
 - [2026-05-04] ASCII-only symbols in all UI output -- no Unicode emojis or special characters.
 - [2026-05-04] Guard added to `readLine` to prevent the `close` event from resolving the promise before the `question` callback fires.
+- [2026-05-05] Input validation added to `checkbox`, `radio`, and `checkboxTree` -- throw `TypeError` on missing or invalid `choices`/`groups`.
+- [2026-05-05] `checkboxTree` returns selections in display order, not toggle order.
+- [2026-05-05] Spinner guards against multiple intervals when `start()` called twice.
+- [2026-05-05] Wizard validates `steps` is an array, defaults to empty array on `undefined`, and omits ANSI formatting in non-TTY.
+- [2026-05-05] `checkboxTree` returns empty array for empty groups without prompting.
 
 ---
 
@@ -63,14 +68,23 @@ $ npm run check
 
  PASS  tests/ui/selects.test.js
   checkbox (non-TTY)
-    ✓ should return selected items by number (1 ms)
-    ✓ should handle empty input gracefully (1 ms)
+    ✓ should return selected items by number
+    ✓ should handle empty input gracefully
   radio (non-TTY)
     ✓ should return a single selected item
     ✓ should default to first choice on invalid input
+  flat select validation
+    ✓ should throw when checkbox choices is missing
+    ✓ should throw when radio choices is empty
   checkboxTree (non-TTY)
-    ✓ should return selected items from groups by number (1 ms)
+    ✓ should return selected items from groups by number
     ✓ should handle empty selection
+    ✓ should throw when groups is missing
+    ✓ should throw when groups is null
+    ✓ should throw when a group items is not an array
+    ✓ should return an empty array for empty groups without prompting
+  checkboxTree (TTY)
+    ✓ should resolve selections in display order, not toggle order
 
  PASS  tests/ui/wizard.test.js
   Wizard
@@ -78,42 +92,46 @@ $ npm run check
     ✓ should honour the skip() predicate
     ✓ should pass context to skip()
     ✓ should default context to empty object
+    ✓ should default steps to empty array
     ✓ should handle an empty steps array
-    ✓ should propagate step errors (4 ms)
+    ✓ should throw a clear error when steps is not an array
+    ✓ should omit ANSI formatting in non-TTY mode
+    ✓ should propagate step errors
 
  PASS  tests/ui/spinner.test.js
   spinner
-    ✓ should return an object with start, succeed, fail, update methods (1 ms)
+    ✓ should return an object with start, succeed, fail, update methods
     ✓ should default to current text when succeed is called without args
     non-TTY mode
-      ✓ should print plain text on start in non-TTY (1 ms)
+      ✓ should print plain text on start in non-TTY
       ✓ should print succeed message in non-TTY
       ✓ should print fail message in non-TTY
     TTY mode
-      ✓ should animate frames on an interval (1 ms)
+      ✓ should animate frames on an interval
+      ✓ should not create multiple intervals when start is called twice
       ✓ should stop animation on succeed
-      ✓ should stop animation on fail (1 ms)
+      ✓ should stop animation on fail
       ✓ should update text while running
 
  PASS  tests/ui/prompts.test.js
   text
-    ✓ should return the user input (1 ms)
+    ✓ should return the user input
     ✓ should return defaultValue when input is empty
     ✓ should trim whitespace from input
-    ✓ should retry when validation fails (1 ms)
+    ✓ should retry when validation fails
   confirm
     ✓ should return true for "y"
     ✓ should return true for "yes"
     ✓ should return false for "n"
-    ✓ should return defaultValue on empty input (1 ms)
+    ✓ should return defaultValue on empty input
     ✓ should default to false when no defaultValue
   password
     ✓ should fall back to readLine in non-TTY
 
 Test Suites: 4 passed, 4 total
-Tests:       31 passed, 31 total
+Tests:       42 passed, 42 total
 Snapshots:   0 total
-Time:        0.182 s, estimated 1 s
+Time:        0.197 s, estimated 1 s
 Ran all test suites.
 ```
 
@@ -122,7 +140,8 @@ Ran all test suites.
 ## Notes for the reviewer
 
 - All eight exports exposed from barrel: Wizard, text, confirm, password, checkbox, radio, checkboxTree, spinner.
-- Non-TTY fallbacks tested.
+- Non-TTY fallbacks tested for all primitives.
+- Input validation tested for `checkbox`, `radio`, and `checkboxTree`.
 - No banned dependencies used.
 - ASCII-only symbols throughout -- no Unicode emojis.
 - Stub files for other sub-exports (scaffolds, release, hooks, ci, version-monitor, lint) are not included; those belong to their own issues.
