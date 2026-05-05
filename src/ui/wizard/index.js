@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const { writeLine, ANSI } = require('../core/terminal');
+const { writeLine, ANSI, isTTY } = require('../core/terminal');
 
 /**
  * Wizard class -- orchestrates an array of steps in order.
@@ -22,7 +22,14 @@ class Wizard {
 	 * @param {Array<{name: string, run: Function, skip?: Function}>} steps   - Ordered steps.
 	 * @param {Object}                                                context - Shared mutable context.
 	 */
-	constructor(steps, context = {}) {
+	constructor(steps = [], context = {}) {
+		if (!Array.isArray(steps)) {
+			const received = steps === null ? 'null' : typeof steps;
+			throw new TypeError(
+				`Wizard expected "steps" to be an array, received ${received}.`
+			);
+		}
+
 		this.steps = steps;
 		this.context = context;
 	}
@@ -36,17 +43,25 @@ class Wizard {
 	 * @return {Promise<Object>} The shared context after all steps have run.
 	 */
 	async run() {
+		const tty = isTTY();
+
 		for (let i = 0; i < this.steps.length; i++) {
 			const step = this.steps[i];
 			const label = `[${i + 1}/${this.steps.length}] ${step.name}`;
 
 			if (typeof step.skip === 'function' && step.skip(this.context)) {
-				writeLine(`${ANSI.dim}>> ${label} (skipped)${ANSI.reset}`);
+				writeLine(
+					tty
+						? `${ANSI.dim}>> ${label} (skipped)${ANSI.reset}`
+						: `>> ${label} (skipped)`
+				);
 				continue;
 			}
 
 			writeLine(
-				`\n${ANSI.cyan}>${ANSI.reset} ${ANSI.bold}${label}${ANSI.reset}`
+				tty
+					? `\n${ANSI.cyan}>${ANSI.reset} ${ANSI.bold}${label}${ANSI.reset}`
+					: `\n> ${label}`
 			);
 			await step.run(this.context);
 		}

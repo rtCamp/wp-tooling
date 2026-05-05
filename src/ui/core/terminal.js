@@ -101,7 +101,7 @@ let _lineQueueClosed = false;
 /**
  * Ensure the shared non-TTY line queue is initialised.
  *
- * @return {{ shift: Function, onLine: Function, closed: boolean }} The line queue.
+ * @return {{ shift: Function, readonly closed: boolean }} The line queue.
  */
 function _getLineQueue() {
 	if (_lineQueue) {

@@ -1,7 +1,7 @@
 /**
  * Non-TTY demo -- proves every primitive works when stdin is not a terminal.
  *
- * Run with:  echo "my-project\nsecret\n2\n1,3\n1,4\ny" | node examples/non-tty-demo.js
+ * Run with:  echo "my-project\nsecret\n2\n1,3\n1,4\ny" | node examples/wizard-demo-non-tty.js
  *
  * Each prompt reads one line from piped stdin. No crashes, no hangs.
  */

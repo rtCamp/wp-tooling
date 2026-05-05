@@ -10,6 +10,10 @@ beforeEach(() => {
 	jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
 });
 
+afterEach(() => {
+	jest.restoreAllMocks();
+});
+
 describe('Wizard', () => {
 	it('should run all steps in order', async () => {
 		const order = [];
@@ -110,11 +114,55 @@ describe('Wizard', () => {
 		expect(result.done).toBe(true);
 	});
 
+	it('should default steps to empty array', async () => {
+		const wizard = new Wizard();
+		const result = await wizard.run();
+
+		expect(result).toEqual({});
+	});
+
 	it('should handle an empty steps array', async () => {
 		const wizard = new Wizard([]);
 		const result = await wizard.run();
 
 		expect(result).toEqual({});
+	});
+
+	it('should throw a clear error when steps is not an array', () => {
+		expect(() => new Wizard(null)).toThrow(
+			'Wizard expected "steps" to be an array, received null.'
+		);
+		expect(() => new Wizard({})).toThrow(
+			'Wizard expected "steps" to be an array, received object.'
+		);
+	});
+
+	it('should omit ANSI formatting in non-TTY mode', async () => {
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: false,
+			configurable: true,
+		});
+
+		const wizard = new Wizard([
+			{
+				name: 'Step A',
+				run: async () => {},
+			},
+		]);
+
+		await wizard.run();
+
+		const output = process.stdout.write.mock.calls
+			.map(([text]) => String(text))
+			.join('');
+
+		expect(output).toContain('> [1/1] Step A');
+		expect(output).not.toMatch(/\x1b\[/);
+
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: undefined,
+			configurable: true,
+		});
 	});
 
 	it('should propagate step errors', async () => {

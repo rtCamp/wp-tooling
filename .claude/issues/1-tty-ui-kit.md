@@ -9,7 +9,7 @@
 
 ## Summary
 
-The TTY UI kit is the interactive terminal layer every skeleton's setup wizard and add-module flow depend on. It is consumed via `@rtcamp/wp-tooling/ui`. Built entirely on Node.js built-ins (readline, process.stdout, process.stdin) — zero runtime dependencies. Provides seven public primitives: Wizard, text, confirm, password, checkbox, radio, checkboxTree, and spinner.
+The TTY UI kit is the interactive terminal layer every skeleton's setup wizard and add-module flow depend on. It is consumed via `@rtcamp/wp-tooling/ui`. Built entirely on Node.js built-ins (readline, process.stdout, process.stdin) — zero runtime dependencies. Provides eight public primitives: Wizard, text, confirm, password, checkbox, radio, checkboxTree, and spinner.
 
 ---
 
