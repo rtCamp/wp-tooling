@@ -18,6 +18,32 @@ const {
 } = require('../core/terminal');
 
 /**
+ * Validate grouped checkboxTree input.
+ *
+ * @param {*} groups - The received groups value.
+ * @return {void}
+ */
+function validateGroups(groups) {
+	if (!Array.isArray(groups)) {
+		const received = groups === null ? 'null' : typeof groups;
+		throw new TypeError(
+			`checkboxTree() expected "groups" to be an array, received ${received}.`
+		);
+	}
+
+	for (let i = 0; i < groups.length; i++) {
+		const group = groups[i];
+		const items = group && group.items;
+		if (!Array.isArray(items)) {
+			const received = items === null ? 'null' : typeof items;
+			throw new TypeError(
+				`checkboxTree() expected "groups[${i}].items" to be an array, received ${received}.`
+			);
+		}
+	}
+}
+
+/**
  * Build a flat list of renderable rows from groups.
  *
  * @param {Array<{label: string, items: string[]}>} groups - Grouped items.
@@ -162,9 +188,12 @@ function interactiveCheckboxTree({ message, groups }) {
 				cleanup();
 				showCursor();
 				const result = [];
-				for (const k of selected) {
-					const [g, i] = k.split(':').map(Number);
-					result.push(groups[g].items[i]);
+				for (let g = 0; g < groups.length; g++) {
+					for (let i = 0; i < groups[g].items.length; i++) {
+						if (selected.has(`${g}:${i}`)) {
+							result.push(groups[g].items[i]);
+						}
+					}
 				}
 				resolve(result);
 			} else if (key.ctrl && key.name === 'c') {
@@ -214,10 +243,16 @@ async function plainCheckboxTree({ message, groups }) {
  *
  * @param {Object}                                  options         - Options.
  * @param {string}                                  options.message - Prompt label shown above the tree.
- * @param {Array<{label: string, items: string[]}>} options.groups  - Groups of selectable items.
+ * @param {Array<{label: string, items: string[]}>} options.groups  - Groups of selectable items with array-based "items".
  * @return {Promise<string[]>} Array of selected item labels.
  */
 async function checkboxTree({ message, groups } = {}) {
+	validateGroups(groups);
+
+	if (groups.length === 0) {
+		return [];
+	}
+
 	if (isTTY() && process.stdin.isTTY) {
 		return interactiveCheckboxTree({ message, groups });
 	}

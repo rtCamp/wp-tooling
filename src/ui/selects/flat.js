@@ -18,6 +18,28 @@ const {
 } = require('../core/terminal');
 
 /**
+ * Validate select choices input.
+ *
+ * @param {*}      choices - The received choices value.
+ * @param {string} apiName - Public API name for error context.
+ * @return {void}
+ */
+function validateChoices(choices, apiName) {
+	if (!Array.isArray(choices)) {
+		const received = choices === null ? 'null' : typeof choices;
+		throw new TypeError(
+			`${apiName} expected "choices" to be a non-empty array, received ${received}.`
+		);
+	}
+
+	if (choices.length === 0) {
+		throw new TypeError(
+			`${apiName} expected "choices" to be a non-empty array, received an empty array.`
+		);
+	}
+}
+
+/**
  * Render a flat list of options for TTY interactive selection.
  *
  * @param {Object}   options          - Select options.
@@ -153,10 +175,12 @@ async function plainSelect({ message, choices, multiple }) {
  *
  * @param {Object}   options         - Checkbox options.
  * @param {string}   options.message - The prompt label.
- * @param {string[]} options.choices - Array of choice labels.
+ * @param {string[]} options.choices - Non-empty array of choice labels.
  * @return {Promise<string[]>} Array of selected labels.
  */
 async function checkbox({ message, choices } = {}) {
+	validateChoices(choices, 'checkbox()');
+
 	if (isTTY() && process.stdin.isTTY) {
 		return interactiveSelect({ message, choices, multiple: true });
 	}
@@ -168,10 +192,12 @@ async function checkbox({ message, choices } = {}) {
  *
  * @param {Object}   options         - Radio options.
  * @param {string}   options.message - The prompt label.
- * @param {string[]} options.choices - Array of choice labels.
+ * @param {string[]} options.choices - Non-empty array of choice labels.
  * @return {Promise<string>} The selected label.
  */
 async function radio({ message, choices } = {}) {
+	validateChoices(choices, 'radio()');
+
 	if (isTTY() && process.stdin.isTTY) {
 		return interactiveSelect({ message, choices, multiple: false });
 	}

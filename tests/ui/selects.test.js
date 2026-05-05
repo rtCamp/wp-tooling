@@ -78,6 +78,29 @@ describe('radio (non-TTY)', () => {
 	});
 });
 
+describe('flat select validation', () => {
+	it('should throw when checkbox choices is missing', async () => {
+		await expect(
+			checkbox({
+				message: 'Pick items',
+			})
+		).rejects.toThrow(
+			'checkbox() expected "choices" to be a non-empty array, received undefined.'
+		);
+	});
+
+	it('should throw when radio choices is empty', async () => {
+		await expect(
+			radio({
+				message: 'Pick one',
+				choices: [],
+			})
+		).rejects.toThrow(
+			'radio() expected "choices" to be a non-empty array, received an empty array.'
+		);
+	});
+});
+
 describe('checkboxTree (non-TTY)', () => {
 	it('should return selected items from groups by number', async () => {
 		terminal.readLine.mockResolvedValueOnce('1, 4');
@@ -108,5 +131,104 @@ describe('checkboxTree (non-TTY)', () => {
 		});
 
 		expect(result).toEqual([]);
+	});
+
+	it('should throw when groups is missing', async () => {
+		await expect(
+			checkboxTree({
+				message: 'Select modules',
+			})
+		).rejects.toThrow(
+			'checkboxTree() expected "groups" to be an array, received undefined.'
+		);
+	});
+
+	it('should throw when groups is null', async () => {
+		await expect(
+			checkboxTree({
+				message: 'Select modules',
+				groups: null,
+			})
+		).rejects.toThrow(
+			'checkboxTree() expected "groups" to be an array, received null.'
+		);
+	});
+
+	it('should throw when a group items is not an array', async () => {
+		await expect(
+			checkboxTree({
+				message: 'Select modules',
+				groups: [{ label: 'Utilities' }],
+			})
+		).rejects.toThrow(
+			'checkboxTree() expected "groups[0].items" to be an array, received undefined.'
+		);
+	});
+
+	it('should return an empty array for empty groups without prompting', async () => {
+		const result = await checkboxTree({
+			message: 'Select modules',
+			groups: [],
+		});
+
+		expect(result).toEqual([]);
+		expect(terminal.readLine).not.toHaveBeenCalled();
+	});
+});
+
+describe('checkboxTree (TTY)', () => {
+	it('should resolve selections in display order, not toggle order', async () => {
+		terminal.isTTY.mockReturnValue(true);
+
+		const stdinDescriptor = Object.getOwnPropertyDescriptor(
+			process.stdin,
+			'isTTY'
+		);
+		Object.defineProperty(process.stdin, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
+
+		let keypressHandler;
+		terminal.onKeypress.mockImplementation((handler) => {
+			keypressHandler = handler;
+			return () => {};
+		});
+
+		try {
+			const selectionPromise = checkboxTree({
+				message: 'Select modules',
+				groups: [
+					{ label: 'Utilities', items: ['cache', 'logger'] },
+					{ label: 'Integrations', items: ['algolia', 'scheduler'] },
+				],
+			});
+
+			keypressHandler(null, { name: 'down' });
+			keypressHandler(null, { name: 'down' });
+			keypressHandler(null, { name: 'down' });
+			keypressHandler(null, { name: 'down' });
+			keypressHandler(null, { name: 'down' });
+			keypressHandler(null, { name: 'space' });
+
+			keypressHandler(null, { name: 'up' });
+			keypressHandler(null, { name: 'up' });
+			keypressHandler(null, { name: 'up' });
+			keypressHandler(null, { name: 'up' });
+			keypressHandler(null, { name: 'space' });
+
+			keypressHandler(null, { name: 'return' });
+
+			await expect(selectionPromise).resolves.toEqual([
+				'cache',
+				'scheduler',
+			]);
+		} finally {
+			if (stdinDescriptor) {
+				Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+			} else {
+				delete process.stdin.isTTY;
+			}
+		}
 	});
 });
