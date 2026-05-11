@@ -142,31 +142,109 @@ function gitDiffFiles(explicitBase) {
  * Determine the diff base ref from environment.
  *
  * - `GITHUB_BASE_REF` set (PR mode): fetch then use `origin/<base>`.
- * - Otherwise (push mode): use `HEAD~1`.
+ * - Otherwise (push mode): prefer the push event's `before` SHA from
+ *   `$GITHUB_EVENT_PATH`; fall back to deepening history and using `HEAD~1`.
  *
  * @return {string} The git ref to diff against `HEAD`.
  */
 function resolveBaseRef() {
 	const baseRef = process.env.GITHUB_BASE_REF;
-	if (!baseRef) {
-		return 'HEAD~1';
+	if (baseRef) {
+		try {
+			execFileSync(
+				'git',
+				['fetch', '--depth=1', '--no-tags', 'origin', baseRef],
+				{ stdio: ['ignore', 'ignore', 'pipe'] }
+			);
+		} catch (err) {
+			const detail = (err.stderr || err.message || '').toString().trim();
+			process.stderr.write(
+				`detect-changes: git fetch origin ${baseRef} failed (${detail}).\n`
+			);
+		}
+		return `origin/${baseRef}`;
 	}
+
+	const beforeSha = readPushBeforeSha();
+	if (beforeSha) {
+		try {
+			execFileSync(
+				'git',
+				['fetch', '--depth=1', '--no-tags', 'origin', beforeSha],
+				{ stdio: ['ignore', 'ignore', 'pipe'] }
+			);
+			return beforeSha;
+		} catch (err) {
+			const detail = (err.stderr || err.message || '').toString().trim();
+			process.stderr.write(
+				`detect-changes: git fetch origin ${beforeSha} failed (${detail}). Falling back to HEAD~1.\n`
+			);
+		}
+	}
+
 	try {
-		execFileSync(
-			'git',
-			['fetch', '--depth=1', '--no-tags', 'origin', baseRef],
-			{ stdio: ['ignore', 'ignore', 'pipe'] }
-		);
+		execFileSync('git', ['fetch', '--deepen=1', '--no-tags'], {
+			stdio: ['ignore', 'ignore', 'pipe'],
+		});
 	} catch (err) {
 		const detail = (err.stderr || err.message || '').toString().trim();
 		process.stderr.write(
-			`detect-changes: git fetch origin ${baseRef} failed (${detail}).\n`
+			`detect-changes: git fetch --deepen=1 failed (${detail}).\n`
 		);
 	}
-	return `origin/${baseRef}`;
+	return 'HEAD~1';
+}
+
+/**
+ * Read the push event's `before` SHA from the GitHub event payload.
+ *
+ * `$GITHUB_EVENT_PATH` points at a JSON file containing the webhook payload.
+ * For `push` events, `payload.before` is the pre-push commit SHA. An all-zeros
+ * SHA indicates the initial push of a new branch — treated as unavailable.
+ *
+ * @return {string|null} The before-SHA, or `null` if unavailable.
+ */
+function readPushBeforeSha() {
+	const eventPath = process.env.GITHUB_EVENT_PATH;
+	if (!eventPath) {
+		return null;
+	}
+	try {
+		const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+		const before = payload && payload.before;
+		if (typeof before !== 'string' || before.length === 0) {
+			return null;
+		}
+		if (/^0+$/.test(before)) {
+			return null;
+		}
+		return before;
+	} catch {
+		return null;
+	}
 }
 
 const VALID_OUTPUTS = ['text', 'json', 'github'];
+
+/**
+ * Consume the argv slot at `index` as a value for `flag`.
+ *
+ * Rejects missing values and values that look like another flag (anything
+ * starting with `-` other than the literal `-`, which is the stdin marker
+ * used by `--files`).
+ *
+ * @param {string[]} argv
+ * @param {number}   index Position of the value (i.e. the slot after the flag).
+ * @param {string}   flag  Flag name, for the error message.
+ * @return {string} The validated value.
+ */
+function takeValue(argv, index, flag) {
+	const value = argv[index];
+	if (value === undefined || (value.startsWith('-') && value !== '-')) {
+		throw new Error(`missing value for ${flag}`);
+	}
+	return value;
+}
 
 /**
  * Parse argv (without leading `node` and script path).
@@ -181,16 +259,16 @@ function parseArgs(argv) {
 		const arg = argv[i];
 		switch (arg) {
 			case '--output':
-				opts.output = argv[++i];
+				opts.output = takeValue(argv, ++i, '--output');
 				break;
 			case '--ignore':
-				opts.ignore = argv[++i];
+				opts.ignore = takeValue(argv, ++i, '--ignore');
 				break;
 			case '--base':
-				opts.base = argv[++i];
+				opts.base = takeValue(argv, ++i, '--base');
 				break;
 			case '--files':
-				opts.filesArg = argv[++i];
+				opts.filesArg = takeValue(argv, ++i, '--files');
 				break;
 			case '--dry-run':
 				opts.dryRun = true;
@@ -303,6 +381,17 @@ function runCli(argv) {
 			`detect-changes: invalid --output "${opts.output}" (expected one of: ${VALID_OUTPUTS.join(', ')})\n`
 		);
 		return 2;
+	}
+
+	if (typeof opts.ignore === 'string' && opts.ignore !== '') {
+		try {
+			new RegExp(opts.ignore);
+		} catch (err) {
+			process.stderr.write(
+				`detect-changes: invalid --ignore regex "${opts.ignore}" (${err.message})\n`
+			);
+			return 2;
+		}
 	}
 
 	let files;
