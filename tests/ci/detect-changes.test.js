@@ -398,4 +398,53 @@ describe('runCli', () => {
 		expect(code).toBe(1);
 		expect(stderrChunks.join('')).toMatch(/cannot read file list/);
 	});
+
+	test('--files followed by another flag exits 2 (does not swallow the flag)', () => {
+		const code = runCli(['--files', '--output', 'json']);
+		expect(code).toBe(2);
+		expect(stderrChunks.join('')).toMatch(/missing value for --files/);
+	});
+
+	test('--files at end of argv exits 2', () => {
+		const code = runCli(['--files']);
+		expect(code).toBe(2);
+		expect(stderrChunks.join('')).toMatch(/missing value for --files/);
+	});
+
+	test('--ignore followed by another flag exits 2', () => {
+		const code = runCli(['--ignore', '--output', 'json']);
+		expect(code).toBe(2);
+		expect(stderrChunks.join('')).toMatch(/missing value for --ignore/);
+	});
+
+	test('--files - is accepted as the stdin sentinel (parser does not reject lone dash)', () => {
+		// Pair with --help so runCli short-circuits before readFilesArg
+		// would block on a real stdin read.
+		const code = runCli(['--files', '-', '--help']);
+		expect(code).toBe(0);
+		expect(stderrChunks.join('')).not.toMatch(/missing value/);
+		expect(stdoutChunks.join('')).toMatch(/Usage: detect-changes/);
+	});
+
+	test('invalid --ignore regex exits 2 with a clean usage error', () => {
+		const f = tmpFile('files.txt', 'src/foo.js\n');
+		try {
+			const code = runCli([
+				'--files',
+				f,
+				'--ignore',
+				'[',
+				'--output',
+				'json',
+			]);
+			expect(code).toBe(2);
+			expect(stderrChunks.join('')).toMatch(
+				/invalid --ignore regex "\["/
+			);
+			// And no JSON output should have been emitted.
+			expect(stdoutChunks.join('')).toBe('');
+		} finally {
+			fs.unlinkSync(f);
+		}
+	});
 });

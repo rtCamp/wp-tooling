@@ -26,6 +26,9 @@ Consolidate the per-skeleton modified-files helper into `@rtcamp/wp-tooling/ci`,
 - [2026-05-08] DEFAULT_IGNORE has no trailing `\/` after the lookaheads. The original issue body proposed `\.github\/(?!workflows)(?!actions)\/|...` (with trailing slash); that pattern fails for non-nested ignores like `.github/dependabot.yml` or `.github/CODEOWNERS`. Dropped the slash; tests covered it.
 - [2026-05-08] On any git failure (shallow clone, missing ref) the script writes a clear stderr message and returns an empty file list. Workflow does not crash on a misconfigured checkout; it just gates everything as "no changes" and surfaces the reason.
 - [2026-05-08] `--output github` warns rather than errors when `$GITHUB_OUTPUT` is unset, so local testing of the github mode does not blow up.
+- [2026-05-11] Post-review fix (push-mode diff base): `resolveBaseRef()` now prefers `payload.before` from `$GITHUB_EVENT_PATH` for push events and falls back to `git fetch --deepen=1` before returning `HEAD~1`. The original `HEAD~1`-only fallback failed silently under `actions/checkout`'s default `fetch-depth: 1`, producing all-zero counts and exit 0 — CI would skip jobs on real changes.
+- [2026-05-11] Post-review fix (argv values): `parseArgs` routes every value-taking flag (`--output`, `--ignore`, `--base`, `--files`) through a shared `takeValue` helper that rejects missing values and adjacent flags. Caught `--files --output json` (was swallowing `--output` as the file path) and `--files` at end-of-argv (was silently falling back to git-diff mode). Literal `-` still accepted as the stdin sentinel.
+- [2026-05-11] Post-review fix (invalid `--ignore` regex): `runCli` validates the regex eagerly at the CLI boundary, returning a one-line `detect-changes: invalid --ignore regex "..."` with exit 2 instead of the raw Node `SyntaxError` stack. Library `resolveIgnore` behaviour unchanged — bad regex strings still surface as real errors to programmer callers.
 
 ---
 
@@ -36,7 +39,7 @@ Consolidate the per-skeleton modified-files helper into `@rtcamp/wp-tooling/ci`,
 - `src/ci/detect-changes.js` — new (library + `runCli` for the dispatcher)
 - `src/ci/index.js` — new (barrel)
 - `tests/cli/index.test.js` — new (11 tests)
-- `tests/ci/detect-changes.test.js` — new (30 tests)
+- `tests/ci/detect-changes.test.js` — new (35 tests)
 - `CHANGELOG.md` — new (Unreleased entry)
 - `.claude/issues/6-detect-changes.md` — new (this file)
 
