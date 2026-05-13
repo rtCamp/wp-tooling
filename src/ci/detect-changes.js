@@ -33,20 +33,14 @@ const DEFAULT_IGNORE =
 	/\.github\/(?!workflows)(?!actions)|\.wordpress-org\/|docs\//;
 
 /**
- * Compute per-bucket change counts for a list of files.
+ * Compute per-bucket change counts (and optionally file lists) for a set of files.
  *
  * @param {Object}             [options]
- * @param {string[]|string}    [options.files]  Newline-delimited string or array. Omit to run `git diff`.
- * @param {RegExp|string|null} [options.ignore] Override default ignore regex. `null` disables ignoring.
- * @param {string}             [options.base]   Override the diff base ref.
- * @return {{
- *   'total-count': number,
- *   'ignored-count': number,
- *   'css-count': number,
- *   'js-count': number,
- *   'php-count': number,
- *   'gha-count': number,
- * }} Counts.
+ * @param {string[]|string}    [options.files]        Newline-delimited string or array. Omit to run `git diff`.
+ * @param {RegExp|string|null} [options.ignore]       Override default ignore regex. `null` disables ignoring.
+ * @param {string}             [options.base]         Override the diff base ref.
+ * @param {boolean}            [options.includeFiles] When true, include `<bucket>-files` arrays alongside counts.
+ * @return {Object} Counts keyed `<bucket>-count`. When `includeFiles` is true, matching `<bucket>-files` arrays are included.
  */
 function detectChanges(options = {}) {
 	const ignore = resolveIgnore(options.ignore);
@@ -58,17 +52,32 @@ function detectChanges(options = {}) {
 	const ignored = ignore ? files.filter((f) => ignore.test(f)) : [];
 	const relevant = ignore ? files.filter((f) => !ignore.test(f)) : files;
 
-	return {
+	const buckets = {
+		css: relevant.filter((f) => DEFAULT_PATTERNS.css.test(f)),
+		js: relevant.filter((f) => DEFAULT_PATTERNS.js.test(f)),
+		php: relevant.filter((f) => DEFAULT_PATTERNS.php.test(f)),
+		gha: relevant.filter((f) => DEFAULT_PATTERNS.gha.test(f)),
+	};
+
+	const result = {
 		'total-count': relevant.length,
 		'ignored-count': ignored.length,
-		'css-count': relevant.filter((f) => DEFAULT_PATTERNS.css.test(f))
-			.length,
-		'js-count': relevant.filter((f) => DEFAULT_PATTERNS.js.test(f)).length,
-		'php-count': relevant.filter((f) => DEFAULT_PATTERNS.php.test(f))
-			.length,
-		'gha-count': relevant.filter((f) => DEFAULT_PATTERNS.gha.test(f))
-			.length,
+		'css-count': buckets.css.length,
+		'js-count': buckets.js.length,
+		'php-count': buckets.php.length,
+		'gha-count': buckets.gha.length,
 	};
+
+	if (options.includeFiles) {
+		result['total-files'] = relevant;
+		result['ignored-files'] = ignored;
+		result['css-files'] = buckets.css;
+		result['js-files'] = buckets.js;
+		result['php-files'] = buckets.php;
+		result['gha-files'] = buckets.gha;
+	}
+
+	return result;
 }
 
 /**
@@ -273,6 +282,9 @@ function parseArgs(argv) {
 			case '--dry-run':
 				opts.dryRun = true;
 				break;
+			case '--include-files':
+				opts.includeFiles = true;
+				break;
 			case '--help':
 			case '-h':
 				opts.help = true;
@@ -298,21 +310,56 @@ function readFilesArg(filesArg) {
 	return fs.readFileSync(filesArg, 'utf8');
 }
 
+/** GHA heredoc delimiter. File paths cannot contain newlines, so a fixed sentinel is safe. */
+const GHA_HEREDOC = 'EOF_WP_TOOLING';
+
 /**
- * Emit counts in the requested output mode.
+ * Render one `$GITHUB_OUTPUT` line for a scalar or array value.
  *
- * @param {Object}  counts
+ * Arrays use the GitHub Actions heredoc syntax for multi-line outputs.
+ * Empty arrays render as `key=` (no heredoc) for compactness.
+ *
+ * @param {string}                 key
+ * @param {number|string|string[]} value
+ * @return {string} Formatted `key=value` or heredoc block ready to append to `$GITHUB_OUTPUT`.
+ */
+function formatGithubLine(key, value) {
+	if (Array.isArray(value)) {
+		if (value.length === 0) {
+			return `${key}=`;
+		}
+		return `${key}<<${GHA_HEREDOC}\n${value.join('\n')}\n${GHA_HEREDOC}`;
+	}
+	return `${key}=${value}`;
+}
+
+/**
+ * Render one text-mode line. Arrays are space-joined.
+ *
+ * @param {string}                 key
+ * @param {number|string|string[]} value
+ * @return {string} Formatted `key: value` line for human-readable output.
+ */
+function formatTextLine(key, value) {
+	const rendered = Array.isArray(value) ? value.join(' ') : String(value);
+	return `${key}: ${rendered}`;
+}
+
+/**
+ * Emit the result in the requested output mode.
+ *
+ * @param {Object}  result
  * @param {string}  mode
  * @param {boolean} [dryRun=false] In `github` mode, preview to stdout instead of writing the file.
  */
-function emit(counts, mode, dryRun = false) {
+function emit(result, mode, dryRun = false) {
 	if (mode === 'json') {
-		process.stdout.write(JSON.stringify(counts) + '\n');
+		process.stdout.write(JSON.stringify(result) + '\n');
 		return;
 	}
 	if (mode === 'github') {
-		const lines = Object.entries(counts)
-			.map(([k, v]) => `${k}=${v}`)
+		const lines = Object.entries(result)
+			.map(([k, v]) => formatGithubLine(k, v))
 			.join('\n');
 		if (dryRun) {
 			process.stdout.write(
@@ -330,8 +377,8 @@ function emit(counts, mode, dryRun = false) {
 		fs.appendFileSync(dest, lines + '\n');
 		return;
 	}
-	for (const [key, value] of Object.entries(counts)) {
-		process.stdout.write(`${key}: ${value}\n`);
+	for (const [key, value] of Object.entries(result)) {
+		process.stdout.write(formatTextLine(key, value) + '\n');
 	}
 }
 
@@ -349,6 +396,7 @@ function printUsage() {
 			'  --base <ref>                  Override the diff base ref.',
 			'  --files <path|->              Read newline-delimited file list from a path',
 			'                                or stdin (`-`); skip git entirely.',
+			'  --include-files               Include the matching file paths per bucket in the output.',
 			'  --dry-run                     With --output github, preview to stdout (no file write).',
 			'  --help, -h                    Print this help.',
 			'',
@@ -406,13 +454,14 @@ function runCli(argv) {
 		}
 	}
 
-	const counts = detectChanges({
+	const result = detectChanges({
 		files,
 		ignore: opts.ignore,
 		base: opts.base,
+		includeFiles: opts.includeFiles === true,
 	});
 
-	emit(counts, opts.output, opts.dryRun === true);
+	emit(result, opts.output, opts.dryRun === true);
 	return 0;
 }
 

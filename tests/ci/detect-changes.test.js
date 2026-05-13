@@ -163,6 +163,47 @@ describe('detectChanges', () => {
 		});
 		expect(r['gha-count']).toBe(1);
 	});
+
+	test('includeFiles adds <bucket>-files arrays alongside counts', () => {
+		const r = detectChanges({
+			files: [
+				'src/foo.js',
+				'src/style.scss',
+				'plugin.php',
+				'.github/workflows/test.yml',
+				'docs/x.md',
+			],
+			includeFiles: true,
+		});
+		expect(r['total-files']).toEqual([
+			'src/foo.js',
+			'src/style.scss',
+			'plugin.php',
+			'.github/workflows/test.yml',
+		]);
+		expect(r['ignored-files']).toEqual(['docs/x.md']);
+		expect(r['css-files']).toEqual(['src/style.scss']);
+		expect(r['js-files']).toEqual(['src/foo.js']);
+		expect(r['php-files']).toEqual(['plugin.php']);
+		expect(r['gha-files']).toEqual(['.github/workflows/test.yml']);
+	});
+
+	test('includeFiles omitted leaves the result counts-only', () => {
+		const r = detectChanges({ files: ['src/foo.js'] });
+		expect(r).not.toHaveProperty('css-files');
+		expect(r).not.toHaveProperty('total-files');
+		expect(r).not.toHaveProperty('ignored-files');
+	});
+
+	test('includeFiles preserves the same file in multiple buckets', () => {
+		const r = detectChanges({
+			files: ['package-lock.json'],
+			includeFiles: true,
+		});
+		expect(r['css-files']).toEqual(['package-lock.json']);
+		expect(r['js-files']).toEqual(['package-lock.json']);
+		expect(r['php-files']).toEqual([]);
+	});
 });
 
 describe('exports', () => {
@@ -424,6 +465,112 @@ describe('runCli', () => {
 		expect(code).toBe(0);
 		expect(stderrChunks.join('')).not.toMatch(/missing value/);
 		expect(stdoutChunks.join('')).toMatch(/Usage: detect-changes/);
+	});
+
+	test('--include-files in json mode emits <bucket>-files arrays', () => {
+		const f = tmpFile('files.txt', 'src/a.js\nsrc/b.scss\ndocs/x.md\n');
+		try {
+			const code = runCli([
+				'--files',
+				f,
+				'--include-files',
+				'--output',
+				'json',
+			]);
+			expect(code).toBe(0);
+			const parsed = JSON.parse(stdoutChunks.join(''));
+			expect(parsed['total-count']).toBe(2);
+			expect(parsed['total-files']).toEqual(['src/a.js', 'src/b.scss']);
+			expect(parsed['ignored-files']).toEqual(['docs/x.md']);
+			expect(parsed['js-files']).toEqual(['src/a.js']);
+			expect(parsed['css-files']).toEqual(['src/b.scss']);
+			expect(parsed['php-files']).toEqual([]);
+			expect(parsed['gha-files']).toEqual([]);
+		} finally {
+			fs.unlinkSync(f);
+		}
+	});
+
+	test('--include-files in text mode prints space-joined paths', () => {
+		const f = tmpFile('files.txt', 'src/a.js\nsrc/b.js\n');
+		try {
+			const code = runCli(['--files', f, '--include-files']);
+			expect(code).toBe(0);
+			const out = stdoutChunks.join('');
+			expect(out).toMatch(/js-files: src\/a\.js src\/b\.js/);
+			expect(out).toMatch(/css-files: (?:\r?\n|$)/m);
+		} finally {
+			fs.unlinkSync(f);
+		}
+	});
+
+	test('--include-files in github mode writes heredoc multi-line outputs', () => {
+		const filesPath = tmpFile('files.txt', 'src/a.js\nsrc/b.scss\n');
+		const outPath = tmpFile('out.txt', '');
+		const prev = process.env.GITHUB_OUTPUT;
+		process.env.GITHUB_OUTPUT = outPath;
+		try {
+			const code = runCli([
+				'--files',
+				filesPath,
+				'--include-files',
+				'--output',
+				'github',
+			]);
+			expect(code).toBe(0);
+			const written = fs.readFileSync(outPath, 'utf8');
+			expect(written).toMatch(/total-count=2/);
+			expect(written).toMatch(
+				/js-files<<EOF_WP_TOOLING\nsrc\/a\.js\nEOF_WP_TOOLING/
+			);
+			expect(written).toMatch(
+				/css-files<<EOF_WP_TOOLING\nsrc\/b\.scss\nEOF_WP_TOOLING/
+			);
+			// Empty buckets serialise compactly as `key=` (no heredoc).
+			expect(written).toMatch(/php-files=\n/);
+			expect(written).toMatch(/gha-files=\n/);
+		} finally {
+			if (prev === undefined) {
+				delete process.env.GITHUB_OUTPUT;
+			} else {
+				process.env.GITHUB_OUTPUT = prev;
+			}
+			fs.unlinkSync(filesPath);
+			fs.unlinkSync(outPath);
+		}
+	});
+
+	test('--include-files dry-run previews heredoc blocks without writing', () => {
+		const filesPath = tmpFile('files.txt', 'src/a.js\n');
+		const outPath = tmpFile('out.txt', 'pre-existing\n');
+		const before = fs.readFileSync(outPath, 'utf8');
+		const prev = process.env.GITHUB_OUTPUT;
+		process.env.GITHUB_OUTPUT = outPath;
+		try {
+			const code = runCli([
+				'--dry-run',
+				'--include-files',
+				'--files',
+				filesPath,
+				'--output',
+				'github',
+			]);
+			expect(code).toBe(0);
+			expect(fs.readFileSync(outPath, 'utf8')).toBe(before);
+			const out = stdoutChunks.join('');
+			expect(out).toMatch(/\[dry-run\] would append/);
+			expect(out).toMatch(
+				/js-files<<EOF_WP_TOOLING\nsrc\/a\.js\nEOF_WP_TOOLING/
+			);
+		} finally {
+			if (prev === undefined) {
+				delete process.env.GITHUB_OUTPUT;
+			} else {
+				process.env.GITHUB_OUTPUT = prev;
+			}
+			fs.unlinkSync(filesPath);
+			fs.unlinkSync(outPath);
+		}
 	});
 
 	test('invalid --ignore regex exits 2 with a clean usage error', () => {
