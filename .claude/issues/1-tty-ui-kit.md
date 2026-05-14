@@ -153,3 +153,20 @@ Ran all test suites.
 - No banned dependencies used.
 - ASCII-only symbols throughout -- no Unicode emojis.
 - Stub files for other sub-exports (scaffolds, release, hooks, ci, version-monitor, lint) are not included; those belong to their own issues.
+
+## Handoff log
+
+### ← Handoff IN · 2026-05-14 · @Adi-ty
+
+- **Confirmed reproducibility:** `npm run check` → exit 0; 4 test suites pass, lint clean. HEAD at `523f58f`.
+- **Starting point:** PR #3 has `CHANGES_REQUESTED` from @bhavz-10 (2026-05-08) that is still outstanding. Picking up:
+    - Cancellation inconsistency — `text()` and `confirm()` go through `readLine()` and resolve `''` / default on
+Ctrl+C; `password` already throws `CancelledError`. Make `text` and `confirm` reject with `CancelledError` to match.
+    - `text` / `confirm` / `password` only accept an options object — `text('Name')` prompts with `undefined`. Add a
+string-form shortcut (or throw a clear `TypeError`).
+    - Sub-export stubs flagged HIGH by Copilot are still missing. `package.json` `exports` map points at
+`./src/{scaffolds,release,hooks,ci,version-monitor,lint/*}` — those files don't exist, so
+`require('@rtcamp/wp-tooling/scaffolds')` etc. fails at runtime. Decide: add the seven stubs (matches acceptance
+criteria) vs. trim exports map to only `./ui` until each sub-package lands.
+- **Deviations from plan above:** N/A — no `/handoff out` was recorded by @abhishekxix before rotation. Outgoing
+context reconstructed from PR #3 review thread and `.claude/issues/1-tty-ui-kit.md` history.
