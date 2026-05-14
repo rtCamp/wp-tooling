@@ -27,6 +27,7 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - [2026-05-05] `checkboxTree` returns empty array for empty groups without prompting.
 - [2026-05-14] `readLine` rejects with `CancelledError` on SIGINT (Ctrl+C) in TTY mode. Reason: without an explicit SIGINT listener, `readline.createInterface` only pauses on Ctrl+C — `text` and `confirm` would silently resolve `''` / default instead of surfacing cancellation. Centralising the fix in `readLine` keeps `text`, `confirm`, and any future prompt that routes through it consistent with `password`.
 - [2026-05-14] `text`, `confirm`, and `password` accept either a string message shortcut or a full options object. Reason: `text('Name?')` previously destructured the string and prompted with `undefined`. Normalising at the function boundary (`normaliseOptions`) keeps the options-object path untouched.
+- [2026-05-14] Added seven sub-export stubs (`scaffolds`, `release`, `hooks`, `ci`, `version-monitor`, `lint/eslint`, `lint/stylelint`) so the `package.json` `exports` map resolves end-to-end.
 
 ---
 
@@ -48,6 +49,13 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - `src/ui/spinner/index.js` -- new (spinner with TTY/non-TTY modes)
 - `src/ui/errors.js` -- new (CancelledError class)
 - `src/ui/wizard/index.js` -- new (Wizard class)
+- `src/scaffolds/index.js` -- new stub (added 2026-05-14)
+- `src/release/index.js` -- new stub (added 2026-05-14)
+- `src/hooks/index.js` -- new stub (added 2026-05-14)
+- `src/ci/index.js` -- new stub (added 2026-05-14)
+- `src/version-monitor/index.js` -- new stub (added 2026-05-14)
+- `src/lint/eslint.js` -- new stub (added 2026-05-14)
+- `src/lint/stylelint.js` -- new stub (added 2026-05-14)
 - `tests/ui/prompts.test.js` -- new; +6 tests on 2026-05-14 (string shortcuts and cancellation propagation)
 - `tests/ui/selects.test.js` -- new
 - `tests/ui/spinner.test.js` -- new
@@ -167,7 +175,7 @@ function
 - String-message shortcut accepted by `text`, `confirm`, `password` — addresses @bhavz-10 review point that `text('Name')` previously prompted with `undefined`.
 - No banned dependencies used.
 - ASCII-only symbols throughout -- no Unicode emojis.
-- Stub files for other sub-exports (scaffolds, release, hooks, ci, version-monitor, lint) are not included; those belong to their own issues.
+- Stub files for the other seven sub-exports (`scaffolds`, `release`, `hooks`, `ci`, `version-monitor`, `lint/eslint`, `lint/stylelint`) are included as `module.exports = {}` so the `package.json` `exports` map resolves end-to-end. Each will be replaced by the feature PR that owns the sub-package.
 
 ## Handoff log
 
