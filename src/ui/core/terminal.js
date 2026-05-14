@@ -6,6 +6,7 @@
 'use strict';
 
 const readline = require('readline');
+const { CancelledError } = require('../errors');
 
 /** ANSI escape sequences. */
 const ANSI = {
@@ -158,7 +159,10 @@ function _getLineQueue() {
 /**
  * Read a single line from stdin.
  *
- * In TTY mode a fresh readline interface asks the user a question.
+ * In TTY mode a fresh readline interface asks the user a question. Ctrl+C
+ * rejects the returned promise with `CancelledError` so callers can treat
+ * cancellation distinctly from empty input.
+ *
  * In non-TTY (piped) mode a shared line queue is used so that
  * successive calls do not discard buffered input.
  *
@@ -173,20 +177,32 @@ function readLine(prompt) {
 	}
 
 	// TTY: interactive question per call.
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		const rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout,
 		});
 		let answered = false;
+		let cancelled = false;
+
+		// Without an explicit SIGINT listener, readline only pauses on Ctrl+C.
+		// We catch it, mark the call cancelled, and let the close handler reject.
+		rl.on('SIGINT', () => {
+			cancelled = true;
+			rl.close();
+		});
+
 		rl.question(prompt, (answer) => {
 			answered = true;
 			rl.close();
 			resolve(answer);
 		});
-		// If stdin closes without input, resolve with empty string.
+
 		rl.once('close', () => {
-			if (!answered) {
+			if (cancelled) {
+				writeLine();
+				reject(new CancelledError());
+			} else if (!answered) {
 				resolve('');
 			}
 		});

@@ -57,6 +57,21 @@ describe('text', () => {
 		expect(result).toBe('valid');
 		expect(terminal.readLine).toHaveBeenCalledTimes(2);
 	});
+
+	it('should accept a string message shortcut', async () => {
+		terminal.readLine.mockResolvedValueOnce('hello');
+		const result = await text('Name?');
+		expect(result).toBe('hello');
+		// Prompt rendered should reference the string message, not undefined.
+		expect(terminal.readLine.mock.calls[0][0]).toContain('Name?');
+	});
+
+	it('should propagate CancelledError from readLine', async () => {
+		terminal.readLine.mockRejectedValueOnce(new CancelledError());
+		await expect(text({ message: 'Name?' })).rejects.toThrow(
+			CancelledError
+		);
+	});
 });
 
 describe('confirm', () => {
@@ -92,6 +107,20 @@ describe('confirm', () => {
 		const result = await confirm({ message: 'Continue?' });
 		expect(result).toBe(false);
 	});
+
+	it('should accept a string message shortcut', async () => {
+		terminal.readLine.mockResolvedValueOnce('y');
+		const result = await confirm('Continue?');
+		expect(result).toBe(true);
+		expect(terminal.readLine.mock.calls[0][0]).toContain('Continue?');
+	});
+
+	it('should propagate CancelledError from readLine', async () => {
+		terminal.readLine.mockRejectedValueOnce(new CancelledError());
+		await expect(confirm({ message: 'Continue?' })).rejects.toThrow(
+			CancelledError
+		);
+	});
 });
 
 describe('password', () => {
@@ -101,6 +130,14 @@ describe('password', () => {
 
 		const result = await password({ message: 'Password' });
 		expect(result).toBe('secret123');
+	});
+
+	it('should accept a string message shortcut', async () => {
+		terminal.isTTY.mockReturnValue(false);
+		terminal.readLine.mockResolvedValueOnce('shhh');
+		const result = await password('Token?');
+		expect(result).toBe('shhh');
+		expect(terminal.readLine.mock.calls[0][0]).toContain('Token?');
 	});
 
 	it('should reject with CancelledError on Ctrl+C', async () => {

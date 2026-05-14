@@ -16,15 +16,32 @@ const {
 const { CancelledError } = require('../errors');
 
 /**
+ * Normalise a prompt argument that may be passed as either a string message
+ * shortcut or a full options object.
+ *
+ * @param {string|Object} options - String message, or full options object.
+ * @return {Object} A normalised options object.
+ */
+function normaliseOptions(options) {
+	if (typeof options === 'string') {
+		return { message: options };
+	}
+	return options || {};
+}
+
+/**
  * Prompt the user for a text value.
  *
- * @param {Object}   options                - Prompt options.
- * @param {string}   options.message        - The label / question to display.
- * @param {string}   [options.defaultValue] - Default value if the user presses Enter without typing.
- * @param {Function} [options.validate]     - Validation function. Return a string message on failure, or undefined on success.
+ * Accepts either a string shortcut (`text('Name?')`) or a full options object.
+ *
+ * @param {string|Object} options                - String message, or options object.
+ * @param {string}        options.message        - The label / question to display.
+ * @param {string}        [options.defaultValue] - Default value if the user presses Enter without typing.
+ * @param {Function}      [options.validate]     - Validation function. Return a string message on failure, or undefined on success.
  * @return {Promise<string>} The user's input.
  */
-async function text({ message, defaultValue, validate } = {}) {
+async function text(options) {
+	const { message, defaultValue, validate } = normaliseOptions(options);
 	const defaultHint =
 		defaultValue !== undefined
 			? ` ${ANSI.dim}(${defaultValue})${ANSI.reset}`
@@ -51,12 +68,15 @@ async function text({ message, defaultValue, validate } = {}) {
 /**
  * Prompt the user for a yes/no confirmation.
  *
- * @param {Object}  options                      - Prompt options.
- * @param {string}  options.message              - The label / question to display.
- * @param {boolean} [options.defaultValue=false] - Default if the user presses Enter.
+ * Accepts either a string shortcut (`confirm('Continue?')`) or a full options object.
+ *
+ * @param {string|Object} options                      - String message, or options object.
+ * @param {string}        options.message              - The label / question to display.
+ * @param {boolean}       [options.defaultValue=false] - Default if the user presses Enter.
  * @return {Promise<boolean>} True for yes, false for no.
  */
-async function confirm({ message, defaultValue = false } = {}) {
+async function confirm(options) {
+	const { message, defaultValue = false } = normaliseOptions(options);
 	const hint = defaultValue ? 'Y/n' : 'y/N';
 	const prompt = isTTY()
 		? `${ANSI.cyan}?${ANSI.reset} ${ANSI.bold}${message}${ANSI.reset} ${ANSI.dim}(${hint})${ANSI.reset} `
@@ -75,13 +95,15 @@ async function confirm({ message, defaultValue = false } = {}) {
  * Prompt the user for a password (masked input).
  *
  * In non-TTY mode, reads from stdin as plain text (no masking possible).
+ * Accepts either a string shortcut (`password('Token?')`) or a full options object.
  *
- * @param {Object} options            - Prompt options.
- * @param {string} options.message    - The label / question to display.
- * @param {string} [options.mask='*'] - Character used to mask each typed character.
+ * @param {string|Object} options            - String message, or options object.
+ * @param {string}        options.message    - The label / question to display.
+ * @param {string}        [options.mask='*'] - Character used to mask each typed character.
  * @return {Promise<string>} The entered password.
  */
-async function password({ message, mask = '*' } = {}) {
+async function password(options) {
+	const { message, mask = '*' } = normaliseOptions(options);
 	if (!isTTY() || !process.stdin.isTTY) {
 		return readLine(`${message}: `);
 	}

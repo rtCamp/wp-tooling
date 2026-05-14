@@ -25,6 +25,8 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - [2026-05-05] Wizard validates `steps` is an array, defaults to empty array on `undefined`, and omits ANSI formatting in non-TTY.
 - [2026-05-05] `CancelledError` added -- thrown on Ctrl+C in any TTY prompt or select.
 - [2026-05-05] `checkboxTree` returns empty array for empty groups without prompting.
+- [2026-05-14] `readLine` rejects with `CancelledError` on SIGINT (Ctrl+C) in TTY mode. Reason: without an explicit SIGINT listener, `readline.createInterface` only pauses on Ctrl+C — `text` and `confirm` would silently resolve `''` / default instead of surfacing cancellation. Centralising the fix in `readLine` keeps `text`, `confirm`, and any future prompt that routes through it consistent with `password`.
+- [2026-05-14] `text`, `confirm`, and `password` accept either a string message shortcut or a full options object. Reason: `text('Name?')` previously destructured the string and prompted with `undefined`. Normalising at the function boundary (`normaliseOptions`) keeps the options-object path untouched.
 
 ---
 
@@ -39,14 +41,14 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 - `examples/wizard-demo.js` -- new (full wizard + all primitives demo)
 - `examples/wizard-demo-non-tty.js` -- new (piped stdin non-TTY demo)
 - `src/ui/index.js` -- new (barrel export)
-- `src/ui/core/terminal.js` -- new (ANSI codes, cursor, keypress, readLine)
-- `src/ui/prompts/index.js` -- new (text, confirm, password)
+- `src/ui/core/terminal.js` -- new (ANSI codes, cursor, keypress, readLine); updated 2026-05-14 — `readLine` rejects with `CancelledError` on SIGINT in TTY mode
+- `src/ui/prompts/index.js` -- new (text, confirm, password); updated 2026-05-14 — string-message shortcut via `normaliseOptions`
 - `src/ui/selects/flat.js` -- new (checkbox, radio)
 - `src/ui/selects/tree.js` -- new (checkboxTree)
 - `src/ui/spinner/index.js` -- new (spinner with TTY/non-TTY modes)
 - `src/ui/errors.js` -- new (CancelledError class)
 - `src/ui/wizard/index.js` -- new (Wizard class)
-- `tests/ui/prompts.test.js` -- new
+- `tests/ui/prompts.test.js` -- new; +6 tests on 2026-05-14 (string shortcuts and cancellation propagation)
 - `tests/ui/selects.test.js` -- new
 - `tests/ui/spinner.test.js` -- new
 - `tests/ui/wizard.test.js` -- new
@@ -56,7 +58,8 @@ The TTY UI kit is the interactive terminal layer every skeleton's setup wizard a
 ## Verification run
 
 ```bash
-$ npm run check
+❯ npm run check
+
 > @rtcamp/wp-tooling@0.1.0 check
 > npm run lint && npm test
 
@@ -70,54 +73,28 @@ $ npm run check
 
  PASS  tests/ui/selects.test.js
   checkbox (non-TTY)
-    ✓ should return selected items by number
+    ✓ should return selected items by number (1 ms)
     ✓ should return unique selections in display order
-    ✓ should handle empty input gracefully
+    ✓ should handle empty input gracefully (1 ms)
   radio (non-TTY)
     ✓ should return a single selected item
     ✓ should default to first choice on invalid input
   flat select validation
-    ✓ should throw when checkbox choices is missing
+    ✓ should throw when checkbox choices is missing (5 ms)
     ✓ should throw when radio choices is empty
   flat select (TTY) -- Ctrl+C
-    ✓ should reject with CancelledError on Ctrl+C
+    ✓ should reject with CancelledError on Ctrl+C (1 ms)
   checkboxTree (non-TTY)
     ✓ should return selected items from groups by number
     ✓ should return unique selections in display order
     ✓ should handle empty selection
-    ✓ should throw when groups is missing
-    ✓ should throw when groups is null
+    ✓ should throw when groups is missing (1 ms)
+    ✓ should throw when groups is null (1 ms)
     ✓ should throw when a group items is not an array
     ✓ should return an empty array for empty groups without prompting
   checkboxTree (TTY)
     ✓ should resolve selections in display order, not toggle order
-
- PASS  tests/ui/wizard.test.js
-  Wizard
-    ✓ should run all steps in order
-    ✓ should honour the skip() predicate
-    ✓ should pass context to skip()
-    ✓ should default context to empty object
-    ✓ should default steps to empty array
-    ✓ should handle an empty steps array
-    ✓ should throw a clear error when steps is not an array
-    ✓ should omit ANSI formatting in non-TTY mode
-    ✓ should propagate step errors
-
- PASS  tests/ui/spinner.test.js
-  spinner
-    ✓ should return an object with start, succeed, fail, update methods
-    ✓ should default to current text when succeed is called without args
-    non-TTY mode
-      ✓ should print plain text on start in non-TTY
-      ✓ should print succeed message in non-TTY
-      ✓ should print fail message in non-TTY
-    TTY mode
-      ✓ should animate frames on an interval
-      ✓ should not create multiple intervals when start is called twice
-      ✓ should stop animation on succeed
-      ✓ should stop animation on fail
-      ✓ should update text while running
+    ✓ should reject with CancelledError on Ctrl+C (1 ms)
 
  PASS  tests/ui/prompts.test.js
   text
@@ -125,21 +102,58 @@ $ npm run check
     ✓ should return defaultValue when input is empty
     ✓ should trim whitespace from input
     ✓ should retry when validation fails
+    ✓ should accept a string message shortcut
+    ✓ should propagate CancelledError from readLine (2 ms)
   confirm
     ✓ should return true for "y"
     ✓ should return true for "yes"
     ✓ should return false for "n"
     ✓ should return defaultValue on empty input
     ✓ should default to false when no defaultValue
+    ✓ should accept a string message shortcut (1 ms)
+    ✓ should propagate CancelledError from readLine
   password
     ✓ should fall back to readLine in non-TTY
-    ✓ should reject with CancelledError on Ctrl+C
+    ✓ should accept a string message shortcut
+    ✓ should reject with CancelledError on Ctrl+C (1 ms)
+
+ PASS  tests/ui/wizard.test.js
+  Wizard
+    ✓ should run all steps in order (1 ms)
+    ✓ should honour the skip() predicate
+    ✓ should pass context to skip()
+    ✓ should default context to empty object
+    ✓ should default steps to empty array
+    ✓ should handle an empty steps array (1 ms)
+    ✓ should throw a clear error when steps is not an array (2 ms)
+    ✓ should omit ANSI formatting in non-TTY mode
+    ✓ should propagate step errors
+
+ PASS  tests/ui/spinner.test.js
+  spinner
+    ✓ should return an object with start, succeed, fail, update methods
+    ✓ should default to current text when succeed is called without args (1 ms)
+    non-TTY mode
+      ✓ should print plain text on start in non-TTY
+      ✓ should print succeed message in non-TTY
+      ✓ should print fail message in non-TTY
+    TTY mode
+      ✓ should animate frames on an interval (1 ms)
+      ✓ should not create multiple intervals when start is called twice
+      ✓ should stop animation on succeed
+      ✓ should stop animation on fail
+      ✓ should update text while running
 
 Test Suites: 4 passed, 4 total
-Tests:       46 passed, 46 total
+Tests:       52 passed, 52 total
 Snapshots:   0 total
-Time:        0.197 s, estimated 1 s
+Time:        0.161 s, estimated 1 s
 Ran all test suites.
+❯ node -e "const {Wizard} = require('./src/ui/index.js'); console.log(typeof Wizard)"
+
+function
+❯ node -e "const {spinner} = require('./src/ui/index.js'); const s = spinner('CI run'); s.start(); s.succeed('OK');" < /dev/null
++ OK
 ```
 
 ---
@@ -149,7 +163,8 @@ Ran all test suites.
 - Nine exports from barrel: Wizard, text, confirm, password, checkbox, radio, checkboxTree, spinner, CancelledError.
 - Non-TTY fallbacks tested for all primitives.
 - Input validation tested for `checkbox`, `radio`, and `checkboxTree`.
-- Ctrl+C (`CancelledError`) tested for TTY prompts and selects.
+- Ctrl+C (`CancelledError`) tested for TTY prompts and selects. `text` and `confirm` propagate the rejection from `readLine`, so cancellation is consistent across every prompt.
+- String-message shortcut accepted by `text`, `confirm`, `password` — addresses @bhavz-10 review point that `text('Name')` previously prompted with `undefined`.
 - No banned dependencies used.
 - ASCII-only symbols throughout -- no Unicode emojis.
 - Stub files for other sub-exports (scaffolds, release, hooks, ci, version-monitor, lint) are not included; those belong to their own issues.
