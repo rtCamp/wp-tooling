@@ -50,6 +50,7 @@ describe('cli main()', () => {
 		const out = stdoutChunks.join('');
 		expect(out).toMatch(/Usage: wp-tooling/);
 		expect(out).toMatch(/detect-changes/);
+		expect(out).toMatch(/install-hooks/);
 	});
 
 	test('--help prints top-level usage', () => {
@@ -126,6 +127,37 @@ describe('cli COMMANDS registry', () => {
 		expect(cli.COMMANDS['detect-changes']).toBeDefined();
 		expect(typeof cli.COMMANDS['detect-changes'].summary).toBe('string');
 		expect(typeof cli.COMMANDS['detect-changes'].run).toBe('function');
+	});
+
+	test('install-hooks is registered with a summary and run handler', () => {
+		expect(cli.COMMANDS['install-hooks']).toBeDefined();
+		expect(typeof cli.COMMANDS['install-hooks'].summary).toBe('string');
+		expect(typeof cli.COMMANDS['install-hooks'].run).toBe('function');
+	});
+});
+
+describe('cli main() routes install-hooks', () => {
+	let stdoutChunks;
+	let stdoutSpy;
+
+	beforeEach(() => {
+		stdoutChunks = [];
+		stdoutSpy = jest
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((chunk) => {
+				stdoutChunks.push(chunk.toString());
+				return true;
+			});
+	});
+
+	afterEach(() => {
+		stdoutSpy.mockRestore();
+	});
+
+	test('routes install-hooks --help to its runCli', () => {
+		const code = cli.main(['install-hooks', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: install-hooks/);
 	});
 });
 

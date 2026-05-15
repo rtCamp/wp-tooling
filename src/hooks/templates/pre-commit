@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Runs `npm run lint:staged` when the script is defined in package.json.
+# No-op (exit 0) otherwise — keeps pure-PHP repos working out of the box.
+if [ -f package.json ] && grep -q '"lint:staged"' package.json; then
+    npm run lint:staged --silent
+fi
