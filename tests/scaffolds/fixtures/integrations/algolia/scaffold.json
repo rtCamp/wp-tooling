@@ -1,0 +1,15 @@
+{
+    "name": "Algolia search",
+    "slug": "algolia",
+    "description": "Algolia indexing + search integration with admin settings.",
+    "wizard_step": "integrations",
+    "source": "template",
+    "files": [
+        { "src": "templates/integration.php.mustache", "dest": "includes/integrations/search/class-algolia.php" }
+    ],
+    "npm_dependencies": { "algoliasearch": "^5.0" },
+    "npm_dev_dependencies": {},
+    "composer_dependencies": { "algolia/algoliasearch-client-php": "^4.0" },
+    "composer_dev_dependencies": {},
+    "composer_suggest": {}
+}

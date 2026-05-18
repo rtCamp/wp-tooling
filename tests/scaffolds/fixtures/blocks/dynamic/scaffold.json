@@ -1,0 +1,20 @@
+{
+    "name": "Dynamic block",
+    "slug": "block-dynamic",
+    "description": "Server-side rendered Gutenberg block (block.json + edit.js + render.php).",
+    "wizard_step": null,
+    "source": "template",
+    "files": [
+        { "src": "templates/block.json.mustache", "dest": "src/blocks/{slug}/block.json" },
+        { "src": "templates/edit.js.mustache", "dest": "src/blocks/{slug}/edit.js" },
+        { "src": "templates/render.php.mustache", "dest": "src/blocks/{slug}/render.php" }
+    ],
+    "npm_dependencies": {},
+    "npm_dev_dependencies": {
+        "@wordpress/scripts": "^30.0",
+        "@wordpress/blocks": "^14.0"
+    },
+    "composer_dependencies": {},
+    "composer_dev_dependencies": {},
+    "composer_suggest": {}
+}

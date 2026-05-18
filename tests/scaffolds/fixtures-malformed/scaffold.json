@@ -1,0 +1,6 @@
+{
+    "name": "Broken scaffold",
+    "slug": "Broken_Slug",
+    "description": "Missing source + bad slug + non-array files.",
+    "files": "not-an-array"
+}

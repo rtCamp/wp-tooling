@@ -1,0 +1,14 @@
+{
+    "name": "Cache utility",
+    "slug": "cache",
+    "description": "Wrapper around wp_cache_* with the rtCamp Cache utility from wp-php-toolkit.",
+    "wizard_step": "modules",
+    "source": "package",
+    "module_class": "RtCamp\\WPToolkit\\Utilities\\Cache",
+    "files": [],
+    "npm_dependencies": {},
+    "npm_dev_dependencies": {},
+    "composer_dependencies": { "rtcamp/wp-php-toolkit": "^1.0" },
+    "composer_dev_dependencies": {},
+    "composer_suggest": {}
+}
