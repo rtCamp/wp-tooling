@@ -14,4 +14,4 @@ All notable changes to this project will be documented in this file.
 - `checkboxTree` -- grouped tree multi-select with group-level toggling. Returns selections in display order. Input validation for `groups`. Returns empty array for empty groups without prompting.
 - `CancelledError` -- thrown on Ctrl+C in any TTY-interactive prompt or select (including `text` and `confirm`, which surface cancellation through the underlying `readLine` SIGINT handler). Callers decide exit behaviour.
 - Low-level terminal helpers (`src/ui/core/terminal.js`) -- ANSI codes, cursor control, keypress events.
-- Jest test suite for all UI primitives (52 tests).
+- Jest test suite for all UI primitives (75 tests, including dedicated coverage for `src/ui/core/terminal.js`).
