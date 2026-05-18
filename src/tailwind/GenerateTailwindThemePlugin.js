@@ -1,11 +1,12 @@
 'use strict';
 
-const fs = require( 'fs' );
-const path = require( 'path' );
+const fs = require('fs');
+const path = require('path');
 
 const PLUGIN_NAME = 'GenerateTailwindThemePlugin';
 
-const BASE_CSS = `@layer theme, base, components, utilities;
+const BASE_CSS = `/* Auto-generated from theme.json by GenerateTailwindThemePlugin */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
@@ -17,11 +18,31 @@ const BASE_CSS = `@layer theme, base, components, utilities;
  * @type {Array<{keyPath: string[], wpType: string, twPrefix: string}>}
  */
 const PRESET_MAP = [
-	{ keyPath: [ 'settings', 'color', 'palette' ], wpType: 'color', twPrefix: '--color' },
-	{ keyPath: [ 'settings', 'typography', 'fontSizes' ], wpType: 'font-size', twPrefix: '--text' },
-	{ keyPath: [ 'settings', 'typography', 'fontFamilies' ], wpType: 'font-family', twPrefix: '--font' },
-	{ keyPath: [ 'settings', 'spacing', 'spacingSizes' ], wpType: 'spacing', twPrefix: '--spacing' },
-	{ keyPath: [ 'settings', 'shadow', 'presets' ], wpType: 'shadow', twPrefix: '--shadow' },
+	{
+		keyPath: ['settings', 'color', 'palette'],
+		wpType: 'color',
+		twPrefix: '--color',
+	},
+	{
+		keyPath: ['settings', 'typography', 'fontSizes'],
+		wpType: 'font-size',
+		twPrefix: '--text',
+	},
+	{
+		keyPath: ['settings', 'typography', 'fontFamilies'],
+		wpType: 'font-family',
+		twPrefix: '--font',
+	},
+	{
+		keyPath: ['settings', 'spacing', 'spacingSizes'],
+		wpType: 'spacing',
+		twPrefix: '--spacing',
+	},
+	{
+		keyPath: ['settings', 'shadow', 'presets'],
+		wpType: 'shadow',
+		twPrefix: '--shadow',
+	},
 ];
 
 /**
@@ -31,7 +52,7 @@ const PRESET_MAP = [
  * @param {string[]} keys Key path.
  * @return {*} Value at the key path, or undefined.
  */
-const get = ( obj, keys ) => keys.reduce( ( acc, key ) => acc?.[ key ], obj );
+const get = (obj, keys) => keys.reduce((acc, key) => acc?.[key], obj);
 
 /**
  * Generate the @theme {} block content from a parsed theme.json object.
@@ -39,47 +60,55 @@ const get = ( obj, keys ) => keys.reduce( ( acc, key ) => acc?.[ key ], obj );
  * @param {Object} themeJson Parsed theme.json content.
  * @return {string} Full @theme {} block as a CSS string.
  */
-const generateThemeBlock = ( themeJson ) => {
+const generateThemeBlock = (themeJson) => {
 	const lines = [];
 
-	for ( const { keyPath, wpType, twPrefix } of PRESET_MAP ) {
-		const items = get( themeJson, keyPath );
+	for (const { keyPath, wpType, twPrefix } of PRESET_MAP) {
+		const items = get(themeJson, keyPath);
 
-		if ( ! Array.isArray( items ) || items.length === 0 ) {
+		if (!Array.isArray(items) || items.length === 0) {
 			continue;
 		}
 
-		lines.push( `\t/* ${ keyPath.at( -1 ) } */` );
+		lines.push(`\t/* ${keyPath.at(-1)} */`);
 
-		for ( const item of items ) {
-			if ( ! item.slug ) {
-				console.warn( `[${ PLUGIN_NAME }] Skipping ${ wpType } entry with missing slug: ${ JSON.stringify( item ) }` );
+		for (const item of items) {
+			if (!item.slug) {
+				console.warn(
+					`[${PLUGIN_NAME}] Skipping ${wpType} entry with missing slug: ${JSON.stringify(item)}`
+				);
 				continue;
 			}
-			lines.push( `\t${ twPrefix }-${ item.slug }: var(--wp--preset--${ wpType }--${ item.slug });` );
+			lines.push(
+				`\t${twPrefix}-${item.slug}: var(--wp--preset--${wpType}--${item.slug});`
+			);
 		}
 
-		lines.push( '' );
+		lines.push('');
 	}
 
-	const layout = get( themeJson, [ 'settings', 'layout' ] ) ?? {};
+	const layout = get(themeJson, ['settings', 'layout']) ?? {};
 
-	if ( layout.contentSize || layout.wideSize ) {
-		lines.push( '\t/* layout */' );
-		if ( layout.contentSize ) {
-			lines.push( '\t--max-width-content: var(--wp--style--global--content-size);' );
+	if (layout.contentSize || layout.wideSize) {
+		lines.push('\t/* layout */');
+		if (layout.contentSize) {
+			lines.push(
+				'\t--max-width-content: var(--wp--style--global--content-size);'
+			);
 		}
-		if ( layout.wideSize ) {
-			lines.push( '\t--max-width-wide: var(--wp--style--global--wide-size);' );
+		if (layout.wideSize) {
+			lines.push(
+				'\t--max-width-wide: var(--wp--style--global--wide-size);'
+			);
 		}
-		lines.push( '' );
+		lines.push('');
 	}
 
-	if ( lines.at( -1 ) === '' ) {
+	if (lines.at(-1) === '') {
 		lines.pop();
 	}
 
-	return `@theme {\n${ lines.join( '\n' ) }\n}\n`;
+	return `@theme {\n${lines.join('\n')}\n}\n`;
 };
 
 /**
@@ -105,7 +134,8 @@ const generateThemeBlock = ( themeJson ) => {
  * Opt-in pattern (PHP side):
  *   The compiled output at assets/build/css/frontend/tailwind.css is only enqueued
  *   when src/css/frontend/tailwind.css is present (i.e. this plugin has run).
- *   Themes can force-enable or disable via a constant or filter — see Assets.php.
+ *   Consuming themes can force-enable or disable via a constant or filter —
+ *   see the theme's Assets class for the expected wiring.
  */
 class GenerateTailwindThemePlugin {
 	/**
@@ -113,9 +143,18 @@ class GenerateTailwindThemePlugin {
 	 * @param {string} [options.themeJson]   Absolute path to theme.json.
 	 * @param {string} [options.tailwindCss] Absolute path to the output tailwind.css.
 	 */
-	constructor( { themeJson, tailwindCss } = {} ) {
-		this.themeJsonPath = themeJson ?? path.resolve( process.cwd(), 'theme.json' );
-		this.tailwindCssPath = tailwindCss ?? path.resolve( process.cwd(), 'src', 'css', 'frontend', 'tailwind.css' );
+	constructor({ themeJson, tailwindCss } = {}) {
+		this.themeJsonPath =
+			themeJson ?? path.resolve(process.cwd(), 'theme.json');
+		this.tailwindCssPath =
+			tailwindCss ??
+			path.resolve(
+				process.cwd(),
+				'src',
+				'css',
+				'frontend',
+				'tailwind.css'
+			);
 	}
 
 	/**
@@ -124,23 +163,36 @@ class GenerateTailwindThemePlugin {
 	 * @return {void}
 	 */
 	generate() {
-		if ( ! fs.existsSync( this.themeJsonPath ) ) {
-			console.error( `[${ PLUGIN_NAME }] theme.json not found at ${ this.themeJsonPath }` );
+		if (!fs.existsSync(this.themeJsonPath)) {
+			console.error(
+				`[${PLUGIN_NAME}] theme.json not found at ${this.themeJsonPath}`
+			);
 			return;
 		}
 
 		let themeJson;
 		try {
-			themeJson = JSON.parse( fs.readFileSync( this.themeJsonPath, 'utf8' ) );
-		} catch ( err ) {
-			console.error( `[${ PLUGIN_NAME }] Failed to parse theme.json — ${ err.message }` );
+			themeJson = JSON.parse(fs.readFileSync(this.themeJsonPath, 'utf8'));
+		} catch (err) {
+			console.error(
+				`[${PLUGIN_NAME}] Failed to parse theme.json — ${err.message}`
+			);
 			return;
 		}
 
-		const output = BASE_CSS + generateThemeBlock( themeJson );
-		fs.mkdirSync( path.dirname( this.tailwindCssPath ), { recursive: true } );
-		fs.writeFileSync( this.tailwindCssPath, output, 'utf8' );
-		console.log( `[${ PLUGIN_NAME }] Written to ${ this.tailwindCssPath }` );
+		const output = BASE_CSS + generateThemeBlock(themeJson);
+		fs.mkdirSync(path.dirname(this.tailwindCssPath), { recursive: true });
+
+		const existing = fs.existsSync(this.tailwindCssPath)
+			? fs.readFileSync(this.tailwindCssPath, 'utf8')
+			: null;
+
+		if (existing === output) {
+			return;
+		}
+
+		fs.writeFileSync(this.tailwindCssPath, output, 'utf8');
+		console.log(`[${PLUGIN_NAME}] Written to ${this.tailwindCssPath}`);
 	}
 
 	/**
@@ -149,24 +201,25 @@ class GenerateTailwindThemePlugin {
 	 * @param {import('webpack').Compiler} compiler Webpack compiler instance.
 	 * @return {void}
 	 */
-	apply( compiler ) {
-		// Initial build and non-watch builds.
-		compiler.hooks.beforeRun.tap( PLUGIN_NAME, () => this.generate() );
+	apply(compiler) {
+		// Single builds (compiler.run()). Not called in watch mode.
+		compiler.hooks.run.tap(PLUGIN_NAME, () => this.generate());
 
-		// Watch mode rebuilds — only regenerate when theme.json itself changed.
-		compiler.hooks.watchRun.tap( PLUGIN_NAME, ( comp ) => {
+		// Watch mode — covers both the initial compilation (modifiedFiles is
+		// undefined on the first watchRun) and subsequent rebuilds when theme.json changes.
+		compiler.hooks.watchRun.tap(PLUGIN_NAME, (comp) => {
 			const modified = comp.modifiedFiles;
-			if ( ! modified || modified.has( this.themeJsonPath ) ) {
+			if (!modified || modified.has(this.themeJsonPath)) {
 				this.generate();
 			}
-		} );
+		});
 
 		// Re-register theme.json as a watched file dependency on every compilation
 		// so webpack keeps tracking it between rebuilds.
-		compiler.hooks.afterEmit.tap( PLUGIN_NAME, ( compilation ) => {
-			compilation.fileDependencies.add( this.themeJsonPath );
-		} );
+		compiler.hooks.afterEmit.tap(PLUGIN_NAME, (compilation) => {
+			compilation.fileDependencies.add(this.themeJsonPath);
+		});
 	}
 }
 
-module.exports = GenerateTailwindThemePlugin;
+module.exports = { GenerateTailwindThemePlugin, generateThemeBlock };
