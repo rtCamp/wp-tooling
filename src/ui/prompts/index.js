@@ -135,6 +135,7 @@ async function password(options) {
 				cleanup();
 				writeLine();
 				reject(new CancelledError());
+				return;
 			}
 
 			if (ch) {
