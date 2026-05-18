@@ -64,5 +64,13 @@
     "peerDependencies": {
         "@tailwindcss/postcss": "^4.3.0",
         "tailwindcss": "^4.3.0"
+    },
+    "peerDependenciesMeta": {
+        "@tailwindcss/postcss": {
+            "optional": true
+        },
+        "tailwindcss": {
+            "optional": true
+        }
     }
 }
