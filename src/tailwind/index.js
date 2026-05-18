@@ -1,5 +1,8 @@
 'use strict';
 
-const GenerateTailwindThemePlugin = require( './GenerateTailwindThemePlugin' );
+const {
+	GenerateTailwindThemePlugin,
+	generateThemeBlock,
+} = require('./GenerateTailwindThemePlugin');
 
-module.exports = { GenerateTailwindThemePlugin };
+module.exports = { GenerateTailwindThemePlugin, generateThemeBlock };
