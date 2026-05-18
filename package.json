@@ -30,7 +30,9 @@
         "./ci": "./src/ci/index.js",
         "./version-monitor": "./src/version-monitor/index.js",
         "./eslint-config": "./src/lint/eslint.js",
-        "./stylelint-config": "./src/lint/stylelint.js"
+        "./stylelint-config": "./src/lint/stylelint.js",
+        "./tailwind-config": "./src/tailwind/index.js",
+        "./tailwind-config/postcss": "./src/tailwind/postcss.js"
     },
     "files": [
         "bin",
@@ -39,14 +41,13 @@
         "LICENSE"
     ],
     "scripts": {
-        "lint": "eslint src tests",
-        "lint:fix": "eslint src tests --fix",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
         "test": "jest",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "check": "npm run lint && npm test"
     },
-    "dependencies": {},
     "devDependencies": {
         "@wordpress/eslint-plugin": "^22.0.0",
         "eslint": "8.57.1",
@@ -59,5 +60,9 @@
         "scaffolding",
         "tty",
         "cli"
-    ]
+    ],
+    "peerDependencies": {
+        "@tailwindcss/postcss": "^4.3.0",
+        "tailwindcss": "^4.3.0"
+    }
 }
