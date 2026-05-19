@@ -1,0 +1,47 @@
+{
+	"slug": "dynamic",
+	"category": "block",
+	"name": "Dynamic block",
+	"description": "Adds a server-rendered Gutenberg block (block.json, edit.js, index.js, render.php).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "blocks_dir",
+			"description": "Directory under the project root where blocks live.",
+			"default": "src/blocks"
+		},
+		{
+			"key": "slug",
+			"description": "Block slug (kebab-case, no vendor prefix).",
+			"required": true
+		},
+		{
+			"key": "title",
+			"description": "Human-readable block title shown in the editor.",
+			"required": true
+		},
+		{
+			"key": "vendor",
+			"description": "Vendor prefix for the block (e.g., `acme` for `acme/foo`).",
+			"default": "rtcamp"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/block.json.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/block.json"
+		},
+		{
+			"src": "templates/index.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/index.js"
+		},
+		{
+			"src": "templates/edit.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/edit.js"
+		},
+		{
+			"src": "templates/render.php.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/render.php"
+		}
+	]
+}

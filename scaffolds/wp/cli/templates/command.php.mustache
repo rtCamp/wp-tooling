@@ -1,0 +1,36 @@
+<?php
+/**
+ * WP-CLI command: {{name}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Cli;
+
+use WP_CLI;
+
+/**
+ * {{class}} command.
+ */
+class {{class}} {
+
+	/**
+	 * Run the command.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Print what would happen without making changes.
+	 *
+	 * @param array<int,string>    $args       Positional arguments.
+	 * @param array<string,string> $assoc_args Named arguments.
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+
+		// TODO: implement {{name}}.
+		WP_CLI::success( $dry_run ? '{{name}} dry-run complete.' : '{{name}} complete.' );
+	}
+}

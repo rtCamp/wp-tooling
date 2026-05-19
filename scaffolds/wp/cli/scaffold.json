@@ -1,0 +1,53 @@
+{
+	"slug": "cli",
+	"category": "wp",
+	"name": "WP-CLI command",
+	"description": "Adds a WP-CLI command class with a PHPUnit test stub.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace prefix.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc"
+		},
+		{
+			"key": "base_path",
+			"description": "PHP source base directory.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes"
+		},
+		{
+			"key": "name",
+			"description": "Slug for the command (kebab-case).",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/command.php.mustache",
+			"dest": "{{base_path}}/Cli/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Plugin.php",
+			"anchor": "// scaffold:cli-commands",
+			"snippet_template": "$this->boot('{{name}}', \\{{namespace}}\\Cli\\{{class}}::class);",
+			"description": "Register the new CLI command with the plugin command bus. Insert immediately after the last existing CLI registration inside the bootstrap method. The anchor is a useful insertion hint when present but is frequently removed during code cleanup; the AI falls back to pattern sampling."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "tests/Cli/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	]
+}

@@ -1,0 +1,33 @@
+{
+	"slug": "cache",
+	"category": "utility",
+	"name": "Cache utility",
+	"description": "Adds the wp-php-toolkit Cache utility via Composer (source: package). Writes no files; only declares the dependency and wiring.",
+	"source": "package",
+	"module_class": "RtCamp\\WPToolkit\\Utilities\\Cache",
+	"inputs": [
+		{
+			"key": "base_path",
+			"description": "PHP source base directory (for the wiring target file).",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes"
+		},
+		{
+			"key": "prefix",
+			"description": "Cache key prefix used by the wrapper.",
+			"required": true
+		}
+	],
+	"files": [],
+	"composer_dependencies": {
+		"rtcamp/wp-php-toolkit": "^1.0"
+	},
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Plugin.php",
+			"anchor": "// scaffold:utilities",
+			"snippet_template": "$this->cache = new \\RtCamp\\WPToolkit\\Utilities\\Cache('{{prefix}}');",
+			"description": "Instantiate the Cache utility once at plugin init. If the project does not use a // scaffold:utilities anchor, place the instantiation near other utility wirings in the bootstrap method."
+		}
+	]
+}

@@ -1,0 +1,16 @@
+<?php
+/**
+ * {{vendor}}/{{slug}} block server render.
+ *
+ * @package {{vendor}}/{{slug}}
+ *
+ * @var array<string,mixed> $attributes Block attributes.
+ * @var string              $content    Rendered inner content.
+ * @var WP_Block            $block      Block instance.
+ */
+
+$wrapper_attributes = get_block_wrapper_attributes();
+?>
+<div <?php echo $wrapper_attributes; ?>>
+	<p><?php esc_html_e( '{{title}}', '{{vendor}}-{{slug}}' ); ?></p>
+</div>
