@@ -37,10 +37,17 @@ module.exports = {
             files: [ 'tests/**/*.js' ],
             rules: {
                 'no-restricted-modules': 'off',
+                'no-console': 'off',
             },
         },
         {
             files: [ 'examples/**/*.js' ],
+            rules: {
+                'no-console': 'off',
+            },
+        },
+        {
+            files: [ 'bin/**/*.js' ],
             rules: {
                 'no-console': 'off',
             },
