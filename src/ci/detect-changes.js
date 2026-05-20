@@ -49,15 +49,29 @@ function detectChanges(options = {}) {
 			? normaliseFiles(options.files)
 			: gitDiffFiles(options.base);
 
-	const ignored = ignore ? files.filter((f) => ignore.test(f)) : [];
-	const relevant = ignore ? files.filter((f) => !ignore.test(f)) : files;
+	const ignored = [];
+	const relevant = [];
+	const buckets = { css: [], js: [], php: [], gha: [] };
 
-	const buckets = {
-		css: relevant.filter((f) => DEFAULT_PATTERNS.css.test(f)),
-		js: relevant.filter((f) => DEFAULT_PATTERNS.js.test(f)),
-		php: relevant.filter((f) => DEFAULT_PATTERNS.php.test(f)),
-		gha: relevant.filter((f) => DEFAULT_PATTERNS.gha.test(f)),
-	};
+	for (const file of files) {
+		if (ignore && ignore.test(file)) {
+			ignored.push(file);
+			continue;
+		}
+		relevant.push(file);
+		if (DEFAULT_PATTERNS.css.test(file)) {
+			buckets.css.push(file);
+		}
+		if (DEFAULT_PATTERNS.js.test(file)) {
+			buckets.js.push(file);
+		}
+		if (DEFAULT_PATTERNS.php.test(file)) {
+			buckets.php.push(file);
+		}
+		if (DEFAULT_PATTERNS.gha.test(file)) {
+			buckets.gha.push(file);
+		}
+	}
 
 	const result = {
 		'total-count': relevant.length,
