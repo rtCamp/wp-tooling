@@ -27,6 +27,7 @@ Add the generic scaffold engine to `wp-tooling`: a `ScaffoldRegistry` class that
 - [2026-05-18] No `--dry-run` flag on `scaffolds-validate`. The command is read-only — it scans and reports, never writes. A degenerate "skip the work" dry-run let invalid scaffolds pass CI silently (bug in the first implementation). The flag is rejected as an unknown argument so CI scripts that pass it blindly fail loudly (exit 2) rather than silently passing. CLAUDE.md's "every CLI supports `--dry-run`" rule is taken to apply to commands with side effects.
 - [2026-05-18] `scan()` updates `this.scaffolds` atomically. Build into a local `nextScaffolds`; assign on success. On parse or validation failure, `this.scaffolds` is unchanged (callers can inspect prior good state). On ENOENT (missing dir), `this.scaffolds` is cleared so `all()` matches the empty array `scan()` returns. Original implementation mutated incrementally, leaving stale entries from prior scans when a re-scan failed, found fewer files, or hit a now-missing dir. Three regression tests added (registry.test.js): re-scan-removes-stale, re-scan-against-missing-dir-clears, re-scan-throws-preserves-prior-state.
 - [2026-05-18] Dependency-map value validation tightened. The five dependency maps (`npm_dependencies`, `npm_dev_dependencies`, `composer_dependencies`, `composer_dev_dependencies`, `composer_suggest`) now require each value to be a non-empty string version range. Numbers, nulls, arrays, and empty strings produce a clear per-entry error: `<map>["<pkg>"] must be a non-empty version range string, got <value>`. The validator does not semantically check the version range itself (that is npm/composer's job) — only that it is a non-empty string. Five test.each cases for non-string values across all five maps; one happy-path test for `@dev` (composer's branch marker, valid).
+- [2026-05-20] Rebased onto the dispatcher auto-discovery refactor on `v1.0.0/task/detect-changes`. The `scaffolds-validate` registration moved from an edit on `src/cli/index.js` (old hardcoded `COMMANDS` map) into a new `src/cli/commands/scaffolds-validate.js` exporting `{ name, summary, run }`. The async upgrade to `main()` and the bin shim's `.then(process.exit, errorHandler)` carry over unchanged. The auto-discovery loader happily registers sync and async subcommand modules side-by-side. Final tree: 118 tests, lint clean.
 
 ---
 
@@ -38,7 +39,9 @@ Add the generic scaffold engine to `wp-tooling`: a `ScaffoldRegistry` class that
 - `src/scaffolds/registry.js` — new
 - `src/scaffolds/cli.js` — new
 - `src/scaffolds/index.js` — edited (replace stub)
-- `src/cli/index.js` — edited (register scaffolds-validate)
+- `src/cli/commands/scaffolds-validate.js` — new (dispatcher auto-discovery registration; no edit to `src/cli/index.js`)
+- `src/cli/index.js` — edited (async `main`; auto-discovery already in place from detect-changes refactor)
+- `bin/wp-tooling.js` — edited (await `main()` and surface unhandled rejections cleanly)
 - `tests/scaffolds/fixtures/modules/cache/scaffold.json` — new
 - `tests/scaffolds/fixtures/blocks/dynamic/scaffold.json` — new
 - `tests/scaffolds/fixtures/integrations/algolia/scaffold.json` — new
@@ -46,6 +49,7 @@ Add the generic scaffold engine to `wp-tooling`: a `ScaffoldRegistry` class that
 - `tests/scaffolds/validate.test.js` — new
 - `tests/scaffolds/registry.test.js` — new
 - `tests/scaffolds/cli.test.js` — new
+- `tests/cli/index.test.js` — edited (await every `main()` call after async upgrade)
 - `CHANGELOG.md` — edited
 
 ---
