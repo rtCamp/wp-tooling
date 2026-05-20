@@ -1,8 +1,8 @@
-'use strict';
+"use strict";
 
-const wordpress = require('@wordpress/eslint-plugin');
-const commentsConfigs = require('@eslint-community/eslint-plugin-eslint-comments/configs');
-const jestPlugin = require('eslint-plugin-jest');
+const wordpress = require("@wordpress/eslint-plugin");
+const commentsConfigs = require("@eslint-community/eslint-plugin-eslint-comments/configs");
+const jestPlugin = require("eslint-plugin-jest");
 
 module.exports = [
 	...wordpress.configs.recommended,
@@ -13,7 +13,7 @@ module.exports = [
 		},
 	},
 	{
-		...jestPlugin.configs['flat/recommended'],
-		files: ['**/*.test.js'],
+		...jestPlugin.configs["flat/recommended"],
+		files: ["**/*.test.js"],
 	},
 ];
