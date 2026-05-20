@@ -31,16 +31,18 @@ Consolidate the per-skeleton modified-files helper into `@rtcamp/wp-tooling/ci`,
 - [2026-05-11] Post-review fix (invalid `--ignore` regex): `runCli` validates the regex eagerly at the CLI boundary, returning a one-line `detect-changes: invalid --ignore regex "..."` with exit 2 instead of the raw Node `SyntaxError` stack. Library `resolveIgnore` behaviour unchanged — bad regex strings still surface as real errors to programmer callers.
 - [2026-05-13] Added `--include-files` (library: `includeFiles: true`) on review request — surfaces the matching file paths per bucket so downstream workflows can lint or test only the changed files. Opt-in, not default, for two reasons: (1) `$GITHUB_OUTPUT` has a per-output size limit and a large changeset would otherwise bloat every step output; (2) preserves the original counts-only contract for any existing consumer. The result object stays a flat record (`<bucket>-count` always; `<bucket>-files` when opted in), so it reads as a planned extension rather than a bolt-on layer.
 - [2026-05-13] Output formatting per mode: JSON serialises arrays natively; text mode space-joins paths on the same line as the key (Unix pipe-friendly); GitHub mode uses the multi-line heredoc syntax with a fixed `EOF_WP_TOOLING` delimiter for non-empty buckets and the compact `key=` form for empty ones. File paths cannot contain newlines, so a fixed delimiter is safe.
+- [2026-05-20] Dispatcher refactored from a hardcoded `COMMANDS` literal to filesystem auto-discovery (`fs.readdirSync('src/cli/commands/')`). Each subcommand now ships as a self-contained file under `src/cli/commands/` exporting `{ name, summary, run }`. Rationale: WTL-06 (scaffold `add` subcommand) and follow-on stories (`scaffolds-validate`, `git-hooks`) each land a new subcommand; without auto-discovery every story would touch the dispatcher and stack rebase conflicts on `src/cli/index.js`. The auto-discovery uses a dynamic `require(path.join(dir, file))` inside `loadCommands`; CLAUDE.md's "no dynamic require paths" rule targets untrusted input, and here the path is built from a package-owned directory and a `readdirSync` entry — flagged with an inline comment. Validation guard rails (shape check, duplicate-name detection, deterministic sort) covered by five new tests in `tests/cli/index.test.js`.
 
 ---
 
 ## Files changed so far
 
 - `bin/wp-tooling.js` — new (executable shim, `chmod +x`)
-- `src/cli/index.js` — new (dispatcher + subcommand registry)
+- `src/cli/index.js` — new (dispatcher; loads subcommands via filesystem auto-discovery)
+- `src/cli/commands/detect-changes.js` — new (subcommand registration: `{ name, summary, run }`)
 - `src/ci/detect-changes.js` — new (library + `runCli` for the dispatcher)
 - `src/ci/index.js` — new (barrel)
-- `tests/cli/index.test.js` — new (11 tests)
+- `tests/cli/index.test.js` — new (16 tests, incl. 5 covering `loadCommands` validation guard rails)
 - `tests/ci/detect-changes.test.js` — new (42 tests)
 - `CHANGELOG.md` — new (Unreleased entry)
 - `.claude/issues/6-detect-changes.md` — new (this file)

@@ -128,3 +128,98 @@ describe('cli COMMANDS registry', () => {
 		expect(typeof cli.COMMANDS['detect-changes'].run).toBe('function');
 	});
 });
+
+describe('cli loadCommands()', () => {
+	let tmpDir;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-cmds-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	function writeCommand(filename, body) {
+		fs.writeFileSync(path.join(tmpDir, filename), body);
+	}
+
+	test('discovers a valid command module and indexes it by name', () => {
+		writeCommand(
+			'demo.js',
+			`'use strict';
+module.exports = { name: 'demo', summary: 'Demo command', run: () => 0 };`
+		);
+
+		const registry = cli.loadCommands(tmpDir);
+
+		expect(Object.keys(registry)).toEqual(['demo']);
+		expect(registry.demo.summary).toBe('Demo command');
+		expect(typeof registry.demo.run).toBe('function');
+	});
+
+	test('ignores non-.js files in the commands directory', () => {
+		writeCommand(
+			'ok.js',
+			`'use strict';
+module.exports = { name: 'ok', summary: '', run: () => 0 };`
+		);
+		writeCommand('README.md', '# notes — not a command');
+		writeCommand('helper.txt', 'ignore me');
+
+		const registry = cli.loadCommands(tmpDir);
+
+		expect(Object.keys(registry)).toEqual(['ok']);
+	});
+
+	test('throws a clear error when a module is missing required fields', () => {
+		writeCommand(
+			'broken.js',
+			`'use strict';
+module.exports = { summary: 'no name or run' };`
+		);
+
+		expect(() => cli.loadCommands(tmpDir)).toThrow(
+			/invalid command module "broken\.js"/
+		);
+	});
+
+	test('throws when two modules register the same name', () => {
+		writeCommand(
+			'a.js',
+			`'use strict';
+module.exports = { name: 'dup', summary: 'first', run: () => 0 };`
+		);
+		writeCommand(
+			'b.js',
+			`'use strict';
+module.exports = { name: 'dup', summary: 'second', run: () => 0 };`
+		);
+
+		expect(() => cli.loadCommands(tmpDir)).toThrow(
+			/duplicate command "dup"/
+		);
+	});
+
+	test('returns entries in deterministic (sorted) order', () => {
+		writeCommand(
+			'zeta.js',
+			`'use strict';
+module.exports = { name: 'zeta', summary: '', run: () => 0 };`
+		);
+		writeCommand(
+			'alpha.js',
+			`'use strict';
+module.exports = { name: 'alpha', summary: '', run: () => 0 };`
+		);
+		writeCommand(
+			'mu.js',
+			`'use strict';
+module.exports = { name: 'mu', summary: '', run: () => 0 };`
+		);
+
+		const registry = cli.loadCommands(tmpDir);
+
+		expect(Object.keys(registry)).toEqual(['alpha', 'mu', 'zeta']);
+	});
+});

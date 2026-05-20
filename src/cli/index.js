@@ -1,29 +1,72 @@
 /**
  * wp-tooling CLI dispatcher.
  *
- * Routes `wp-tooling <subcommand> ...` to the matching handler. New
- * subcommands register themselves in the COMMANDS map below. Implementation
- * modules are required lazily so cold-start time stays close to a single
- * subcommand's footprint.
+ * Routes `wp-tooling <subcommand> ...` to the matching handler. Subcommands
+ * are auto-discovered from `src/cli/commands/*.js` at startup — adding a new
+ * subcommand is a single new file under that directory with no edit here.
  */
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 const PKG = require('../../package.json');
 
+const COMMANDS_DIR = path.join(__dirname, 'commands');
+
 /**
- * Subcommand registry.
+ * Discover subcommand modules under `commands/`.
  *
- * Each entry: `{ summary, run }`.
+ * Each module must export `{ name, summary, run }`:
+ *   - `name`: subcommand string the dispatcher matches against argv[0].
  *   - `summary`: one-line description for top-level help.
  *   - `run(argv)`: receives argv after the subcommand name; returns an exit code.
+ *
+ * Entries are sorted so help output is stable across platforms whose
+ * `readdirSync` order differs.
+ *
+ * @param {string} [dir=COMMANDS_DIR] Directory to scan; overridable for tests.
+ * @return {Object<string, {summary: string, run: Function}>} Registry keyed by name.
  */
-const COMMANDS = {
-	'detect-changes': {
-		summary: 'Bucket changed files for CI gating',
-		run: (argv) => require('../ci/detect-changes').runCli(argv),
-	},
-};
+function loadCommands(dir = COMMANDS_DIR) {
+	const registry = {};
+	const entries = fs
+		.readdirSync(dir, { withFileTypes: true })
+		.filter((e) => e.isFile() && e.name.endsWith('.js'))
+		.map((e) => e.name)
+		.sort();
+
+	for (const file of entries) {
+		// Intentional dynamic require: path = package-owned dir + readdirSync
+		// entry, no user input.
+		const mod = require(path.join(dir, file));
+		if (
+			!mod ||
+			typeof mod.name !== 'string' ||
+			typeof mod.run !== 'function'
+		) {
+			throw new Error(
+				`wp-tooling: invalid command module "${file}" — expected { name, summary, run }, got ${JSON.stringify(
+					mod
+				)}`
+			);
+		}
+		if (registry[mod.name]) {
+			throw new Error(
+				`wp-tooling: duplicate command "${mod.name}" registered by "${file}"`
+			);
+		}
+		registry[mod.name] = {
+			summary: typeof mod.summary === 'string' ? mod.summary : '',
+			run: mod.run,
+		};
+	}
+
+	return registry;
+}
+
+const COMMANDS = loadCommands();
 
 /**
  * Render top-level usage text.
@@ -32,7 +75,8 @@ const COMMANDS = {
  */
 function usage() {
 	const names = Object.keys(COMMANDS).sort();
-	const width = Math.max(...names.map((n) => n.length));
+	const width =
+		names.length > 0 ? Math.max(...names.map((n) => n.length)) : 0;
 	const lines = [
 		`Usage: wp-tooling <command> [options]`,
 		'',
@@ -95,4 +139,5 @@ module.exports = {
 	main,
 	COMMANDS,
 	usage,
+	loadCommands,
 };
