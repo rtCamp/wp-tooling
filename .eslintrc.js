@@ -39,5 +39,11 @@ module.exports = {
                 'no-restricted-modules': 'off',
             },
         },
+        {
+            files: [ 'examples/**/*.js' ],
+            rules: {
+                'no-console': 'off',
+            },
+        },
     ],
 };

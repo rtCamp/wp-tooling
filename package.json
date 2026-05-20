@@ -47,6 +47,10 @@
         "check": "npm run lint && npm test"
     },
     "dependencies": {},
+    "// overrides": "Forces minimatch off the vulnerable 9.0.0-9.0.6 range (3 high-severity ReDoS CVEs reaching us via the @typescript-eslint/typescript-estree chain that @wordpress/eslint-plugin v22 pulls in). Remove this block once we can bump @wordpress/eslint-plugin to v25, which requires ESLint 9. The bump is gated on @wordpress/scripts officially supporting ESLint 9 (we follow its pin per CLAUDE.md).",
+    "overrides": {
+        "minimatch": "^9.0.7"
+    },
     "devDependencies": {
         "@wordpress/eslint-plugin": "^22.0.0",
         "eslint": "8.57.1",
