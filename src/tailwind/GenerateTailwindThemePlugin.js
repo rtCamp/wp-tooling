@@ -5,12 +5,27 @@ const path = require('path');
 
 const PLUGIN_NAME = 'GenerateTailwindThemePlugin';
 
-const BASE_CSS = `/* Auto-generated from theme.json by GenerateTailwindThemePlugin */
+/**
+ * Build the file header for tailwind.css, including an @source directive that
+ * points from the CSS file's directory back to the project root so Tailwind v4
+ * scans all template files (PHP, Twig, JS, etc.) regardless of where the CSS
+ * file lives within the project tree.
+ *
+ * @param {string} tailwindCssPath Absolute path to the output tailwind.css.
+ * @return {string} CSS header string.
+ */
+const generateBaseCss = (tailwindCssPath) => {
+	const cssDir = path.dirname(tailwindCssPath);
+	const relToRoot = path.relative(cssDir, process.cwd());
+	const sourceDir = relToRoot.split(path.sep).join('/') + '/';
+	return `/* Auto-generated from theme.json by GenerateTailwindThemePlugin */
+@source "${sourceDir}";
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
 `;
+};
 
 /**
  * Maps theme.json preset paths to WordPress CSS variable types and Tailwind v4 namespace prefixes.
@@ -180,7 +195,9 @@ class GenerateTailwindThemePlugin {
 			return;
 		}
 
-		const output = BASE_CSS + generateThemeBlock(themeJson);
+		const output =
+			generateBaseCss(this.tailwindCssPath) +
+			generateThemeBlock(themeJson);
 		fs.mkdirSync(path.dirname(this.tailwindCssPath), { recursive: true });
 
 		const existing = fs.existsSync(this.tailwindCssPath)
