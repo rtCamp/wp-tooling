@@ -44,8 +44,8 @@ describe('cli main()', () => {
 		stderrSpy.mockRestore();
 	});
 
-	test('no args prints top-level usage and exits 0', () => {
-		const code = cli.main([]);
+	test('no args prints top-level usage and exits 0', async () => {
+		const code = await cli.main([]);
 		expect(code).toBe(0);
 		const out = stdoutChunks.join('');
 		expect(out).toMatch(/Usage: wp-tooling/);
@@ -53,52 +53,52 @@ describe('cli main()', () => {
 		expect(out).toMatch(/install-hooks/);
 	});
 
-	test('--help prints top-level usage', () => {
-		const code = cli.main(['--help']);
+	test('--help prints top-level usage', async () => {
+		const code = await cli.main(['--help']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling/);
 	});
 
-	test('-h prints top-level usage', () => {
-		const code = cli.main(['-h']);
+	test('-h prints top-level usage', async () => {
+		const code = await cli.main(['-h']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling/);
 	});
 
-	test('--version prints package version and exits 0', () => {
-		const code = cli.main(['--version']);
+	test('--version prints package version and exits 0', async () => {
+		const code = await cli.main(['--version']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('').trim()).toBe(PKG.version);
 	});
 
-	test('-v prints package version', () => {
-		const code = cli.main(['-v']);
+	test('-v prints package version', async () => {
+		const code = await cli.main(['-v']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('').trim()).toBe(PKG.version);
 	});
 
-	test('unknown top-level flag exits 2 with stderr message', () => {
-		const code = cli.main(['--bogus']);
+	test('unknown top-level flag exits 2 with stderr message', async () => {
+		const code = await cli.main(['--bogus']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/unknown option "--bogus"/);
 	});
 
-	test('unknown subcommand exits 2 with stderr message', () => {
-		const code = cli.main(['frobnicate']);
+	test('unknown subcommand exits 2 with stderr message', async () => {
+		const code = await cli.main(['frobnicate']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/unknown command "frobnicate"/);
 	});
 
-	test('routes detect-changes --help to its runCli', () => {
-		const code = cli.main(['detect-changes', '--help']);
+	test('routes detect-changes --help to its runCli', async () => {
+		const code = await cli.main(['detect-changes', '--help']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: detect-changes/);
 	});
 
-	test('routes detect-changes through to its runCli with args', () => {
+	test('routes detect-changes through to its runCli with args', async () => {
 		const f = tmpFile('files.txt', 'src/a.js\nsrc/b.scss\n');
 		try {
-			const code = cli.main([
+			const code = await cli.main([
 				'detect-changes',
 				'--files',
 				f,
@@ -115,8 +115,8 @@ describe('cli main()', () => {
 		}
 	});
 
-	test('detect-changes propagates a usage-error exit code', () => {
-		const code = cli.main(['detect-changes', '--output', 'xml']);
+	test('detect-changes propagates a usage-error exit code', async () => {
+		const code = await cli.main(['detect-changes', '--output', 'xml']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/invalid --output/);
 	});
@@ -154,8 +154,8 @@ describe('cli main() routes install-hooks', () => {
 		stdoutSpy.mockRestore();
 	});
 
-	test('routes install-hooks --help to its runCli', () => {
-		const code = cli.main(['install-hooks', '--help']);
+	test('routes install-hooks --help to its runCli', async () => {
+		const code = await cli.main(['install-hooks', '--help']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: install-hooks/);
 	});

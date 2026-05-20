@@ -96,10 +96,16 @@ function usage() {
 /**
  * Dispatch entry point.
  *
+ * Always returns a `Promise<number>`. The promise resolves whether the
+ * routed subcommand is sync (returns a number) or async (returns a
+ * `Promise<number>`) -- `async` here awaits both transparently. Sync
+ * throws from a subcommand become promise rejections, which the bin
+ * shim's failure handler renders cleanly.
+ *
  * @param {string[]} argv argv slice (without `node` and script path).
- * @return {number} Process exit code.
+ * @return {Promise<number>} Process exit code.
  */
-function main(argv) {
+async function main(argv) {
 	if (argv.length === 0) {
 		process.stdout.write(usage());
 		return 0;
