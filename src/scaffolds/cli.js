@@ -12,14 +12,16 @@
  * side effects, and a degenerate "skip the work" dry-run would let
  * invalid scaffolds pass CI silently.
  *
- * Zero runtime dependencies. The CLI is structured so the TTY UI kit
- * (spinner, CancelledError) can be layered in later as a localised diff
- * around the `await registry.scan()` call.
+ * Zero runtime dependencies. A spinner from the TTY UI kit wraps the
+ * `await registry.scan()` call so the user sees progress in interactive
+ * shells; the spinner degrades to plain `Validating ...` / `+ ... valid`
+ * lines in non-TTY environments (CI) per the UI kit contract.
  */
 
 'use strict';
 
 const { ScaffoldRegistry } = require('./registry');
+const { spinner, CancelledError } = require('../ui');
 
 /**
  * Parse argv (without the subcommand name).
@@ -101,15 +103,26 @@ async function runCli(argv) {
 	}
 
 	const registry = new ScaffoldRegistry(opts.dir);
+	const s = spinner(`Validating scaffolds under ${opts.dir}`);
+	s.start();
+
 	try {
 		await registry.scan();
 	} catch (err) {
+		s.fail('Validation failed');
+		// `CancelledError` only ever escapes from TTY UI primitives. The
+		// validate flow doesn't use any today, but catching here keeps the
+		// CLI compliant with the project-wide cancellation contract: Ctrl+C
+		// returns 130, no stack trace.
+		if (err instanceof CancelledError) {
+			return 130;
+		}
 		process.stderr.write(`scaffolds-validate: ${err.message}\n`);
 		return 1;
 	}
 
 	const count = registry.all().length;
-	process.stdout.write(`${count} scaffold${count === 1 ? '' : 's'} valid\n`);
+	s.succeed(`${count} scaffold${count === 1 ? '' : 's'} valid`);
 	return 0;
 }
 
