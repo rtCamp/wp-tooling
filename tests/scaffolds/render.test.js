@@ -80,6 +80,59 @@ describe('collectPlaceholders', () => {
 	it('returns empty for non-string input', () => {
 		expect(collectPlaceholders(null)).toEqual([]);
 	});
+
+	it('includes section flags and inverted sections', () => {
+		expect(
+			collectPlaceholders('{{#flag}}x{{/flag}}{{^other}}y{{/other}}{{z}}')
+		).toEqual(expect.arrayContaining(['flag', 'other', 'z']));
+	});
+});
+
+describe('render — sections', () => {
+	it('keeps inner content when section flag is truthy ("true")', () => {
+		expect(render('a{{#f}}B{{/f}}c', { f: 'true' })).toBe('aBc');
+	});
+
+	it('drops inner content when section flag is falsy ("false")', () => {
+		expect(render('a{{#f}}B{{/f}}c', { f: 'false' })).toBe('ac');
+	});
+
+	it('treats empty string, "no", "0" as falsy', () => {
+		expect(render('a{{#f}}x{{/f}}b', { f: '' })).toBe('ab');
+		expect(render('a{{#f}}x{{/f}}b', { f: 'no' })).toBe('ab');
+		expect(render('a{{#f}}x{{/f}}b', { f: '0' })).toBe('ab');
+	});
+
+	it('treats arbitrary non-empty value as truthy', () => {
+		expect(render('a{{#f}}x{{/f}}b', { f: 'yes' })).toBe('axb');
+		expect(render('a{{#f}}x{{/f}}b', { f: 'singleton' })).toBe('axb');
+	});
+
+	it('inverted section renders when flag is falsy', () => {
+		expect(render('a{{^f}}B{{/f}}c', { f: 'false' })).toBe('aBc');
+		expect(render('a{{^f}}B{{/f}}c', { f: 'true' })).toBe('ac');
+	});
+
+	it('substitutes variables inside a truthy section', () => {
+		expect(
+			render('{{#f}}use {{ns}};{{/f}}', { f: 'true', ns: 'Foo\\Bar' })
+		).toBe('use Foo\\Bar;');
+	});
+
+	it('throws ERENDERFAIL when section flag is undefined', () => {
+		expect(() => render('{{#missing}}x{{/missing}}', {})).toThrow(
+			RenderError
+		);
+	});
+
+	it('handles multi-line section content (singleton use-case)', () => {
+		const tpl =
+			'class X {\n{{#singleton}}\n\tuse Singleton;\n\n\tpublic function setup(): void {}\n\n{{/singleton}}\t/**\n\t * method\n\t */\n}';
+		expect(render(tpl, { singleton: 'true' })).toContain('use Singleton;');
+		expect(render(tpl, { singleton: 'false' })).not.toContain(
+			'use Singleton;'
+		);
+	});
 });
 
 describe('applyTransform', () => {

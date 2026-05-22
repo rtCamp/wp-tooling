@@ -2,13 +2,19 @@
  * Minimal Mustache-style renderer for scaffold templates.
  *
  * Hand-rolled because the package policy is zero runtime dependencies.
- * Supports only the subset the scaffold engine needs:
+ * Supports the subset the scaffold engine needs:
  *
- *   {{name}}            simple variable substitution
- *   {{base_path}}/foo   variables inside paths
+ *   {{name}}                       simple variable substitution
+ *   {{base_path}}/foo              variables inside paths
+ *   {{#flag}}...{{/flag}}          section: render inner content when truthy
+ *   {{^flag}}...{{/flag}}          inverted section: render when falsy
  *
- * Does NOT support: partials, sections (#name), inverted sections (^name),
- * comments, set delimiters. If a scaffold ever needs more, extend here.
+ * Section flags are string values. Truthy = non-empty and not one of
+ * `"false"`, `"no"`, `"0"`. Sections do not nest within themselves and
+ * cannot iterate (we only need boolean flags, e.g. singleton vs multi).
+ *
+ * Does NOT support: partials, comments, set delimiters, iterating over
+ * arrays/lists. Extend here if a scaffold ever needs more.
  *
  * Critical: HTML escape is DISABLED. Templates render code (PHP, JS, YAML);
  * HTML-encoding would mangle generated code. This matches the project rule
@@ -19,6 +25,7 @@
  *
  * Implements:
  *   WTL-06  rendering used by execute() for files, dests, and wiring snippets
+ *   WTL-10  conditional sections enabling pattern-flag templates (singleton/multi)
  */
 
 'use strict';
@@ -33,9 +40,31 @@ class RenderError extends Error {
 }
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+const SECTION_RE =
+	/\{\{#\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/g;
+const INVERTED_SECTION_RE =
+	/\{\{\^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/g;
+const ANY_TAG_RE = /\{\{[#^/]?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+
+const FALSY_STRINGS = new Set(['', 'false', 'no', '0']);
+
+function isTruthy(value) {
+	if (typeof value !== 'string') {
+		return Boolean(value);
+	}
+	return !FALSY_STRINGS.has(value.trim().toLowerCase());
+}
 
 /**
  * Render a Mustache-style template string with the given variables.
+ *
+ * Three passes, in order:
+ *   1. Sections          `{{#flag}}...{{/flag}}` keep inner when truthy.
+ *   2. Inverted sections `{{^flag}}...{{/flag}}` keep inner when falsy.
+ *   3. Variables         `{{name}}` substituted with `vars[name]`.
+ *
+ * Section flags and variables are looked up the same way (both throw
+ * ERENDERFAIL when the key is not in `vars`).
  *
  * @param {string}                template - The template to render.
  * @param {Object<string,string>} vars     - Resolved input values keyed by name.
@@ -50,7 +79,28 @@ function render(template, vars) {
 		});
 	}
 	const safeVars = vars && typeof vars === 'object' ? vars : {};
-	return template.replace(PLACEHOLDER_RE, (_match, key) => {
+
+	let result = template.replace(SECTION_RE, (_match, key, inner) => {
+		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
+			throw new RenderError(`undefined placeholder '${key}'`, {
+				code: 'ERENDERFAIL',
+				placeholder: key,
+			});
+		}
+		return isTruthy(safeVars[key]) ? inner : '';
+	});
+
+	result = result.replace(INVERTED_SECTION_RE, (_match, key, inner) => {
+		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
+			throw new RenderError(`undefined placeholder '${key}'`, {
+				code: 'ERENDERFAIL',
+				placeholder: key,
+			});
+		}
+		return !isTruthy(safeVars[key]) ? inner : '';
+	});
+
+	return result.replace(PLACEHOLDER_RE, (_match, key) => {
 		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
 			throw new RenderError(`undefined placeholder '${key}'`, {
 				code: 'ERENDERFAIL',
@@ -62,7 +112,8 @@ function render(template, vars) {
 }
 
 /**
- * Collect every distinct placeholder name in a template.
+ * Collect every distinct placeholder name in a template, including
+ * section flags (`{{#key}}`, `{{^key}}`) and closing tags (`{{/key}}`).
  *
  * Used by execute() to determine which inputs a scaffold needs when the
  * manifest has no explicit `inputs[]` block (backward-compat path).
@@ -76,8 +127,8 @@ function collectPlaceholders(template) {
 	}
 	const seen = new Set();
 	let match;
-	PLACEHOLDER_RE.lastIndex = 0;
-	while ((match = PLACEHOLDER_RE.exec(template)) !== null) {
+	ANY_TAG_RE.lastIndex = 0;
+	while ((match = ANY_TAG_RE.exec(template)) !== null) {
 		seen.add(match[1]);
 	}
 	return Array.from(seen);

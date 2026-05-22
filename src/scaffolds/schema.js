@@ -58,9 +58,12 @@ const DEPENDENCY_MAPS = [
 	'composer_suggest',
 ];
 
+/** Where a declared script lives. Closed enum. */
+const ALLOWED_SCRIPT_TARGETS = ['npm', 'composer'];
+
 /** Identifier patterns. */
 const SLUG_PATTERN = '^[a-z0-9-]+$';
-const CATEGORY_PATTERN = '^[a-z][a-z0-9-]*$';
+const CATEGORY_PATTERN = '^[a-z][a-z0-9/-]*$';
 const INPUT_KEY_PATTERN = '^[a-z][a-z0-9_]*$';
 const SECRET_KEY_PATTERN = '^[A-Z][A-Z0-9_]*$';
 
@@ -128,6 +131,21 @@ const FILE_ENTRY = {
 const DEPENDENCY_MAP = {
 	type: 'object',
 	additionalProperties: { type: 'string' },
+};
+
+/**
+ * Scripts to add to package.json (npm) or composer.json (composer).
+ * The engine treats this as a verbatim passthrough; the AI orchestrator
+ * applies the merge with developer consent, since editing the user's
+ * package/composer manifest is a cross-file edit.
+ */
+const SCRIPTS_BLOCK = {
+	type: 'object',
+	additionalProperties: false,
+	properties: {
+		npm: { type: 'object', additionalProperties: { type: 'string' } },
+		composer: { type: 'object', additionalProperties: { type: 'string' } },
+	},
 };
 
 const SCAFFOLD_SCHEMA = {
@@ -205,6 +223,7 @@ const SCAFFOLD_SCHEMA = {
 				'Secrets the developer must set (never values, only declarations).',
 			items: SECRET_ENTRY,
 		},
+		scripts: SCRIPTS_BLOCK,
 		npm_dependencies: DEPENDENCY_MAP,
 		npm_dev_dependencies: DEPENDENCY_MAP,
 		composer_dependencies: DEPENDENCY_MAP,
@@ -221,6 +240,7 @@ module.exports = {
 	ALLOWED_TEST_FRAMEWORKS,
 	ALLOWED_SECRET_SCOPES,
 	ALLOWED_INPUT_TRANSFORMS,
+	ALLOWED_SCRIPT_TARGETS,
 	DEPENDENCY_MAPS,
 	SLUG_PATTERN,
 	CATEGORY_PATTERN,

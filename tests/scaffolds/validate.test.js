@@ -57,6 +57,12 @@ describe('validate base scaffold', () => {
 		expect(validate({ ...baseValid(), category: 'wp' })).toEqual([]);
 	});
 
+	it('accepts nested category with slashes (e.g. lint/phpcs)', () => {
+		expect(validate({ ...baseValid(), category: 'lint/phpcs' })).toEqual(
+			[]
+		);
+	});
+
 	it('rejects unknown source value', () => {
 		const errors = validate({ ...baseValid(), source: 'magic' });
 		expect(errors[0]).toMatch(/source: must be one of/);
@@ -243,6 +249,64 @@ describe('validate secrets block', () => {
 			],
 		});
 		expect(errors[0]).toMatch(/secrets\[0\]: unknown field 'value'/);
+	});
+});
+
+describe('validate scripts block', () => {
+	it('accepts npm-only scripts', () => {
+		expect(
+			validate({
+				...baseValid(),
+				scripts: { npm: { 'lint:js': 'eslint .' } },
+			})
+		).toEqual([]);
+	});
+
+	it('accepts composer-only scripts', () => {
+		expect(
+			validate({
+				...baseValid(),
+				scripts: { composer: { 'lint:php': 'phpcs' } },
+			})
+		).toEqual([]);
+	});
+
+	it('accepts both targets', () => {
+		expect(
+			validate({
+				...baseValid(),
+				scripts: {
+					npm: { 'lint:js': 'eslint .' },
+					composer: { 'lint:php': 'phpcs' },
+				},
+			})
+		).toEqual([]);
+	});
+
+	it('rejects unknown script target', () => {
+		const errors = validate({
+			...baseValid(),
+			scripts: { yarn: { 'lint:js': 'eslint .' } },
+		});
+		expect(errors[0]).toMatch(/scripts: unknown target 'yarn'/);
+	});
+
+	it('rejects non-string command', () => {
+		const errors = validate({
+			...baseValid(),
+			scripts: { npm: { 'lint:js': 42 } },
+		});
+		expect(errors[0]).toMatch(
+			/scripts\.npm\['lint:js'\]: must be a non-empty string/
+		);
+	});
+
+	it('rejects non-object map per target', () => {
+		const errors = validate({
+			...baseValid(),
+			scripts: { npm: 'eslint .' },
+		});
+		expect(errors[0]).toMatch(/scripts\.npm: must be an object/);
 	});
 });
 

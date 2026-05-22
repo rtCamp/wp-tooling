@@ -22,6 +22,7 @@ const {
 	ALLOWED_TEST_FRAMEWORKS,
 	ALLOWED_SECRET_SCOPES,
 	ALLOWED_INPUT_TRANSFORMS,
+	ALLOWED_SCRIPT_TARGETS,
 	DEPENDENCY_MAPS,
 	SLUG_PATTERN,
 	CATEGORY_PATTERN,
@@ -47,6 +48,7 @@ const TOP_LEVEL_KEYS = new Set([
 	'wiring',
 	'tests',
 	'secrets',
+	'scripts',
 	...DEPENDENCY_MAPS,
 ]);
 
@@ -130,6 +132,9 @@ function validate(scaffold) {
 	}
 	if (scaffold.secrets !== undefined) {
 		errors.push(...validateSecrets(scaffold.secrets));
+	}
+	if (scaffold.scripts !== undefined) {
+		errors.push(...validateScripts(scaffold.scripts));
 	}
 
 	for (const mapKey of DEPENDENCY_MAPS) {
@@ -380,6 +385,38 @@ function validateDependencyMap(map, name) {
 	for (const [pkg, ver] of Object.entries(map)) {
 		if (typeof ver !== 'string') {
 			errors.push(`${name}['${pkg}']: version must be a string`);
+		}
+	}
+	return errors;
+}
+
+function validateScripts(scripts) {
+	const errors = [];
+	if (
+		scripts === null ||
+		typeof scripts !== 'object' ||
+		Array.isArray(scripts)
+	) {
+		return ['scripts: must be an object'];
+	}
+	for (const target of Object.keys(scripts)) {
+		if (!ALLOWED_SCRIPT_TARGETS.includes(target)) {
+			errors.push(
+				`scripts: unknown target '${target}' (must be one of ${ALLOWED_SCRIPT_TARGETS.join(', ')})`
+			);
+			continue;
+		}
+		const map = scripts[target];
+		if (map === null || typeof map !== 'object' || Array.isArray(map)) {
+			errors.push(`scripts.${target}: must be an object`);
+			continue;
+		}
+		for (const [name, cmd] of Object.entries(map)) {
+			if (typeof cmd !== 'string' || cmd.length === 0) {
+				errors.push(
+					`scripts.${target}['${name}']: must be a non-empty string`
+				);
+			}
 		}
 	}
 	return errors;
