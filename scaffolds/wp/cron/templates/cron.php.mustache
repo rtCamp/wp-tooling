@@ -1,0 +1,35 @@
+<?php
+/**
+ * Cron job: {{name}} (hook: {{hook}}, schedule: {{schedule}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Cron;
+
+use RtCamp\WPToolkit\Abstracts\Abstract_Cron_Job;
+
+/**
+ * {{class}} cron job.
+ */
+class {{class}} extends Abstract_Cron_Job {
+
+	/**
+	 * WordPress hook name. Used by wp_schedule_event() and add_action().
+	 */
+	protected string $hook = '{{hook}}';
+
+	/**
+	 * Recurrence: 'hourly', 'twicedaily', 'daily', or 'weekly'.
+	 */
+	protected string $recurrence = '{{schedule}}';
+
+	/**
+	 * The job body. Called every time the hook fires.
+	 */
+	public function run(): void {
+		// TODO: implement {{name}} job.
+	}
+}

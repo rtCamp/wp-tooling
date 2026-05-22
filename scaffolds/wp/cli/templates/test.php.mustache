@@ -18,8 +18,9 @@ use {{namespace}}\Cli\{{class}};
 final class {{class}}Test extends TestCase {
 
 	public function test_command_instantiates(): void {
-		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
-	}
+{{#singleton}}		$this->assertInstanceOf( {{class}}::class, {{class}}::get_instance() );
+{{/singleton}}{{^singleton}}		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
+{{/singleton}}	}
 
 	public function test_command_runs_without_args(): void {
 		$this->markTestIncomplete( 'TODO: implement {{name}} test.' );

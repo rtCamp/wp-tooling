@@ -1,0 +1,76 @@
+{
+	"slug": "taxonomy",
+	"category": "wp",
+	"name": "Taxonomy",
+	"description": "Adds a Taxonomy class extending Abstract_Taxonomy from rtcamp/wp-php-toolkit. Always multi-instance (one class per taxonomy).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace prefix.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc"
+		},
+		{
+			"key": "base_path",
+			"description": "PHP source base directory.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes"
+		},
+		{
+			"key": "slug",
+			"description": "Taxonomy slug (kebab-case, used as the key in register_taxonomy(), e.g. 'product-category').",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "singular",
+			"description": "Singular human-readable label, e.g. 'Category'.",
+			"required": true
+		},
+		{
+			"key": "plural",
+			"description": "Plural human-readable label, e.g. 'Categories'.",
+			"required": true
+		},
+		{
+			"key": "object_type",
+			"description": "Post type slug(s) this taxonomy attaches to (comma-separated for multiple, e.g. 'product' or 'product,page').",
+			"required": true
+		},
+		{
+			"key": "hierarchical",
+			"description": "Hierarchical taxonomy (like categories) or flat (like tags). Pass 'true' or 'false'. Default 'true'.",
+			"default": "true"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/taxonomy.php.mustache",
+			"dest": "{{base_path}}/Taxonomies/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Plugin.php",
+			"anchor": "// scaffold:taxonomies",
+			"snippet_template": "( new \\{{namespace}}\\Taxonomies\\{{class}}() )->register();",
+			"description": "Instantiate the taxonomy so it registers its init hook. Taxonomies are always multi-instance. Insert in the plugin bootstrap alongside other taxonomy registrations."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "tests/Taxonomies/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-php-toolkit": "^1.0"
+	}
+}

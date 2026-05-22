@@ -9,14 +9,24 @@ declare(strict_types=1);
 
 namespace {{namespace}}\Cli;
 
-use WP_CLI;
+{{#singleton}}use RtCamp\WPToolkit\Traits\Singleton;
+
+{{/singleton}}use WP_CLI;
 
 /**
  * {{class}} command.
  */
 class {{class}} {
+{{^singleton}}
+{{/singleton}}{{#singleton}}
+	use Singleton;
 
 	/**
+	 * Boot the command. Called once by the Singleton trait.
+	 */
+	public function setup(): void {}
+
+{{/singleton}}	/**
 	 * Run the command.
 	 *
 	 * ## OPTIONS

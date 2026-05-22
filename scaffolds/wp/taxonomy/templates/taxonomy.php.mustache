@@ -1,0 +1,53 @@
+<?php
+/**
+ * Taxonomy: {{slug}} ({{singular}} / {{plural}}), attached to {{object_type}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Taxonomies;
+
+use RtCamp\WPToolkit\Abstracts\Abstract_Taxonomy;
+
+/**
+ * {{class}} taxonomy.
+ */
+class {{class}} extends Abstract_Taxonomy {
+
+	/**
+	 * Taxonomy slug.
+	 */
+	protected string $slug = '{{slug}}';
+
+	/**
+	 * Object types this taxonomy attaches to.
+	 *
+	 * @return string[]
+	 */
+	protected function get_object_types(): array {
+		return array_map( 'trim', explode( ',', '{{object_type}}' ) );
+	}
+
+	/**
+	 * Taxonomy arguments. Returned to register_taxonomy().
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function get_args(): array {
+		return [
+			'hierarchical'      => {{hierarchical}},
+			'labels'            => [
+				'name'          => __( '{{plural}}', 'text-domain' ),
+				'singular_name' => __( '{{singular}}', 'text-domain' ),
+				'add_new_item'  => __( 'Add New {{singular}}', 'text-domain' ),
+				'edit_item'     => __( 'Edit {{singular}}', 'text-domain' ),
+				'search_items'  => __( 'Search {{plural}}', 'text-domain' ),
+			],
+			'public'            => true,
+			'show_in_rest'      => true,
+			'show_admin_column' => true,
+		];
+	}
+}

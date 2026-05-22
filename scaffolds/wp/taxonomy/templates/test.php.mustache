@@ -1,0 +1,27 @@
+<?php
+/**
+ * Tests for {{namespace}}\Taxonomies\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Tests\Taxonomies;
+
+use PHPUnit\Framework\TestCase;
+use {{namespace}}\Taxonomies\{{class}};
+
+/**
+ * @covers \{{namespace}}\Taxonomies\{{class}}
+ */
+final class {{class}}Test extends TestCase {
+
+	public function test_taxonomy_instantiates(): void {
+		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
+	}
+
+	public function test_taxonomy_registers(): void {
+		$this->markTestIncomplete( 'TODO: assert taxonomy_exists("{{slug}}") after register() is called.' );
+	}
+}

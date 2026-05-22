@@ -1,0 +1,67 @@
+{
+	"slug": "cron",
+	"category": "wp",
+	"name": "Cron job",
+	"description": "Adds a cron job class extending Abstract_Cron_Job from rtcamp/wp-php-toolkit. Always multi-instance (one class per scheduled hook).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace prefix.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc"
+		},
+		{
+			"key": "base_path",
+			"description": "PHP source base directory.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes"
+		},
+		{
+			"key": "name",
+			"description": "Cron job slug (kebab-case, e.g. 'sync-feed'). Used to derive the hook name and class.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "hook",
+			"description": "WordPress action hook name (snake_case, e.g. 'acme_sync_feed'). Used in wp_schedule_event() and add_action().",
+			"discover_from": "input:name",
+			"transform": "snake-case"
+		},
+		{
+			"key": "schedule",
+			"description": "WP cron schedule key. One of: 'hourly', 'twicedaily', 'daily', 'weekly'. Default 'daily'.",
+			"default": "daily"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/cron.php.mustache",
+			"dest": "{{base_path}}/Cron/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Plugin.php",
+			"anchor": "// scaffold:cron-jobs",
+			"snippet_template": "( new \\{{namespace}}\\Cron\\{{class}}() )->register();",
+			"description": "Instantiate the cron job so it schedules itself and binds its callback. Cron jobs are always multi-instance. Insert in the plugin bootstrap alongside other cron registrations."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "tests/Cron/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-php-toolkit": "^1.0"
+	}
+}

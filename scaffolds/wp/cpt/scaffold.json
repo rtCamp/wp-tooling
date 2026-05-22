@@ -1,0 +1,66 @@
+{
+	"slug": "cpt",
+	"category": "wp",
+	"name": "Custom Post Type",
+	"description": "Adds a Custom Post Type class extending Abstract_Post_Type from rtcamp/wp-php-toolkit. Always multi-instance (one class per post type).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace prefix.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc"
+		},
+		{
+			"key": "base_path",
+			"description": "PHP source base directory.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes"
+		},
+		{
+			"key": "slug",
+			"description": "Post type slug (kebab-case, used as the key in register_post_type(), e.g. 'product').",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "singular",
+			"description": "Singular human-readable label, e.g. 'Product'.",
+			"required": true
+		},
+		{
+			"key": "plural",
+			"description": "Plural human-readable label, e.g. 'Products'.",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/post-type.php.mustache",
+			"dest": "{{base_path}}/PostTypes/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Plugin.php",
+			"anchor": "// scaffold:post-types",
+			"snippet_template": "( new \\{{namespace}}\\PostTypes\\{{class}}() )->register();",
+			"description": "Instantiate the post type so it registers its init hook. Post types are always multi-instance (each instance carries the configuration for one post type). Insert in the plugin bootstrap alongside other post type registrations."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "tests/PostTypes/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-php-toolkit": "^1.0"
+	}
+}

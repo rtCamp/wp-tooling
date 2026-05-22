@@ -1,0 +1,27 @@
+<?php
+/**
+ * Tests for {{namespace}}\Cron\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Tests\Cron;
+
+use PHPUnit\Framework\TestCase;
+use {{namespace}}\Cron\{{class}};
+
+/**
+ * @covers \{{namespace}}\Cron\{{class}}
+ */
+final class {{class}}Test extends TestCase {
+
+	public function test_cron_instantiates(): void {
+		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
+	}
+
+	public function test_cron_schedules(): void {
+		$this->markTestIncomplete( 'TODO: assert wp_next_scheduled("{{hook}}") returns a timestamp after register().' );
+	}
+}

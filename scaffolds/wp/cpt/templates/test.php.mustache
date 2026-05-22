@@ -1,0 +1,27 @@
+<?php
+/**
+ * Tests for {{namespace}}\PostTypes\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Tests\PostTypes;
+
+use PHPUnit\Framework\TestCase;
+use {{namespace}}\PostTypes\{{class}};
+
+/**
+ * @covers \{{namespace}}\PostTypes\{{class}}
+ */
+final class {{class}}Test extends TestCase {
+
+	public function test_post_type_instantiates(): void {
+		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
+	}
+
+	public function test_post_type_registers(): void {
+		$this->markTestIncomplete( 'TODO: assert post_type_exists("{{slug}}") after register() is called.' );
+	}
+}

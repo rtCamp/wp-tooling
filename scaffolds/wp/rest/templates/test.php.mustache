@@ -1,0 +1,28 @@
+<?php
+/**
+ * Tests for {{namespace}}\Rest\{{class}}Controller.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}}\Tests\Rest;
+
+use PHPUnit\Framework\TestCase;
+use {{namespace}}\Rest\{{class}}Controller;
+
+/**
+ * @covers \{{namespace}}\Rest\{{class}}Controller
+ */
+final class {{class}}ControllerTest extends TestCase {
+
+	public function test_controller_instantiates(): void {
+{{#singleton}}		$this->assertInstanceOf( {{class}}Controller::class, {{class}}Controller::get_instance() );
+{{/singleton}}{{^singleton}}		$this->assertInstanceOf( {{class}}Controller::class, new {{class}}Controller() );
+{{/singleton}}	}
+
+	public function test_routes_register(): void {
+		$this->markTestIncomplete( 'TODO: assert routes appear in rest_get_server()->get_routes().' );
+	}
+}
