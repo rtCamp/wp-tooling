@@ -35,6 +35,9 @@
     "files": [
         "bin",
         "src",
+        "scaffolds",
+        "skills",
+        "docs",
         "README.md",
         "LICENSE"
     ],
