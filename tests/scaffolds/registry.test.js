@@ -343,6 +343,87 @@ describe('execute() error paths', () => {
 	});
 });
 
+describe('execute() passes scripts through to developer block', () => {
+	it('passes npm and composer scripts verbatim', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				category: 'lint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				files: [],
+				scripts: {
+					npm: {
+						'lint:js': 'eslint .',
+						'lint:js:fix': 'eslint . --fix',
+					},
+					composer: {
+						'lint:php': 'phpcs',
+					},
+				},
+			}),
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const result = await r.execute(
+			'lint/eslint',
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.developer.scripts).toEqual({
+			npm: { 'lint:js': 'eslint .', 'lint:js:fix': 'eslint . --fix' },
+			composer: { 'lint:php': 'phpcs' },
+		});
+	});
+
+	it('emits empty script maps when scaffold declares none', async () => {
+		const registry = new ScaffoldRegistry({ defaultsDir: FIXTURE });
+		await registry.scan();
+		const result = await registry.execute(
+			'wp/cli',
+			{ name: 'qm' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.developer.scripts).toEqual({ npm: {}, composer: {} });
+	});
+
+	it('merges npm_dev_dependencies into developer.install.npm', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				files: [],
+				npm_dev_dependencies: { eslint: '8.57.1' },
+				npm_dependencies: { 'react-runtime': '^18' },
+			}),
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const result = await r.execute(
+			'eslint',
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.developer.install.npm).toEqual({
+			'react-runtime': '^18',
+			eslint: '8.57.1',
+		});
+	});
+});
+
 describe('execute() never embeds secret values', () => {
 	it('passes through declared secrets without any value field', async () => {
 		const tmp = makeTmpDir();

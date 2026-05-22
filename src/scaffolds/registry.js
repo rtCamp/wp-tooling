@@ -254,6 +254,7 @@ class ScaffoldRegistry {
 			});
 		}
 
+		const scaffoldScripts = scaffold.scripts || {};
 		return {
 			scaffold: {
 				id: makeId(scaffold),
@@ -264,8 +265,18 @@ class ScaffoldRegistry {
 			engine: { wrote: filesCreated, skipped: filesSkipped },
 			developer: {
 				install: {
-					composer: { ...(scaffold.composer_dependencies || {}) },
-					npm: { ...(scaffold.npm_dependencies || {}) },
+					composer: {
+						...(scaffold.composer_dependencies || {}),
+						...(scaffold.composer_dev_dependencies || {}),
+					},
+					npm: {
+						...(scaffold.npm_dependencies || {}),
+						...(scaffold.npm_dev_dependencies || {}),
+					},
+				},
+				scripts: {
+					npm: { ...(scaffoldScripts.npm || {}) },
+					composer: { ...(scaffoldScripts.composer || {}) },
 				},
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},
