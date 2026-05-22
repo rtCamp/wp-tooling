@@ -1,0 +1,23 @@
+{
+	"slug": "jest",
+	"category": "setup",
+	"name": "Jest",
+	"description": "Adds jest.config.js extending @wordpress/jest-preset-default for WordPress JavaScript testing.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/jest.config.js.mustache",
+			"dest": "jest.config.js"
+		}
+	],
+	"npm_dev_dependencies": {
+		"@wordpress/jest-preset-default": "^12.0.0",
+		"@testing-library/jest-dom": "^6.0.0"
+	},
+	"scripts": {
+		"npm": {
+			"test:js": "jest",
+			"test:js:watch": "jest --watch"
+		}
+	}
+}

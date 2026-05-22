@@ -1,0 +1,28 @@
+{
+	"slug": "psr4",
+	"category": "setup",
+	"name": "PSR-4 autoload",
+	"description": "Wires PSR-4 autoload configuration into composer.json for the project's PHP source directory.",
+	"source": "template",
+	"files": [],
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "Root PHP namespace using backslash separators, without trailing backslash (e.g. Acme\\Blog). The engine adds the required PSR-4 trailing backslash.",
+			"required": true
+		},
+		{
+			"key": "base_path",
+			"description": "Directory containing the PHP source relative to the project root, without trailing slash (e.g. includes or src).",
+			"default": "includes"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "composer.json",
+			"anchor": "\"autoload\"",
+			"snippet_template": "\"autoload\": {\n    \"psr-4\": {\n        \"{{namespace}}\\\\\": \"{{base_path}}/\"\n    }\n}",
+			"description": "Merge PSR-4 autoload into composer.json. The namespace key must have JSON-encoded backslashes and a trailing backslash (e.g. PHP namespace Acme\\Blog becomes JSON key \"Acme\\\\Blog\\\\\"). Create the autoload block if absent. Run composer dump-autoload --optimize after applying."
+		}
+	]
+}
