@@ -122,6 +122,68 @@ describe('cli main()', () => {
 	});
 });
 
+describe('cli main() central error handling', () => {
+	let stdoutChunks;
+	let stderrChunks;
+	let stdoutSpy;
+	let stderrSpy;
+	let originalCommands;
+
+	beforeEach(() => {
+		stdoutChunks = [];
+		stderrChunks = [];
+		stdoutSpy = jest
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((chunk) => {
+				stdoutChunks.push(chunk.toString());
+				return true;
+			});
+		stderrSpy = jest
+			.spyOn(process.stderr, 'write')
+			.mockImplementation((chunk) => {
+				stderrChunks.push(chunk.toString());
+				return true;
+			});
+		originalCommands = { ...cli.COMMANDS };
+		for (const key of Object.keys(cli.COMMANDS)) {
+			delete cli.COMMANDS[key];
+		}
+	});
+
+	afterEach(() => {
+		stdoutSpy.mockRestore();
+		stderrSpy.mockRestore();
+		for (const key of Object.keys(cli.COMMANDS)) {
+			delete cli.COMMANDS[key];
+		}
+		Object.assign(cli.COMMANDS, originalCommands);
+	});
+
+	test('CancelledError from a subcommand exits 130 with a stderr message', async () => {
+		cli.COMMANDS.fake = {
+			summary: 'throws CancelledError',
+			run: async () => {
+				const err = new Error('Prompt cancelled by user.');
+				err.name = 'CancelledError';
+				throw err;
+			},
+		};
+		const code = await cli.main(['fake']);
+		expect(code).toBe(130);
+		expect(stderrChunks.join('')).toMatch(/wp-tooling: cancelled/);
+	});
+
+	test('non-CancelledError rejections propagate to the bin shim', async () => {
+		cli.COMMANDS.boom = {
+			summary: 'throws',
+			run: async () => {
+				throw new Error('disk on fire');
+			},
+		};
+		await expect(cli.main(['boom'])).rejects.toThrow('disk on fire');
+	});
+});
+
 describe('cli COMMANDS registry', () => {
 	test('detect-changes is registered with a summary and run handler', () => {
 		expect(cli.COMMANDS['detect-changes']).toBeDefined();

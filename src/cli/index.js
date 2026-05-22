@@ -102,6 +102,11 @@ function usage() {
  * throws from a subcommand become promise rejections, which the bin
  * shim's failure handler renders cleanly.
  *
+ * A `CancelledError` thrown from any TTY UI primitive (matched by
+ * `err.name === 'CancelledError'`) is caught centrally and mapped to
+ * exit code 130 -- the Unix convention for SIGINT -- so individual
+ * subcommands do not each need their own Ctrl+C handler.
+ *
  * @param {string[]} argv argv slice (without `node` and script path).
  * @return {Promise<number>} Process exit code.
  */
@@ -138,7 +143,17 @@ async function main(argv) {
 		return 2;
 	}
 
-	return command.run(argv.slice(1));
+	try {
+		return await command.run(argv.slice(1));
+	} catch (err) {
+		// Duck-typed so jest.isolateModules paths (which produce a second
+		// CancelledError class) still match.
+		if (err && err.name === 'CancelledError') {
+			process.stderr.write('wp-tooling: cancelled\n');
+			return 130;
+		}
+		throw err;
+	}
 }
 
 module.exports = {
