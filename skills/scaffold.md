@@ -155,19 +155,69 @@ Ask: `Apply this change to <targetFile>? [apply / different location / edit snip
 
 #### `ai.tests`
 
-Array of `{ path, framework, command? }`. After wiring is applied:
-
-1. Resolve the test command. If `command` is null:
-   - `phpunit`: look up `composer.json` `scripts.test` or fall back to `vendor/bin/phpunit <path>`.
-   - `jest`: look up `package.json` `scripts.test` or fall back to `npx jest <path>`.
-   - `actionlint`: `actionlint <path>` if available; fall back to a YAML parse (`node -e "require('yaml').parse(...)"`).
-2. Run the test. For code scaffolds, expect failure (the stub is incomplete by design).
-3. Edit the scaffolded production files to make the test pass, using the user's stated intent and the project conventions from step 2.
-4. Re-run the test. Expect success.
+Array of `{ path, framework, command? }`. The engine writes only a thin starter stub — usually one `markTestIncomplete` placeholder per scenario the scaffold could not anticipate. **You are responsible for expanding this into a real test suite and driving development from those tests.** See [Test-driven implementation loop](#test-driven-implementation-loop) below.
 
 #### `warnings`
 
 Print to the user. Don't let them silently drown.
+
+### 5b. Test-driven implementation loop
+
+After the wiring step is applied, drive the production code from tests. The scaffold engine only writes thin stubs; turn them into a comprehensive suite, then iterate red → green → refactor.
+
+**A. Expand the test stub.** Translate the developer's stated feature into explicit assertions. Cover:
+
+- **Happy path**: the central behaviour described by the developer.
+- **Edge cases**: empty input, missing optional fields, boundary values, large input.
+- **Error paths**: invalid input rejected with the right exception or HTTP code; permission failures handled.
+- **Integration points**: for `wp/cpt` assert `post_type_exists()` after `register()`; for `wp/rest` assert the route appears in `rest_get_server()->get_routes()` and a sample request returns the expected schema; for `wp/cron` assert `wp_next_scheduled()` returns a timestamp; for `wp/cli` assert `WP_CLI::add_command` was called or exercise `__invoke` directly with stubbed args.
+
+Pick the framework that fits each test:
+
+| Scaffold kind | Framework | What to test |
+|---|---|---|
+| `wp/cli` | PHPUnit | command behaviour, dry-run flag, output |
+| `wp/rest` | PHPUnit (integration over `WP_REST_Request`) | route registration, response shape, permissions |
+| `wp/cpt` | PHPUnit | post type registration, supports, REST exposure |
+| `wp/taxonomy` | PHPUnit | taxonomy registration, attached object types, term creation |
+| `wp/cron` | PHPUnit | hook scheduled, callback fires, unschedule works |
+| `block/dynamic` | Jest (edit.js) + PHPUnit (render.php) | renders without crashing, render callback returns expected markup |
+| `block/interactive` | Jest + Playwright | interactivity directives, store actions |
+| `utility/*` (PHP) | PHPUnit | unit-level behaviour |
+| `ci/*` workflows | actionlint + yaml-parse | syntactically valid; no runtime test |
+
+Strip every `markTestIncomplete` you reach — leaving even one in the final state is a failure.
+
+**B. Run the suite.** Resolve the command:
+
+- `phpunit`: prefer `composer test` or `composer test:unit`; fall back to `vendor/bin/phpunit <path>`.
+- `jest`: prefer `npm run test:js`; fall back to `npx jest <path>`.
+
+Expect failure on the first run. If the suite errors before running (missing dependency, missing test framework setup), invoke the relevant `setup/*` scaffold first and re-run.
+
+**C. Minimum implementation to flip one test green.** Edit the scaffolded production file to make one failing test pass. Do not implement multiple cases in one pass.
+
+**D. Re-run.** Confirm the one targeted test now passes; others may still fail.
+
+**E. Iterate B → D for each remaining failing test.** Keep loops tight (one test at a time). If you go three rounds without making progress on a test, stop and ask the developer for clarification rather than guessing — a stuck loop usually signals the feature requirements are ambiguous.
+
+**F. Refactor.** Once everything is green, clean up duplication, extract helpers, improve names. Re-run after each refactor.
+
+**G. Final gates before declaring done.** Run, in this order:
+
+1. The full PHPUnit suite (`composer test`) — not just the new file.
+2. The full Jest suite (`npm run test:js`) if JS was touched.
+3. Lint: `composer lint:php` and `npm run lint:js` as applicable.
+
+All four must be green. Surface any failures verbatim to the developer; do not "fix" pre-existing failures from outside the scaffold's scope without asking.
+
+**Hard rules for TDD:**
+
+- Never write production code before the corresponding test exists.
+- Never silently lower assertion strength to make a test pass (no `assertTrue(true)`, no widened type assertions).
+- Never delete or skip a test the developer would expect to pass. If a test is genuinely wrong, fix it and explain why in the final report.
+- Never leave `markTestIncomplete`, `markTestSkipped`, or `@todo` markers in the final committed state.
+- Stop and ask if the feature requirements are ambiguous after one round of guessing.
 
 ### 6. Report
 
@@ -176,7 +226,7 @@ End with a brief summary:
 - Files written (from `engine.wrote`).
 - Files skipped and why (from `engine.skipped`).
 - Wiring applied (where, what pattern).
-- Tests run (passing / failing).
+- Tests authored and final pass count (e.g. `tests/Cli/QmExportCommandTest.php — 7 tests, 7 passing`). Mention the lint result.
 - Developer actions outstanding (composer / npm installs, secrets to set, branch protection recommendation if it's a CI scaffold).
 
 Keep it scannable, not a novel.
@@ -282,5 +332,6 @@ For a multi-workflow setup ("set up CI + CD to WP.org"), chain `add` calls, one 
 ## Reference
 
 - Full engine contract: `node_modules/@rtcamp/wp-tooling/docs/ai-orchestration.md` (12-section contract this skill is built from).
+- Worked conversation examples: `node_modules/@rtcamp/wp-tooling/docs/examples.md` (CLI command, block, REST + CPT + taxonomy, CI/CD to WP.org, singleton conversion).
 - Engine source: `node_modules/@rtcamp/wp-tooling/src/scaffolds/`.
 - Engine commits to: zero TTY UI dependency in non-interactive mode, four-block JSON shape (`scaffold`, `engine`, `developer`, `ai`, `warnings`), no auto-overwrite, no secret values, no package-manager commands.
