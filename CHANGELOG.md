@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to `@rtcamp/wp-tooling` are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
@@ -15,6 +17,11 @@ All notable changes to this project will be documented in this file.
 - `CancelledError` -- thrown on Ctrl+C in any TTY-interactive prompt or select (including `text` and `confirm`, which surface cancellation through the underlying `readLine` SIGINT handler). Callers decide exit behaviour.
 - Low-level terminal helpers (`src/ui/core/terminal.js`) -- ANSI codes, cursor control, keypress events.
 - Jest test suite for all UI primitives (75 tests, including dedicated coverage for `src/ui/core/terminal.js`).
+- `@rtcamp/wp-tooling/ci` — `detectChanges` library function. Buckets changed files into css / js / php / gha counts against the diff base (auto-detected from `GITHUB_BASE_REF` for PRs, push event `before` SHA from `$GITHUB_EVENT_PATH` for pushes, `HEAD~1` as a last resort). Opt into per-bucket file lists with `{ includeFiles: true }`. Zero runtime dependencies.
+- `wp-tooling` CLI (`bin/wp-tooling.js`) — top-level dispatcher with subcommand registry, `--help`, and `--version`. `main()` always returns `Promise<number>`; a `CancelledError` thrown from any TTY UI primitive is caught centrally and mapped to exit code 130 so individual subcommands need no Ctrl+C handler. Unhandled rejections render as a one-line `wp-tooling: unexpected failure (...)` instead of a Node stack trace.
+- `wp-tooling detect-changes` subcommand. Supports `--output text|json|github`, `--ignore <regex>`, `--base <ref>`, `--files <path|->`, `--include-files`, and `--dry-run`. `--include-files` adds `<bucket>-files` arrays alongside counts (newline heredoc under `--output github`, space-joined under `--output text`, native arrays under `--output json`) so workflows can lint or test only the changed paths. With `--dry-run` and `--output github`, the would-be `$GITHUB_OUTPUT` lines are printed to stdout (prefixed with `[dry-run]`) instead of being appended to the file.
+- `@rtcamp/wp-tooling/hooks` — `installHooks` library function. Copies the bundled POSIX `commit-msg` (Conventional Commits validator) and `pre-commit` (`npm run lint:staged` runner) templates into the active git hooks directory. Resolves submodule and linked-worktree layouts via `git rev-parse --git-common-dir`. Zero runtime dependencies.
+- `wp-tooling install-hooks` subcommand. Supports `--force` (overwrite existing hooks, including Husky-managed ones) and `--dry-run` (print planned actions without writing). Existing hooks are detected and the skip hint names Husky explicitly when a Husky signature is present. Each installed hook carries a `# wp-tooling install-hooks v<X.Y.Z>` header so future runs can spot drift.
 - **Scaffold engine** (`src/scaffolds/`) with `ScaffoldRegistry`, hand-rolled JSON-schema validator, minimal Mustache-style renderer, and `execute()` programmatic API returning the four-block result shape (`scaffold` / `engine` / `developer` / `ai`). Engine core has zero runtime dependencies and zero TTY UI coupling, so it works from AI orchestrators, CI scripts, and headless harnesses. Implements WTL-02, WTL-06, WTL-07.
 - **Manifest extensions** in `scaffold.json` (WTL-07): optional `inputs[]` (project-portable variables with `discover_from` hints and transforms), `wiring[]` (cross-file registration snippets the caller applies with consent), `tests[]` (PHPUnit/Jest/actionlint/yaml-parse stubs), `secrets[]` (declarations only, never values).
 - **`bin/wp-tooling` dispatcher** with auto-registration of subcommands from `bin/commands/*.js`. Drop a new command file in; no edit to the dispatcher required.
