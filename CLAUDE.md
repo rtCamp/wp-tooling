@@ -152,6 +152,16 @@ Always include `Closes #<N>` in the PR body.
 
 ---
 
+## Editor integrity (VSCode)
+
+`.vscode/extensions.json` recommends **only extensions published by verified organisations** (Microsoft, GitHub, Red Hat, EditorConfig Foundation). No individual-published extensions, regardless of popularity.
+
+ESLint runs via the official Microsoft-maintained ESLint extension. Jest runs as a VSCode task (via `.vscode/tasks.json`). JavaScript / TypeScript IntelliSense is built into VSCode — no third-party extension needed. See [`docs/editor-setup.md`](docs/editor-setup.md) for the full policy.
+
+**Do not add unverified extensions to `.vscode/extensions.json`** — personal tools stay personal.
+
+---
+
 ## User preferences
 
 - No auto-commits — the developer runs all `git` commands themselves.

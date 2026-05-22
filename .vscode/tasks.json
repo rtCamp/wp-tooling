@@ -1,0 +1,50 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "JS: Lint (ESLint)",
+            "type": "npm",
+            "script": "lint",
+            "problemMatcher": "$eslint-stylish",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "JS: Auto-fix (ESLint)",
+            "type": "npm",
+            "script": "lint:fix",
+            "problemMatcher": "$eslint-stylish",
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "JS: Run tests (Jest)",
+            "type": "npm",
+            "script": "test",
+            "group": { "kind": "test", "isDefault": true },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "JS: Test watch (Jest)",
+            "type": "npm",
+            "script": "test:watch",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "JS: Coverage report",
+            "type": "npm",
+            "script": "test:coverage",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "shared" }
+        },
+        {
+            "label": "Check everything",
+            "dependsOrder": "sequence",
+            "dependsOn": ["JS: Lint (ESLint)", "JS: Run tests (Jest)"],
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": []
+        }
+    ]
+}
