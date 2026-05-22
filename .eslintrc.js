@@ -52,5 +52,11 @@ module.exports = {
                 'no-console': 'off',
             },
         },
+        {
+            files: [ 'examples/**/*.js' ],
+            rules: {
+                'no-console': 'off',
+            },
+        },
     ],
 };
