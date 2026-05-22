@@ -124,6 +124,12 @@ function summarise(scaffold) {
 			wiring: Array.isArray(scaffold.wiring) ? scaffold.wiring.length : 0,
 			tests: Array.isArray(scaffold.tests) ? scaffold.tests.length : 0,
 			secrets: Array.isArray(scaffold.secrets) ? scaffold.secrets.length : 0,
+			scripts: scaffold.scripts
+				? Object.values(scaffold.scripts).reduce(
+						(n, m) => n + Object.keys(m || {}).length,
+						0
+				  )
+				: 0,
 		},
 	};
 }
@@ -181,6 +187,9 @@ function formatCounts(counts) {
 	}
 	if (counts.secrets) {
 		parts.push(`secrets:${counts.secrets}`);
+	}
+	if (counts.scripts) {
+		parts.push(`scripts:${counts.scripts}`);
 	}
 	return parts.length ? parts.join(' ') : '';
 }

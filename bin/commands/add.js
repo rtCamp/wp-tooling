@@ -125,7 +125,15 @@ function printHumanReport(result) {
 	lines.push('');
 	const composer = Object.entries(developer.install.composer);
 	const npm = Object.entries(developer.install.npm);
-	if (composer.length || npm.length || developer.secrets.length) {
+	const npmScripts = developer.scripts ? Object.entries(developer.scripts.npm || {}) : [];
+	const composerScripts = developer.scripts ? Object.entries(developer.scripts.composer || {}) : [];
+	if (
+		composer.length
+		|| npm.length
+		|| developer.secrets.length
+		|| npmScripts.length
+		|| composerScripts.length
+	) {
 		lines.push('Developer actions:');
 		if (composer.length) {
 			lines.push('  Install (composer):');
@@ -134,6 +142,14 @@ function printHumanReport(result) {
 		if (npm.length) {
 			lines.push('  Install (npm):');
 			for (const [pkg, ver] of npm) lines.push(`    npm install ${pkg}@${ver}`);
+		}
+		if (npmScripts.length) {
+			lines.push('  Add to package.json "scripts":');
+			for (const [name, cmd] of npmScripts) lines.push(`    "${name}": "${cmd}"`);
+		}
+		if (composerScripts.length) {
+			lines.push('  Add to composer.json "scripts":');
+			for (const [name, cmd] of composerScripts) lines.push(`    "${name}": "${cmd}"`);
 		}
 		if (developer.secrets.length) {
 			lines.push('  Set secrets (run these yourself; I never set secrets):');
