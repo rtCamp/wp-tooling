@@ -164,13 +164,33 @@ describe('validate wiring block', () => {
 		).toEqual([]);
 	});
 
-	it('rejects wiring entry missing anchor', () => {
+	it('accepts a wiring entry with no anchor (anchor is advisory per the AI contract)', () => {
 		const errors = validate({
 			...baseValid(),
 			wiring: [{ target_file: 'x.php', snippet_template: 'y;' }],
 		});
+		expect(errors.filter((e) => e.includes('wiring'))).toEqual([]);
+	});
+
+	it('rejects a wiring entry whose anchor is an empty string', () => {
+		const errors = validate({
+			...baseValid(),
+			wiring: [
+				{ target_file: 'x.php', snippet_template: 'y;', anchor: '' },
+			],
+		});
 		expect(errors[0]).toMatch(
-			/wiring\[0\]\.anchor: must be a non-empty string/
+			/wiring\[0\]\.anchor: must be a non-empty string when present/
+		);
+	});
+
+	it('rejects a wiring entry missing snippet_template', () => {
+		const errors = validate({
+			...baseValid(),
+			wiring: [{ target_file: 'x.php' }],
+		});
+		expect(errors[0]).toMatch(
+			/wiring\[0\]\.snippet_template: must be a non-empty string/
 		);
 	});
 });

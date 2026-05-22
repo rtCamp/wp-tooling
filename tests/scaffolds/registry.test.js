@@ -251,7 +251,13 @@ describe('execute() result shape', () => {
 		});
 		expect(result.engine.wrote).toEqual(['includes/Cli/QmExport.php']);
 		expect(result.engine.skipped).toEqual([]);
-		expect(result.developer.install).toEqual({ composer: {}, npm: {} });
+		expect(result.developer.install).toEqual({
+			composer: {},
+			composerDev: {},
+			composerSuggest: {},
+			npm: {},
+			npmDev: {},
+		});
 		expect(result.developer.secrets).toEqual([]);
 		expect(result.ai.wiring).toHaveLength(1);
 		expect(result.ai.wiring[0].targetFile).toBe('includes/Plugin.php');
@@ -393,7 +399,7 @@ describe('execute() passes scripts through to developer block', () => {
 		expect(result.developer.scripts).toEqual({ npm: {}, composer: {} });
 	});
 
-	it('merges npm_dev_dependencies into developer.install.npm', async () => {
+	it('keeps npm runtime vs dev vs composer-suggest in distinct fields (no merging)', async () => {
 		const tmp = makeTmpDir();
 		const sDir = path.join(tmp, 'lint');
 		await fs.mkdir(sDir, { recursive: true });
@@ -405,8 +411,12 @@ describe('execute() passes scripts through to developer block', () => {
 				description: 'ESLint',
 				source: 'template',
 				files: [],
-				npm_dev_dependencies: { eslint: '8.57.1' },
 				npm_dependencies: { 'react-runtime': '^18' },
+				npm_dev_dependencies: { eslint: '8.57.1' },
+				composer_dev_dependencies: {
+					'squizlabs/php_codesniffer': '^3',
+				},
+				composer_suggest: { 'rtcamp/wp-php-toolkit': '^1' },
 			}),
 			'utf8'
 		);
@@ -417,9 +427,18 @@ describe('execute() passes scripts through to developer block', () => {
 			{},
 			{ dryRun: true, cwd: makeTmpDir() }
 		);
+		// Each map is surfaced in its own field so a consumer can pick the
+		// right install command (composer require vs composer require --dev
+		// vs the optional "suggest" hint). Merging would lose that signal.
 		expect(result.developer.install.npm).toEqual({
 			'react-runtime': '^18',
-			eslint: '8.57.1',
+		});
+		expect(result.developer.install.npmDev).toEqual({ eslint: '8.57.1' });
+		expect(result.developer.install.composerDev).toEqual({
+			'squizlabs/php_codesniffer': '^3',
+		});
+		expect(result.developer.install.composerSuggest).toEqual({
+			'rtcamp/wp-php-toolkit': '^1',
 		});
 	});
 });

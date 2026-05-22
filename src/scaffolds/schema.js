@@ -82,9 +82,13 @@ const INPUT_ENTRY = {
 	},
 };
 
+// `anchor` is intentionally NOT required: the AI contract treats it as advisory
+// (the AI falls through to pattern sampling when no anchor is present in the
+// target file). Validate that it's a non-empty string when supplied, but allow
+// scaffolds to omit it entirely. See docs/ai-orchestration.md for the rule.
 const WIRING_ENTRY = {
 	type: 'object',
-	required: ['target_file', 'anchor', 'snippet_template'],
+	required: ['target_file', 'snippet_template'],
 	additionalProperties: false,
 	properties: {
 		target_file: { type: 'string', minLength: 1 },

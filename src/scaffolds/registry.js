@@ -226,26 +226,35 @@ class ScaffoldRegistry {
 			description: w.description || '',
 		}));
 
+		// Declarative tests (lint-only entries like actionlint on the YAML the
+		// files-loop just wrote) reuse a files[].dest. Track those so we don't
+		// re-check existence (always true post-write), don't re-write, and don't
+		// emit a false-positive "already exists" warning.
+		const writtenDestSet = new Set(filesCreated);
+
 		const aiTests = [];
 		for (const t of scaffold.tests || []) {
 			const destRel = render(t.dest, resolved);
-			const destAbs = path.join(cwd, destRel);
-			if (await pathExists(destAbs)) {
-				warnings.push(
-					`test stub already exists, not overwritten: ${destRel}`
-				);
-			} else if (!dryRun) {
-				const srcAbs = path.join(scaffold._dir, t.src);
-				const tpl = await fs.readFile(srcAbs, 'utf8');
-				const out = render(tpl, resolved);
-				await fs.mkdir(path.dirname(destAbs), { recursive: true });
-				await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
-					throw new ScaffoldError(
-						'EWRITEFAIL',
-						`Failed to write ${destRel}: ${err.code || err.message}`,
-						{ path: destRel, errno: err.code }
+			const isDeclarativeLint = writtenDestSet.has(destRel);
+			if (!isDeclarativeLint) {
+				const destAbs = path.join(cwd, destRel);
+				if (await pathExists(destAbs)) {
+					warnings.push(
+						`test stub already exists, not overwritten: ${destRel}`
 					);
-				});
+				} else if (!dryRun) {
+					const srcAbs = path.join(scaffold._dir, t.src);
+					const tpl = await fs.readFile(srcAbs, 'utf8');
+					const out = render(tpl, resolved);
+					await fs.mkdir(path.dirname(destAbs), { recursive: true });
+					await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
+						throw new ScaffoldError(
+							'EWRITEFAIL',
+							`Failed to write ${destRel}: ${err.code || err.message}`,
+							{ path: destRel, errno: err.code }
+						);
+					});
+				}
 			}
 			aiTests.push({
 				path: destRel,
@@ -265,14 +274,13 @@ class ScaffoldRegistry {
 			engine: { wrote: filesCreated, skipped: filesSkipped },
 			developer: {
 				install: {
-					composer: {
-						...(scaffold.composer_dependencies || {}),
+					composer: { ...(scaffold.composer_dependencies || {}) },
+					composerDev: {
 						...(scaffold.composer_dev_dependencies || {}),
 					},
-					npm: {
-						...(scaffold.npm_dependencies || {}),
-						...(scaffold.npm_dev_dependencies || {}),
-					},
+					composerSuggest: { ...(scaffold.composer_suggest || {}) },
+					npm: { ...(scaffold.npm_dependencies || {}) },
+					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
 				scripts: {
 					npm: { ...(scaffoldScripts.npm || {}) },

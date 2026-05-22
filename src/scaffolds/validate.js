@@ -270,12 +270,23 @@ function validateWiring(wiring) {
 			errors.push(`${fieldPath}: must be an object`);
 			continue;
 		}
-		for (const field of ['target_file', 'anchor', 'snippet_template']) {
+		// target_file and snippet_template are required (engine needs both to
+		// place anything). anchor is advisory per the AI contract: validate it's
+		// a non-empty string WHEN PRESENT, but allow scaffolds to omit it.
+		for (const field of ['target_file', 'snippet_template']) {
 			if (typeof entry[field] !== 'string' || entry[field].length === 0) {
 				errors.push(
 					`${fieldPath}.${field}: must be a non-empty string`
 				);
 			}
+		}
+		if (
+			entry.anchor !== undefined &&
+			(typeof entry.anchor !== 'string' || entry.anchor.length === 0)
+		) {
+			errors.push(
+				`${fieldPath}.anchor: must be a non-empty string when present`
+			);
 		}
 		if (
 			entry.description !== undefined &&
