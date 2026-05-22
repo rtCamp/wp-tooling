@@ -1,6 +1,6 @@
 /**
  * Interactive input collector. The ONLY module under src/scaffolds/ that
- * imports the TTY UI kit. Called from `bin/commands/add.js` in interactive
+ * imports the TTY UI kit. Called from `src/scaffolds/add.js` in interactive
  * mode only. AI orchestrators and CI scripts never load this file.
  *
  * Catches `EMISSINGINPUT` errors from `registry.execute()` and prompts the

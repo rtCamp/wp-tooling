@@ -330,3 +330,135 @@ describe('validate dependency maps', () => {
 		);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// CLI surface (runCli) — `wp-tooling validate [scaffold-id...] [flags]`
+// ---------------------------------------------------------------------------
+
+const fssync = require('fs');
+const os = require('os');
+const path = require('path');
+
+const { runCli } = require('../../src/scaffolds/validate');
+
+function makeTmpDir() {
+	return fssync.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-validate-'));
+}
+
+async function withStdoutCapture(fn) {
+	let captured = '';
+	// eslint-disable-next-line @wordpress/no-unused-vars-before-return -- needed for finally{} restore.
+	const original = process.stdout.write.bind(process.stdout);
+	process.stdout.write = (chunk) => {
+		captured += chunk;
+		return true;
+	};
+	try {
+		const code = await fn();
+		return { code, stdout: captured };
+	} finally {
+		process.stdout.write = original;
+	}
+}
+
+async function withStderrCapture(fn) {
+	let captured = '';
+	// eslint-disable-next-line @wordpress/no-unused-vars-before-return -- needed for finally{} restore.
+	const original = process.stderr.write.bind(process.stderr);
+	process.stderr.write = (chunk) => {
+		captured += chunk;
+		return true;
+	};
+	try {
+		const code = await fn();
+		return { code, stderr: captured };
+	} finally {
+		process.stderr.write = original;
+	}
+}
+
+describe('validate runCli', () => {
+	it('exits 0 on --help and prints usage', async () => {
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['--help'])
+		);
+		expect(code).toBe(0);
+		expect(stdout).toContain('Usage: wp-tooling validate');
+	});
+
+	it('validates the whole bundled catalogue with exit 0', async () => {
+		const { code, stdout } = await withStdoutCapture(() => runCli([]));
+		expect(code).toBe(0);
+		expect(stdout).toMatch(/Total: \d+  valid: \d+  invalid: 0/);
+	});
+
+	it('filters by single scaffold id', async () => {
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['wp/cli'])
+		);
+		expect(code).toBe(0);
+		expect(stdout).toMatch(/ok\s+wp\/cli/);
+		expect(stdout).toMatch(/Total: 1/);
+	});
+
+	it('exits 1 on unknown scaffold id with available list', async () => {
+		const { code, stderr } = await withStderrCapture(() =>
+			runCli(['no/such'])
+		);
+		expect(code).toBe(1);
+		expect(stderr).toMatch(/No scaffolds matched: no\/such/);
+		expect(stderr).toMatch(/Available ids:/);
+	});
+
+	it('--json emits machine-readable results', async () => {
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['wp/cli', '--json'])
+		);
+		expect(code).toBe(0);
+		const parsed = JSON.parse(stdout.trim());
+		expect(parsed.results).toHaveLength(1);
+		expect(parsed.results[0].id).toBe('wp/cli');
+		expect(parsed.results[0].valid).toBe(true);
+	});
+
+	it('--json emits structured error for unknown id on stderr', async () => {
+		const { code, stderr } = await withStderrCapture(() =>
+			runCli(['no/such', '--json'])
+		);
+		expect(code).toBe(1);
+		const parsed = JSON.parse(stderr.trim());
+		expect(parsed.code).toBe('ENOSCAFFOLD');
+		expect(Array.isArray(parsed.available)).toBe(true);
+	});
+
+	it('includes project-local scaffolds when --cwd is set', async () => {
+		const cwd = makeTmpDir();
+		const localDir = path.join(cwd, 'bin', 'scaffolds', 'custom', 'thing');
+		fssync.mkdirSync(localDir, { recursive: true });
+		fssync.writeFileSync(
+			path.join(localDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'thing',
+				category: 'custom',
+				name: 'Thing',
+				description: 'A custom thing.',
+				source: 'package',
+				files: [],
+			}),
+			'utf8'
+		);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['custom/thing', '--cwd', cwd])
+		);
+		expect(code).toBe(0);
+		expect(stdout).toMatch(/ok\s+custom\/thing/);
+	});
+
+	it('rejects unknown flags', async () => {
+		const { code, stderr } = await withStderrCapture(() =>
+			runCli(['--bogus'])
+		);
+		expect(code).toBe(1);
+		expect(stderr).toMatch(/Unexpected flag: --bogus/);
+	});
+});

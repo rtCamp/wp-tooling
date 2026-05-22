@@ -1,5 +1,5 @@
 /**
- * Tests for bin/commands/list.js.
+ * Tests for src/scaffolds/list.js (library + CLI).
  *
  * Covers default human output, --json output shape, filters (--category, --origin),
  * and validation of the --origin enum.
@@ -12,7 +12,7 @@ const fssync = require('fs');
 const os = require('os');
 const path = require('path');
 
-const list = require('../../bin/commands/list');
+const list = require('../../src/scaffolds/list');
 
 function makeTmpDir() {
 	return fssync.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-list-'));
@@ -54,25 +54,22 @@ async function withStdoutCapture(fn) {
 
 describe('list command help / parsing', () => {
 	it('--help prints usage and exits 0', async () => {
-		const originalLog = console.log;
-		let captured = '';
-		console.log = (s) => {
-			captured += s;
-		};
-		const code = await list.run(['--help']);
-		console.log = originalLog;
+		const { code, stdout } = await withStdoutCapture(() =>
+			list.runCli(['--help'])
+		);
 		expect(code).toBe(0);
-		expect(captured).toContain('Usage: wp-tooling list');
+		expect(stdout).toContain('Usage: wp-tooling list');
 	});
 
 	it('rejects --origin with invalid value', async () => {
-		const originalErr = console.error;
+		const originalErr = process.stderr.write.bind(process.stderr);
 		let captured = '';
-		console.error = (s) => {
-			captured += s;
+		process.stderr.write = (chunk) => {
+			captured += chunk;
+			return true;
 		};
-		const code = await list.run(['--origin=neither']);
-		console.error = originalErr;
+		const code = await list.runCli(['--origin=neither']);
+		process.stderr.write = originalErr;
 		expect(code).toBe(1);
 		expect(captured).toMatch(/--origin must be/);
 	});
@@ -82,7 +79,7 @@ describe('list command, human output (default catalogue only)', () => {
 	it('lists all bundled scaffolds with categories', async () => {
 		const cwd = makeTmpDir(); // empty project, only bundled defaults
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd])
+			list.runCli(['--cwd', cwd])
 		);
 		expect(code).toBe(0);
 		expect(stdout).toContain('Available scaffolds');
@@ -95,7 +92,7 @@ describe('list command, human output (default catalogue only)', () => {
 	it('shows kind: package for source: package scaffolds', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--category=utility'])
+			list.runCli(['--cwd', cwd, '--category=utility'])
 		);
 		expect(code).toBe(0);
 		expect(stdout).toContain('package');
@@ -106,7 +103,7 @@ describe('list command, --json output', () => {
 	it('emits a single JSON line on stdout', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json'])
+			list.runCli(['--cwd', cwd, '--json'])
 		);
 		expect(code).toBe(0);
 		const lines = stdout.trim().split('\n');
@@ -119,7 +116,7 @@ describe('list command, --json output', () => {
 	it('JSON entries carry the expected shape and counts', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json', '--category=utility'])
+			list.runCli(['--cwd', cwd, '--json', '--category=utility'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
@@ -147,7 +144,7 @@ describe('list command, --json output', () => {
 	it('reports secrets for the WPORG workflow scaffold', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json', '--category=ci'])
+			list.runCli(['--cwd', cwd, '--json', '--category=ci'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
@@ -162,7 +159,7 @@ describe('list command, two-directory merge', () => {
 		const cwd = makeTmpDir();
 		await writeProjectScaffold(cwd, 'custom/widget', 'Custom Widget');
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json'])
+			list.runCli(['--cwd', cwd, '--json'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
@@ -176,7 +173,7 @@ describe('list command, two-directory merge', () => {
 		const cwd = makeTmpDir();
 		await writeProjectScaffold(cwd, 'custom/widget', 'Custom Widget');
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json', '--origin=project'])
+			list.runCli(['--cwd', cwd, '--json', '--origin=project'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
@@ -188,7 +185,7 @@ describe('list command, two-directory merge', () => {
 	it('--category filter narrows the listing', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json', '--category=block'])
+			list.runCli(['--cwd', cwd, '--json', '--category=block'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
@@ -200,7 +197,7 @@ describe('list command, two-directory merge', () => {
 	it('empty filter returns an empty scaffolds array (not an error)', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.run(['--cwd', cwd, '--json', '--category=nonexistent'])
+			list.runCli(['--cwd', cwd, '--json', '--category=nonexistent'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());

@@ -13,7 +13,7 @@
  * kit. AI orchestrators and CI callers must be able to use it from any
  * context (non-TTY containers, headless harnesses, JSON-only pipelines).
  * Interactive prompting lives in `src/scaffolds/prompt-inputs.js` and is
- * only invoked from `bin/commands/add.js` in interactive mode.
+ * only invoked from `src/scaffolds/add.js` in interactive mode.
  *
  * Implements:
  *   WTL-02  scan / get / filter / collectDependencies

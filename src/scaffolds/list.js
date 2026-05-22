@@ -1,5 +1,5 @@
 /**
- * `wp-tooling list` subcommand.
+ * `wp-tooling list` -- library + CLI implementation.
  *
  * Lists every scaffold visible from the current working directory's merged
  * catalogue (wp-tooling's bundled defaults + the project's `bin/scaffolds/`).
@@ -11,6 +11,8 @@
  *     decide what to add without reading every scaffold.json. Skills can
  *     follow up with `add ... --dry-run --json` for full per-scaffold detail.
  *
+ * The `src/cli/commands/list.js` thin shim defers to `runCli` here.
+ *
  * Implements:
  *   WTL-06  CLI surface adjacent to `add` (same registry, same dispatcher)
  */
@@ -18,11 +20,7 @@
 'use strict';
 
 const path = require('path');
-const {
-	ScaffoldRegistry,
-} = require('../../src/scaffolds/registry');
-
-const description = 'List all available scaffolds in the merged catalogue.';
+const { ScaffoldRegistry } = require('./registry');
 
 function parseArgs(argv) {
 	const opts = {
@@ -58,7 +56,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-	console.log(
+	process.stdout.write(
 		[
 			'Usage: wp-tooling list [flags]',
 			'',
@@ -74,6 +72,7 @@ function printHelp() {
 			'  wp-tooling list --category=ci',
 			'  wp-tooling list --json',
 			'  wp-tooling list --origin=project --cwd=/path/to/plugin',
+			'',
 		].join('\n')
 	);
 }
@@ -123,20 +122,23 @@ function summarise(scaffold) {
 			inputs: Array.isArray(scaffold.inputs) ? scaffold.inputs.length : 0,
 			wiring: Array.isArray(scaffold.wiring) ? scaffold.wiring.length : 0,
 			tests: Array.isArray(scaffold.tests) ? scaffold.tests.length : 0,
-			secrets: Array.isArray(scaffold.secrets) ? scaffold.secrets.length : 0,
+			secrets: Array.isArray(scaffold.secrets)
+				? scaffold.secrets.length
+				: 0,
 			scripts: scaffold.scripts
 				? Object.values(scaffold.scripts).reduce(
 						(n, m) => n + Object.keys(m || {}).length,
 						0
-				  )
+					)
 				: 0,
 		},
 	};
 }
 
 function printHumanTable(summaries) {
+	const writeln = (s) => process.stdout.write(`${s}\n`);
 	if (summaries.length === 0) {
-		console.log('No scaffolds match the given filters.');
+		writeln('No scaffolds match the given filters.');
 		return;
 	}
 
@@ -149,29 +151,34 @@ function printHumanTable(summaries) {
 		byCategory.get(key).push(s);
 	}
 
-	const idWidth = Math.max(
-		8,
-		...summaries.map((s) => s.id.length)
-	);
+	const idWidth = Math.max(8, ...summaries.map((s) => s.id.length));
 
-	console.log(`Available scaffolds (${summaries.length}):`);
+	writeln(`Available scaffolds (${summaries.length}):`);
 
 	const categories = Array.from(byCategory.keys()).sort();
 	for (const cat of categories) {
-		console.log(`\n  ${cat.toUpperCase()}`);
-		for (const s of byCategory.get(cat).sort((a, b) => a.id.localeCompare(b.id))) {
+		writeln(`\n  ${cat.toUpperCase()}`);
+		for (const s of byCategory
+			.get(cat)
+			.sort((a, b) => a.id.localeCompare(b.id))) {
 			const id = s.id.padEnd(idWidth);
 			const meta = `${s.kind.padEnd(8)} ${s.origin.padEnd(7)}`;
 			const counts = formatCounts(s.counts);
-			console.log(`    ${id}  ${meta}  ${s.name}`);
-			console.log(`    ${' '.repeat(idWidth)}  ${' '.repeat(meta.length)}  ${s.description}`);
+			writeln(`    ${id}  ${meta}  ${s.name}`);
+			writeln(
+				`    ${' '.repeat(idWidth)}  ${' '.repeat(meta.length)}  ${
+					s.description
+				}`
+			);
 			if (counts) {
-				console.log(`    ${' '.repeat(idWidth)}  ${' '.repeat(meta.length)}  ${counts}`);
+				writeln(
+					`    ${' '.repeat(idWidth)}  ${' '.repeat(meta.length)}  ${counts}`
+				);
 			}
 		}
 	}
 
-	console.log('\nRun `wp-tooling add <id> --help` to scaffold one.');
+	writeln('\nRun `wp-tooling add <id> --help` to scaffold one.');
 }
 
 function formatCounts(counts) {
@@ -194,14 +201,16 @@ function formatCounts(counts) {
 	return parts.length ? parts.join(' ') : '';
 }
 
-async function run(argv) {
+async function runCli(argv) {
 	const opts = parseArgs(argv);
 	if (opts.help) {
 		printHelp();
 		return 0;
 	}
 	if (opts.origin && !['default', 'project'].includes(opts.origin)) {
-		console.error(`Error: --origin must be 'default' or 'project' (got '${opts.origin}')`);
+		process.stderr.write(
+			`Error: --origin must be 'default' or 'project' (got '${opts.origin}')\n`
+		);
 		return 1;
 	}
 	try {
@@ -210,7 +219,9 @@ async function run(argv) {
 		const filtered = applyFilters(all, opts);
 		const summaries = filtered.map(summarise);
 		if (opts.json) {
-			process.stdout.write(JSON.stringify({ scaffolds: summaries }) + '\n');
+			process.stdout.write(
+				JSON.stringify({ scaffolds: summaries }) + '\n'
+			);
 		} else {
 			printHumanTable(summaries);
 		}
@@ -224,10 +235,18 @@ async function run(argv) {
 				}) + '\n'
 			);
 		} else {
-			console.error(`Error: ${err && err.message ? err.message : err}`);
+			process.stderr.write(
+				`Error: ${err && err.message ? err.message : err}\n`
+			);
 		}
 		return 1;
 	}
 }
 
-module.exports = { run, description };
+module.exports = {
+	runCli,
+	parseArgs,
+	printHelp,
+	buildRegistry,
+	summarise,
+};

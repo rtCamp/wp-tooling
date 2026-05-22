@@ -1,5 +1,5 @@
 /**
- * Tests for bin/commands/add.js.
+ * Tests for src/scaffolds/add.js (library + CLI).
  *
  * Argument parsing and the non-interactive code path. The interactive
  * path is tested separately because it loads the TTY UI; here we only
@@ -13,7 +13,7 @@ const fssync = require('fs');
 const os = require('os');
 const path = require('path');
 
-const add = require('../../bin/commands/add');
+const add = require('../../src/scaffolds/add');
 
 function makeTmpDir() {
 	return fssync.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-add-'));
@@ -49,25 +49,26 @@ describe('add command argument parsing', () => {
 	// Indirectly tested via the run() invocations below; this block focuses on edge cases
 	// we cannot reach by run(), like `--help`.
 	it('exits 0 on --help without doing work', async () => {
-		const originalLog = console.log;
+		const originalOut = process.stdout.write.bind(process.stdout);
 		let captured = '';
-		console.log = (s) => {
-			captured += s;
+		process.stdout.write = (chunk) => {
+			captured += chunk;
+			return true;
 		};
-		const code = await add.run(['--help']);
-		console.log = originalLog;
+		const code = await add.runCli(['--help']);
+		process.stdout.write = originalOut;
 		expect(code).toBe(0);
 		expect(captured).toContain('Usage: wp-tooling add');
 	});
 
 	it('exits 1 when scaffold id is missing', async () => {
-		const originalError = console.error;
-		const originalLog = console.log;
-		console.error = () => {};
-		console.log = () => {};
-		const code = await add.run(['--non-interactive']);
-		console.error = originalError;
-		console.log = originalLog;
+		const originalOut = process.stdout.write.bind(process.stdout);
+		const originalErr = process.stderr.write.bind(process.stderr);
+		process.stdout.write = () => true;
+		process.stderr.write = () => true;
+		const code = await add.runCli(['--non-interactive']);
+		process.stdout.write = originalOut;
+		process.stderr.write = originalErr;
 		expect(code).toBe(1);
 	});
 });
@@ -76,16 +77,16 @@ describe('add command non-interactive flow', () => {
 	it('writes files in non-interactive mode', async () => {
 		const cwd = makeTmpDir();
 		await buildProjectWithScaffold(cwd);
-		const originalLog = console.log;
-		console.log = () => {};
-		const code = await add.run([
+		const originalOut = process.stdout.write.bind(process.stdout);
+		process.stdout.write = () => true;
+		const code = await add.runCli([
 			'test/echo',
 			'--non-interactive',
 			'--cwd',
 			cwd,
 			'--value=hello',
 		]);
-		console.log = originalLog;
+		process.stdout.write = originalOut;
 		expect(code).toBe(0);
 		const wrote = await fs.readFile(path.join(cwd, 'out.txt'), 'utf8');
 		expect(wrote).toBe('value=hello\n');
@@ -100,7 +101,7 @@ describe('add command non-interactive flow', () => {
 			captured += chunk;
 			return true;
 		};
-		const code = await add.run([
+		const code = await add.runCli([
 			'test/echo',
 			'--json',
 			'--cwd',
@@ -119,9 +120,9 @@ describe('add command non-interactive flow', () => {
 	it('--dry-run does not write files', async () => {
 		const cwd = makeTmpDir();
 		await buildProjectWithScaffold(cwd);
-		const originalLog = console.log;
-		console.log = () => {};
-		const code = await add.run([
+		const originalOut = process.stdout.write.bind(process.stdout);
+		process.stdout.write = () => true;
+		const code = await add.runCli([
 			'test/echo',
 			'--non-interactive',
 			'--dry-run',
@@ -129,7 +130,7 @@ describe('add command non-interactive flow', () => {
 			cwd,
 			'--value=hi',
 		]);
-		console.log = originalLog;
+		process.stdout.write = originalOut;
 		expect(code).toBe(0);
 		await expect(fs.access(path.join(cwd, 'out.txt'))).rejects.toThrow();
 	});
@@ -143,7 +144,7 @@ describe('add command non-interactive flow', () => {
 			captured += chunk;
 			return true;
 		};
-		const code = await add.run(['test/echo', '--json', '--cwd', cwd]);
+		const code = await add.runCli(['test/echo', '--json', '--cwd', cwd]);
 		process.stderr.write = originalErr;
 		expect(code).toBe(1);
 		const result = JSON.parse(captured.trim().split('\n').pop());
@@ -160,7 +161,7 @@ describe('add command non-interactive flow', () => {
 			captured += chunk;
 			return true;
 		};
-		const code = await add.run(['no/such', '--json', '--cwd', cwd]);
+		const code = await add.runCli(['no/such', '--json', '--cwd', cwd]);
 		process.stderr.write = originalErr;
 		expect(code).toBe(1);
 		const result = JSON.parse(captured.trim().split('\n').pop());
@@ -171,7 +172,7 @@ describe('add command non-interactive flow', () => {
 
 describe('engine core is not coupled to TTY UI', () => {
 	it('non-interactive code path does not require the TTY UI kit', async () => {
-		// If `bin/commands/add.js` eagerly loaded TTY UI at top-level, this test would still
+		// If `src/cli/commands/add.js` eagerly loaded TTY UI at top-level, this test would still
 		// pass (the UI is in @rtcamp/wp-tooling on disk), but the eager-load is exactly what
 		// we want to avoid. We at least assert that registry execute() works without it.
 		const { ScaffoldRegistry } = require('../../src/scaffolds/registry');
