@@ -44,60 +44,61 @@ describe('cli main()', () => {
 		stderrSpy.mockRestore();
 	});
 
-	test('no args prints top-level usage and exits 0', () => {
-		const code = cli.main([]);
+	test('no args prints top-level usage and exits 0', async () => {
+		const code = await cli.main([]);
 		expect(code).toBe(0);
 		const out = stdoutChunks.join('');
 		expect(out).toMatch(/Usage: wp-tooling/);
 		expect(out).toMatch(/detect-changes/);
+		expect(out).toMatch(/install-hooks/);
 	});
 
-	test('--help prints top-level usage', () => {
-		const code = cli.main(['--help']);
+	test('--help prints top-level usage', async () => {
+		const code = await cli.main(['--help']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling/);
 	});
 
-	test('-h prints top-level usage', () => {
-		const code = cli.main(['-h']);
+	test('-h prints top-level usage', async () => {
+		const code = await cli.main(['-h']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling/);
 	});
 
-	test('--version prints package version and exits 0', () => {
-		const code = cli.main(['--version']);
+	test('--version prints package version and exits 0', async () => {
+		const code = await cli.main(['--version']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('').trim()).toBe(PKG.version);
 	});
 
-	test('-v prints package version', () => {
-		const code = cli.main(['-v']);
+	test('-v prints package version', async () => {
+		const code = await cli.main(['-v']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('').trim()).toBe(PKG.version);
 	});
 
-	test('unknown top-level flag exits 2 with stderr message', () => {
-		const code = cli.main(['--bogus']);
+	test('unknown top-level flag exits 2 with stderr message', async () => {
+		const code = await cli.main(['--bogus']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/unknown option "--bogus"/);
 	});
 
-	test('unknown subcommand exits 2 with stderr message', () => {
-		const code = cli.main(['frobnicate']);
+	test('unknown subcommand exits 2 with stderr message', async () => {
+		const code = await cli.main(['frobnicate']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/unknown command "frobnicate"/);
 	});
 
-	test('routes detect-changes --help to its runCli', () => {
-		const code = cli.main(['detect-changes', '--help']);
+	test('routes detect-changes --help to its runCli', async () => {
+		const code = await cli.main(['detect-changes', '--help']);
 		expect(code).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(/Usage: detect-changes/);
 	});
 
-	test('routes detect-changes through to its runCli with args', () => {
+	test('routes detect-changes through to its runCli with args', async () => {
 		const f = tmpFile('files.txt', 'src/a.js\nsrc/b.scss\n');
 		try {
-			const code = cli.main([
+			const code = await cli.main([
 				'detect-changes',
 				'--files',
 				f,
@@ -114,10 +115,72 @@ describe('cli main()', () => {
 		}
 	});
 
-	test('detect-changes propagates a usage-error exit code', () => {
-		const code = cli.main(['detect-changes', '--output', 'xml']);
+	test('detect-changes propagates a usage-error exit code', async () => {
+		const code = await cli.main(['detect-changes', '--output', 'xml']);
 		expect(code).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/invalid --output/);
+	});
+});
+
+describe('cli main() central error handling', () => {
+	let stdoutChunks;
+	let stderrChunks;
+	let stdoutSpy;
+	let stderrSpy;
+	let originalCommands;
+
+	beforeEach(() => {
+		stdoutChunks = [];
+		stderrChunks = [];
+		stdoutSpy = jest
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((chunk) => {
+				stdoutChunks.push(chunk.toString());
+				return true;
+			});
+		stderrSpy = jest
+			.spyOn(process.stderr, 'write')
+			.mockImplementation((chunk) => {
+				stderrChunks.push(chunk.toString());
+				return true;
+			});
+		originalCommands = { ...cli.COMMANDS };
+		for (const key of Object.keys(cli.COMMANDS)) {
+			delete cli.COMMANDS[key];
+		}
+	});
+
+	afterEach(() => {
+		stdoutSpy.mockRestore();
+		stderrSpy.mockRestore();
+		for (const key of Object.keys(cli.COMMANDS)) {
+			delete cli.COMMANDS[key];
+		}
+		Object.assign(cli.COMMANDS, originalCommands);
+	});
+
+	test('CancelledError from a subcommand exits 130 with a stderr message', async () => {
+		cli.COMMANDS.fake = {
+			summary: 'throws CancelledError',
+			run: async () => {
+				const err = new Error('Prompt cancelled by user.');
+				err.name = 'CancelledError';
+				throw err;
+			},
+		};
+		const code = await cli.main(['fake']);
+		expect(code).toBe(130);
+		expect(stderrChunks.join('')).toMatch(/wp-tooling: cancelled/);
+	});
+
+	test('non-CancelledError rejections propagate to the bin shim', async () => {
+		cli.COMMANDS.boom = {
+			summary: 'throws',
+			run: async () => {
+				throw new Error('disk on fire');
+			},
+		};
+		await expect(cli.main(['boom'])).rejects.toThrow('disk on fire');
 	});
 });
 
@@ -126,6 +189,37 @@ describe('cli COMMANDS registry', () => {
 		expect(cli.COMMANDS['detect-changes']).toBeDefined();
 		expect(typeof cli.COMMANDS['detect-changes'].summary).toBe('string');
 		expect(typeof cli.COMMANDS['detect-changes'].run).toBe('function');
+	});
+
+	test('install-hooks is registered with a summary and run handler', () => {
+		expect(cli.COMMANDS['install-hooks']).toBeDefined();
+		expect(typeof cli.COMMANDS['install-hooks'].summary).toBe('string');
+		expect(typeof cli.COMMANDS['install-hooks'].run).toBe('function');
+	});
+});
+
+describe('cli main() routes install-hooks', () => {
+	let stdoutChunks;
+	let stdoutSpy;
+
+	beforeEach(() => {
+		stdoutChunks = [];
+		stdoutSpy = jest
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((chunk) => {
+				stdoutChunks.push(chunk.toString());
+				return true;
+			});
+	});
+
+	afterEach(() => {
+		stdoutSpy.mockRestore();
+	});
+
+	test('routes install-hooks --help to its runCli', async () => {
+		const code = await cli.main(['install-hooks', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: install-hooks/);
 	});
 });
 
