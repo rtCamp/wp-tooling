@@ -45,6 +45,8 @@ describe('commit-msg template', () => {
 		'chore(deps): bump eslint',
 		'ci(detect-changes): cover edge case',
 		'refactor(scaffolds): inline registry scan',
+		'revert: feat(ui): add wizard',
+		'revert(release): restore prior tag',
 	])('accepts %p', (subject) => {
 		expect(pattern.test(subject)).toBe(true);
 	});
@@ -153,6 +155,74 @@ describe('pre-commit template', () => {
 				encoding: 'utf8',
 			});
 			expect(r.status).toBe(0);
+		} finally {
+			fs.rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test('does not false-positive when "lint:staged" appears only as a string', () => {
+		const cwd = fs.mkdtempSync(
+			path.join(require('os').tmpdir(), 'precommit-')
+		);
+		fs.writeFileSync(
+			path.join(cwd, 'package.json'),
+			JSON.stringify({
+				description: 'see "lint:staged" docs for details',
+				scripts: { test: 'jest' },
+			})
+		);
+		try {
+			const r = spawnSync('/bin/sh', [preCommit], {
+				cwd,
+				encoding: 'utf8',
+			});
+			expect(r.status).toBe(0);
+		} finally {
+			fs.rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test('runs the lint:staged script when defined', () => {
+		const cwd = fs.mkdtempSync(
+			path.join(require('os').tmpdir(), 'precommit-')
+		);
+		const marker = path.join(cwd, 'fired.txt');
+		fs.writeFileSync(
+			path.join(cwd, 'package.json'),
+			JSON.stringify({
+				scripts: {
+					'lint:staged': `node -e "require('fs').writeFileSync('${marker.replace(/\\/g, '\\\\')}', 'ok')"`,
+				},
+			})
+		);
+		try {
+			const r = spawnSync('/bin/sh', [preCommit], {
+				cwd,
+				encoding: 'utf8',
+			});
+			expect(r.status).toBe(0);
+			expect(fs.existsSync(marker)).toBe(true);
+		} finally {
+			fs.rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test('propagates a non-zero exit from the lint:staged script', () => {
+		const cwd = fs.mkdtempSync(
+			path.join(require('os').tmpdir(), 'precommit-')
+		);
+		fs.writeFileSync(
+			path.join(cwd, 'package.json'),
+			JSON.stringify({
+				scripts: { 'lint:staged': 'node -e "process.exit(3)"' },
+			})
+		);
+		try {
+			const r = spawnSync('/bin/sh', [preCommit], {
+				cwd,
+				encoding: 'utf8',
+			});
+			expect(r.status).not.toBe(0);
 		} finally {
 			fs.rmSync(cwd, { recursive: true, force: true });
 		}
