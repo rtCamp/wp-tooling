@@ -1,0 +1,20 @@
+# PHPStan config: extends rtCamp/wp-php-toolkit shared baseline.
+#
+# Scaffolded by @rtcamp/wp-tooling. The shared baseline lives at
+# vendor/rtcamp/wp-php-toolkit/phpstan.neon. Override a rule for this
+# project by adding it under `parameters` below.
+
+includes:
+    - vendor/rtcamp/wp-php-toolkit/phpstan.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - includes
+    excludePaths:
+        - vendor
+        - node_modules
+        - build
+        - tests
+    # Project-specific overrides go here.

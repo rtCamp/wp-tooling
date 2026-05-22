@@ -1,0 +1,24 @@
+{
+	"slug": "phpstan",
+	"category": "lint",
+	"name": "PHPStan setup",
+	"description": "Installs PHPStan with rtCamp's shared baseline (includes `vendor/rtcamp/wp-php-toolkit/phpstan.neon`) and adds composer analyse scripts.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/phpstan.neon.dist.mustache",
+			"dest": "phpstan.neon.dist"
+		}
+	],
+	"composer_dev_dependencies": {
+		"phpstan/phpstan": "^1.10",
+		"szepeviktor/phpstan-wordpress": "^1.3",
+		"rtcamp/wp-php-toolkit": "^1.0"
+	},
+	"scripts": {
+		"composer": {
+			"analyse": "phpstan analyse --configuration=phpstan.neon.dist",
+			"analyse:baseline": "phpstan analyse --configuration=phpstan.neon.dist --generate-baseline"
+		}
+	}
+}
