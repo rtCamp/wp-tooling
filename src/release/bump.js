@@ -16,9 +16,12 @@
  * for that location -- not an error, because some plugins don't declare
  * one.
  *
- * Writes are atomic per file (write-to-temp + rename). All writes are
- * staged before any rename runs, so a parse / format failure on file N
- * leaves files 1..N-1 untouched.
+ * Each file write is atomic (write-to-temp + rename). Rewrites are
+ * computed in memory before any rename runs, so a parse or format
+ * failure leaves the entire working tree untouched. Once renames
+ * begin, a failure mid-loop can leave the earlier files updated and
+ * the later ones not. Acceptable because rename within a filesystem
+ * almost never fails after a successful write.
  *
  * Zero runtime dependencies.
  */
