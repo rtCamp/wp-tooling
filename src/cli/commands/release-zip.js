@@ -1,11 +1,11 @@
 /**
- * `wp-tooling release-zip` subcommand.
+ * `wp-tooling release:zip` subcommand.
  *
  * Builds a deterministic `dist/<slug>-<version>.zip` from the current
  * working tree, honouring `.distignore`.
  *
  * Usage:
- *   wp-tooling release-zip [--force] [--dry-run] [--help]
+ *   wp-tooling release:zip [--force] [--dry-run] [--help]
  */
 
 'use strict';
@@ -38,7 +38,7 @@ function parseArgs(argv) {
 function printUsage() {
 	process.stdout.write(
 		[
-			'Usage: wp-tooling release-zip [options]',
+			'Usage: wp-tooling release:zip [options]',
 			'',
 			'  --force       Overwrite an existing dist/<slug>-<version>.zip.',
 			'  --dry-run     Build the archive in memory and report size,',
@@ -71,7 +71,7 @@ function runCli(argv) {
 	try {
 		opts = parseArgs(argv);
 	} catch (err) {
-		process.stderr.write(`release-zip: ${err.message}\n`);
+		process.stderr.write(`release:zip: ${err.message}\n`);
 		return 2;
 	}
 
@@ -101,13 +101,13 @@ function runCli(argv) {
 		if (err instanceof CancelledError) {
 			return 130;
 		}
-		process.stderr.write(`release-zip: ${err.message}\n`);
+		process.stderr.write(`release:zip: ${err.message}\n`);
 		return 1;
 	}
 }
 
 module.exports = {
-	name: 'release-zip',
+	name: 'release:zip',
 	summary: 'Build a .distignore-aware dist/<slug>-<version>.zip',
 	run: runCli,
 	parseArgs,

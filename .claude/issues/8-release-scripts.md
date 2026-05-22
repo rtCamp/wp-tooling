@@ -17,9 +17,9 @@ any consuming repo is a one-command operation per stage:
 
 ```
 "scripts": {
-    "release:bump":      "wp-tooling release-bump",
-    "release:changelog": "wp-tooling release-changelog",
-    "release:zip":       "wp-tooling release-zip"
+    "release:bump":      "wp-tooling release:bump",
+    "release:changelog": "wp-tooling release:changelog",
+    "release:zip":       "wp-tooling release:zip"
 }
 ```
 
@@ -39,10 +39,24 @@ out of scope (they live in the CD workflow).
   `scaffold-registry` and `git-hooks` use; once #7 merges, a rebase
   onto `release/v1.0.0` is conflict-free.
 - [2026-05-20] **Subcommand naming: kebab-case, not colon-prefixed.**
-  The dispatcher uses the filename as the subcommand name, so
-  `release-bump` / `release-changelog` / `release-zip`. The skeleton's
-  `package.json` keeps the human-facing `release:bump` colon style via
-  npm-script aliases (`"release:bump": "wp-tooling release-bump"`).
+  Initial decision was `release-bump` / `release-changelog` /
+  `release-zip` for consistency with `detect-changes` and
+  `install-hooks`. The skeleton's `package.json` would keep the
+  human-facing `release:bump` colon style via npm-script aliases.
+- [2026-05-22] **Reversed the above: colon-prefixed family names.**
+  Renamed to `release:bump` / `release:changelog` / `release:zip`.
+  The dispatcher matches on `mod.name`, not the filename, so the
+  switch only touches the exported `name:` field plus docstrings,
+  usage text, error prefixes and tests. Filenames stay
+  `release-bump.js` etc. because NTFS reserves `:` in paths.
+  Rationale: the family is genuinely a namespace (more siblings
+  likely later such as `release:tag` / `release:publish`); colon-
+  namespaced commands match the WordPress audience's expectations
+  from Composer scripts, Symfony Console, Laravel Artisan and rake;
+  and the skeleton's npm-script aliases now map 1:1 instead of
+  translating hyphens to colons. `detect-changes` and
+  `install-hooks` stay hyphenated because they are one-offs, not
+  families.
 - [2026-05-20] **No new `bin/wp-tooling-release.js` dispatcher.** The
   spec text predates the auto-discovery dispatcher; the equivalent
   today is three files under `src/cli/commands/`. The single

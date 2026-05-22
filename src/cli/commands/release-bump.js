@@ -1,11 +1,11 @@
 /**
- * `wp-tooling release-bump` subcommand.
+ * `wp-tooling release:bump` subcommand.
  *
  * Thin CLI adapter around `src/release/bump.js`. Owns argv parsing,
  * spinner orchestration and exit codes. The library does the work.
  *
  * Usage:
- *   wp-tooling release-bump [--type patch|minor|major] [--to X.Y.Z] [--dry-run] [--help]
+ *   wp-tooling release:bump [--type patch|minor|major] [--to X.Y.Z] [--dry-run] [--help]
  */
 
 'use strict';
@@ -51,7 +51,7 @@ function parseArgs(argv) {
 function printUsage() {
 	process.stdout.write(
 		[
-			'Usage: wp-tooling release-bump [options]',
+			'Usage: wp-tooling release:bump [options]',
 			'',
 			'  --type <patch|minor|major>  Bump component (default: patch). Ignored when --to is set.',
 			'  --to   <X.Y.Z>              Set an explicit version, overriding --type.',
@@ -73,7 +73,7 @@ function runCli(argv) {
 	try {
 		opts = parseArgs(argv);
 	} catch (err) {
-		process.stderr.write(`release-bump: ${err.message}\n`);
+		process.stderr.write(`release:bump: ${err.message}\n`);
 		return 2;
 	}
 
@@ -105,13 +105,13 @@ function runCli(argv) {
 		if (err instanceof CancelledError) {
 			return 130;
 		}
-		process.stderr.write(`release-bump: ${err.message}\n`);
+		process.stderr.write(`release:bump: ${err.message}\n`);
 		return 1;
 	}
 }
 
 module.exports = {
-	name: 'release-bump',
+	name: 'release:bump',
 	summary: 'Bump version in package.json, composer.json and plugin entry',
 	run: runCli,
 	parseArgs,

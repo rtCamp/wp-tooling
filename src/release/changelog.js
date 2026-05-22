@@ -92,7 +92,7 @@ function rewriteChangelog(contents, newVersion, dateString) {
 
 	if (!unreleasedHasContent(lines, headingIdx)) {
 		throw new Error(
-			'release: "## Unreleased" section is empty -- add release notes before running release-changelog'
+			'release: "## Unreleased" section is empty -- add release notes before running release:changelog'
 		);
 	}
 

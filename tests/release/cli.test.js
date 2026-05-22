@@ -11,27 +11,27 @@ const cli = require('../../src/cli/index');
 const { copyFixture, cleanup } = require('./_helpers');
 
 describe('release CLIs - dispatcher registration', () => {
-	test('release-bump is registered', () => {
-		expect(cli.COMMANDS['release-bump']).toBeDefined();
-		expect(typeof cli.COMMANDS['release-bump'].run).toBe('function');
-		expect(cli.COMMANDS['release-bump'].summary).toMatch(/bump/i);
+	test('release:bump is registered', () => {
+		expect(cli.COMMANDS['release:bump']).toBeDefined();
+		expect(typeof cli.COMMANDS['release:bump'].run).toBe('function');
+		expect(cli.COMMANDS['release:bump'].summary).toMatch(/bump/i);
 	});
 
-	test('release-changelog is registered', () => {
-		expect(cli.COMMANDS['release-changelog']).toBeDefined();
-		expect(typeof cli.COMMANDS['release-changelog'].run).toBe('function');
-		expect(cli.COMMANDS['release-changelog'].summary).toMatch(/changelog/i);
+	test('release:changelog is registered', () => {
+		expect(cli.COMMANDS['release:changelog']).toBeDefined();
+		expect(typeof cli.COMMANDS['release:changelog'].run).toBe('function');
+		expect(cli.COMMANDS['release:changelog'].summary).toMatch(/changelog/i);
 	});
 
-	test('release-zip is registered', () => {
-		expect(cli.COMMANDS['release-zip']).toBeDefined();
-		expect(typeof cli.COMMANDS['release-zip'].run).toBe('function');
-		expect(cli.COMMANDS['release-zip'].summary).toMatch(/zip|dist/i);
+	test('release:zip is registered', () => {
+		expect(cli.COMMANDS['release:zip']).toBeDefined();
+		expect(typeof cli.COMMANDS['release:zip'].run).toBe('function');
+		expect(cli.COMMANDS['release:zip'].summary).toMatch(/zip|dist/i);
 	});
 });
 
 describe('release CLIs - parseArgs', () => {
-	test('release-bump parses --type, --to, --dry-run, --help', () => {
+	test('release:bump parses --type, --to, --dry-run, --help', () => {
 		expect(bumpCli.parseArgs(['--type', 'minor'])).toEqual({
 			type: 'minor',
 			to: null,
@@ -47,14 +47,14 @@ describe('release CLIs - parseArgs', () => {
 		expect(bumpCli.parseArgs(['--help']).help).toBe(true);
 	});
 
-	test('release-bump rejects unknown args', () => {
+	test('release:bump rejects unknown args', () => {
 		expect(() => bumpCli.parseArgs(['--frobnicate'])).toThrow(
 			/unknown argument/
 		);
 		expect(() => bumpCli.parseArgs(['--type'])).toThrow(/--type requires/);
 	});
 
-	test('release-changelog parses --to, --dry-run, --help', () => {
+	test('release:changelog parses --to, --dry-run, --help', () => {
 		expect(changelogCli.parseArgs(['--to', '1.2.3'])).toEqual({
 			to: '1.2.3',
 			dryRun: false,
@@ -63,7 +63,7 @@ describe('release CLIs - parseArgs', () => {
 		expect(changelogCli.parseArgs(['--dry-run']).dryRun).toBe(true);
 	});
 
-	test('release-zip parses --force, --dry-run, --help', () => {
+	test('release:zip parses --force, --dry-run, --help', () => {
 		expect(zipCli.parseArgs(['--force'])).toEqual({
 			force: true,
 			dryRun: false,
@@ -101,24 +101,24 @@ describe('release CLIs - runCli help', () => {
 		stderrSpy.mockRestore();
 	});
 
-	test('release-bump --help prints usage and returns 0', () => {
+	test('release:bump --help prints usage and returns 0', () => {
 		expect(bumpCli.run(['--help'])).toBe(0);
-		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling release-bump/);
+		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling release:bump/);
 	});
 
-	test('release-changelog --help prints usage and returns 0', () => {
+	test('release:changelog --help prints usage and returns 0', () => {
 		expect(changelogCli.run(['--help'])).toBe(0);
 		expect(stdoutChunks.join('')).toMatch(
-			/Usage: wp-tooling release-changelog/
+			/Usage: wp-tooling release:changelog/
 		);
 	});
 
-	test('release-zip --help prints usage and returns 0', () => {
+	test('release:zip --help prints usage and returns 0', () => {
 		expect(zipCli.run(['--help'])).toBe(0);
-		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling release-zip/);
+		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling release:zip/);
 	});
 
-	test('release-bump unknown arg returns 2', () => {
+	test('release:bump unknown arg returns 2', () => {
 		expect(bumpCli.run(['--frobnicate'])).toBe(2);
 		expect(stderrChunks.join('')).toMatch(/unknown argument/);
 	});
@@ -148,7 +148,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		stderrSpy.mockRestore();
 	});
 
-	test('release-bump --type patch updates files and returns 0', () => {
+	test('release:bump --type patch updates files and returns 0', () => {
 		tmp = copyFixture('plugin-a');
 		process.chdir(tmp);
 		const code = bumpCli.run(['--type', 'patch']);
@@ -158,7 +158,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		).toBe('1.2.4');
 	});
 
-	test('release-bump --dry-run does not modify files', () => {
+	test('release:bump --dry-run does not modify files', () => {
 		tmp = copyFixture('plugin-a');
 		process.chdir(tmp);
 		const before = fs.readFileSync(path.join(tmp, 'plugin-a.php'));
@@ -167,7 +167,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		expect(fs.readFileSync(path.join(tmp, 'plugin-a.php'))).toEqual(before);
 	});
 
-	test('release-bump exits 1 when plugin entry missing', () => {
+	test('release:bump exits 1 when plugin entry missing', () => {
 		tmp = copyFixture('plugin-a');
 		fs.unlinkSync(path.join(tmp, 'plugin-a.php'));
 		process.chdir(tmp);
@@ -175,7 +175,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		expect(code).toBe(1);
 	});
 
-	test('release-changelog rewrites CHANGELOG and returns 0', () => {
+	test('release:changelog rewrites CHANGELOG and returns 0', () => {
 		tmp = copyFixture('plugin-a');
 		process.chdir(tmp);
 		const code = changelogCli.run([]);
@@ -185,7 +185,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		expect(body).toMatch(/^## Unreleased$/m);
 	});
 
-	test('release-changelog exits 1 on empty Unreleased', () => {
+	test('release:changelog exits 1 on empty Unreleased', () => {
 		tmp = copyFixture('plugin-a');
 		fs.writeFileSync(
 			path.join(tmp, 'CHANGELOG.md'),
@@ -196,7 +196,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		expect(code).toBe(1);
 	});
 
-	test('release-zip writes dist/<slug>-<version>.zip and returns 0', () => {
+	test('release:zip writes dist/<slug>-<version>.zip and returns 0', () => {
 		tmp = copyFixture('plugin-a');
 		process.chdir(tmp);
 		const code = zipCli.run([]);
@@ -206,7 +206,7 @@ describe('release CLIs - runCli end-to-end against fixture', () => {
 		).toBe(true);
 	});
 
-	test('release-zip refuses to overwrite without --force', () => {
+	test('release:zip refuses to overwrite without --force', () => {
 		tmp = copyFixture('plugin-a');
 		process.chdir(tmp);
 		expect(zipCli.run([])).toBe(0);

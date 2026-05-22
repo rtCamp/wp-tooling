@@ -1,12 +1,12 @@
 /**
- * `wp-tooling release-changelog` subcommand.
+ * `wp-tooling release:changelog` subcommand.
  *
  * Renames `## Unreleased` to `## <version> - <YYYY-MM-DD>` and prepends
  * a fresh empty `## Unreleased` section. Refuses to run when the
  * existing Unreleased section has no content.
  *
  * Usage:
- *   wp-tooling release-changelog [--to X.Y.Z] [--dry-run] [--help]
+ *   wp-tooling release:changelog [--to X.Y.Z] [--dry-run] [--help]
  */
 
 'use strict';
@@ -44,7 +44,7 @@ function parseArgs(argv) {
 function printUsage() {
 	process.stdout.write(
 		[
-			'Usage: wp-tooling release-changelog [options]',
+			'Usage: wp-tooling release:changelog [options]',
 			'',
 			'  --to <X.Y.Z>   Version to stamp into the new heading.',
 			'                 Defaults to the version in package.json',
@@ -64,7 +64,7 @@ function runCli(argv) {
 	try {
 		opts = parseArgs(argv);
 	} catch (err) {
-		process.stderr.write(`release-changelog: ${err.message}\n`);
+		process.stderr.write(`release:changelog: ${err.message}\n`);
 		return 2;
 	}
 
@@ -94,13 +94,13 @@ function runCli(argv) {
 		if (err instanceof CancelledError) {
 			return 130;
 		}
-		process.stderr.write(`release-changelog: ${err.message}\n`);
+		process.stderr.write(`release:changelog: ${err.message}\n`);
 		return 1;
 	}
 }
 
 module.exports = {
-	name: 'release-changelog',
+	name: 'release:changelog',
 	summary: 'Finalise the CHANGELOG ## Unreleased section',
 	run: runCli,
 	parseArgs,
