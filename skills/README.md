@@ -37,6 +37,36 @@ The skills are **opinionated** about safety (no auto-installs, no secret values,
 
 A common customisation: change the project introspection step in `SKILL.md` to match your project's conventions if they differ from the rtCamp skeleton (different bootstrap method name, different namespace style, different anchor convention).
 
+## Evals
+
+Each skill carries a behavioural eval set at `skills/<name>/evals/evals.json` per the [skill-creator schema](https://github.com/anthropics/skills/blob/main/skills/skill-creator/references/schemas.md). The shape: `skill_name` plus `evals[]` where each entry has `id`, `prompt`, `expected_output`, `files`, `expectations`.
+
+The schema is validated automatically by `tests/skills/evals-json.test.js` (runs in `npm test`). Edits that break the shape — missing fields, duplicated ids, non-string expectations — fail CI before they reach the upstream skill-creator runner.
+
+### Running the evals
+
+The full lifecycle (spawn → grade → aggregate → viewer → feedback → iterate) is **orchestrated from inside a Claude Code conversation** by the Anthropic skill-creator skill — it spawns subagents, grades outputs against `expectations[]`, then runs the aggregation + viewer scripts. There's no standalone CLI for the whole flow; only aggregate + viewer have CLIs.
+
+One-time setup:
+
+```bash
+/plugin install skill-creator@claude-plugins-official
+```
+
+Then, in a Claude Code session at the repo root, ask the skill-creator skill to run the evals:
+
+```
+/skill-creator:skill-creator run the behavioural evals in skills/scaffold/evals/evals.json against the scaffold skill at skills/scaffold/. Spawn with-skill and without-skill subagents, grade against expectations, aggregate, open the viewer.
+```
+
+The skill-creator skill will create `skills/scaffold-workspace/iteration-N/` (gitignored), drop per-eval outputs, grade them, produce `benchmark.json`, and open the HTML reviewer in your browser. Same flow for setup.
+
+For a manual spot-check without the skill-creator plugin: copy a `prompt` from `evals.json` into any AI session with the skill installed at `.claude/skills/<name>/` and compare the response against the `expectations[]` list by hand.
+
+### Not behavioural evals
+
+The skill-creator's `scripts/run_eval.py` and `scripts/run_loop.py` are for **description optimization** — trigger evals in the format `[{"query":"...","should_trigger":true}, ...]`, a different schema. Don't point them at `skills/<name>/evals/evals.json`; the runner expects a different shape and they're solving a different problem.
+
 ## What these skills never do
 
 Built-in prohibitions (kept in sync with `docs/ai-orchestration.md` section 11):

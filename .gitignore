@@ -6,6 +6,12 @@
 npm-debug.log*
 .idea/
 .vscode/settings.json
+.claude/settings.local.json
 .DS_Store
 Thumbs.db
 package-lock.json
+
+# Local skill-creator eval scratch (transcripts, snapshots, iteration outputs).
+# The shippable portion of evals lives at skills/<name>/evals/ and is committed.
+skill-workspace/
+skills/*-workspace/
