@@ -4,33 +4,40 @@ Copy-pasteable skill files for AI assistants (Claude Code, Cursor, etc.) that dr
 
 ## What's here
 
-- [`scaffold.md`](scaffold.md) ─ The end-to-end AI skill for `npx @rtcamp/wp-tooling add`. Tells the AI how to discover scaffolds, introspect the project, apply naming conventions, invoke the engine, handle adaptive wiring, surface secrets without writing them, run the TDD loop, and report. Built from the 12-section contract in [`docs/ai-orchestration.md`](../docs/ai-orchestration.md).
+- [`scaffold/`](scaffold/SKILL.md) — End-to-end AI skill for `npx @rtcamp/wp-tooling add`. Tells the AI how to discover scaffolds, introspect the project, apply naming conventions, invoke the engine, handle adaptive wiring, surface secrets without writing them, drive the TDD loop, and report.
+- [`setup/`](setup/SKILL.md) — Bootstraps a whole plugin or theme from one natural-language request. Detects existing tooling, plans the right sequence of setup + lint + test + feature scaffolds, confirms the plan with the developer, executes it in two phases, then emits one consolidated report of files written + developer actions outstanding.
 
-## How to use these in your own project
+Each skill is a directory containing a `SKILL.md` file. Same layout as the Claude Code Skills convention.
+
+## How to install in your own project
 
 The simplest path, for Claude Code users:
 
 ```bash
 # from inside any project that has @rtcamp/wp-tooling available (via npm or npx)
 mkdir -p .claude/skills
-curl -L -o .claude/skills/scaffold.md \
-    https://raw.githubusercontent.com/rtCamp/wp-tooling/main/skills/scaffold.md
 
-# OR, if you have the package installed locally:
-cp node_modules/@rtcamp/wp-tooling/skills/scaffold.md .claude/skills/scaffold.md
+# Option A — copy from the installed npm package (preferred):
+cp -r node_modules/@rtcamp/wp-tooling/skills/scaffold .claude/skills/scaffold
+cp -r node_modules/@rtcamp/wp-tooling/skills/setup    .claude/skills/setup
+
+# Option B — download directly from GitHub if you can't install the package locally:
+git clone --depth 1 https://github.com/rtCamp/wp-tooling.git /tmp/wp-tooling
+cp -r /tmp/wp-tooling/skills/scaffold .claude/skills/scaffold
+cp -r /tmp/wp-tooling/skills/setup    .claude/skills/setup
 ```
 
-Claude Code will pick up the skill on next session start. Invoke it with `/scaffold` or just by describing what you want to add ("add a WP-CLI command to ...").
+Claude Code picks up the skill on next session start. Invoke it with `/scaffold` or `/setup`, or just by describing what you want to add ("add a WP-CLI command to ...", "set up this plugin").
 
-For other AI orchestrators (Cursor, Continue, Aider, custom agents), drop `scaffold.md` wherever your tool reads skill or command files from. The skill front-matter follows the Claude Code convention (`name:` and `description:`), but the body is plain Markdown and portable.
+For other AI orchestrators (Cursor, Continue, Aider, custom agents): drop the skill directory wherever your tool reads skill files from. The frontmatter follows the Claude Code convention (`name:`, `description:`); the body is portable Markdown.
 
 ## Customising
 
-The skill is **opinionated** about safety (no auto-installs, no secret values, explicit consent for cross-file edits). If your team wants different defaults, fork the file in your own repo and adjust. The engine's guarantees (in [`docs/ai-orchestration.md`](../docs/ai-orchestration.md)) do not change with the skill; only the orchestration around them does.
+The skills are **opinionated** about safety (no auto-installs, no secret values, explicit consent for cross-file edits). If your team wants different defaults, fork the directory in your own repo and adjust. The engine's guarantees (in [`docs/ai-orchestration.md`](../docs/ai-orchestration.md)) do not change with the skill; only the orchestration around them does.
 
-A common customisation: change the project introspection step to match your project's conventions if they differ from the rtCamp skeleton (different bootstrap method name, different namespace style, different anchor convention).
+A common customisation: change the project introspection step in `SKILL.md` to match your project's conventions if they differ from the rtCamp skeleton (different bootstrap method name, different namespace style, different anchor convention).
 
-## What this skill never does
+## What these skills never do
 
 Built-in prohibitions (kept in sync with `docs/ai-orchestration.md` section 11):
 
@@ -41,4 +48,4 @@ Built-in prohibitions (kept in sync with `docs/ai-orchestration.md` section 11):
 - Never applies cross-file wiring without showing the diff and getting consent.
 - Never sends code or developer data to remote services.
 
-If you fork the skill and remove any of these, please be loud about it in your fork's README. They exist for good reasons.
+If you fork the skills and remove any of these, please be loud about it in your fork's README. They exist for good reasons.
