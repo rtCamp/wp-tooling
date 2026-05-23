@@ -7,15 +7,25 @@
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace prefix.",
+			"description": "PSR-4 namespace for the post type class. Default 'Inc\\PostTypes' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\PostTypes') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "Inc"
+			"default": "Inc\\PostTypes"
 		},
 		{
 			"key": "base_path",
-			"description": "PHP source base directory.",
+			"description": "Directory for the post type file. Default 'includes/PostTypes' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "includes"
+			"default": "includes/PostTypes"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\PostTypes' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"default": "Inc\\Tests\\PostTypes"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/PostTypes'.",
+			"default": "tests/PostTypes"
 		},
 		{
 			"key": "slug",
@@ -42,21 +52,21 @@
 	"files": [
 		{
 			"src": "templates/post-type.php.mustache",
-			"dest": "{{base_path}}/PostTypes/{{class}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/Plugin.php",
 			"anchor": "// scaffold:post-types",
-			"snippet_template": "( new \\{{namespace}}\\PostTypes\\{{class}}() )->register();",
+			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
 			"description": "Instantiate the post type so it registers its init hook. Post types are always multi-instance (each instance carries the configuration for one post type). Insert in the plugin bootstrap alongside other post type registrations."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "tests/PostTypes/{{class}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

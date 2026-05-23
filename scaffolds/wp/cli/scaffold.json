@@ -7,15 +7,25 @@
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace prefix.",
+			"description": "PSR-4 namespace for the command class. Default 'Inc\\Cli' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\CLI') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "Inc"
+			"default": "Inc\\Cli"
 		},
 		{
 			"key": "base_path",
-			"description": "PHP source base directory.",
+			"description": "Directory for the command file. Default 'includes/Cli' matches the rtCamp skeleton; pass the project's actual sub-path (e.g. 'src/CLI') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "includes"
+			"default": "includes/Cli"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cli' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"default": "Inc\\Tests\\Cli"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Cli'.",
+			"default": "tests/Cli"
 		},
 		{
 			"key": "name",
@@ -37,21 +47,21 @@
 	"files": [
 		{
 			"src": "templates/command.php.mustache",
-			"dest": "{{base_path}}/Cli/{{class}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/Plugin.php",
 			"anchor": "// scaffold:cli-commands",
-			"snippet_template": "{{#singleton}}WP_CLI::add_command( '{{name}}', \\{{namespace}}\\Cli\\{{class}}::get_instance() );{{/singleton}}{{^singleton}}WP_CLI::add_command( '{{name}}', new \\{{namespace}}\\Cli\\{{class}}() );{{/singleton}}",
+			"snippet_template": "{{#singleton}}WP_CLI::add_command( '{{name}}', \\{{namespace}}\\{{class}}::get_instance() );{{/singleton}}{{^singleton}}WP_CLI::add_command( '{{name}}', new \\{{namespace}}\\{{class}}() );{{/singleton}}",
 			"description": "Register the new CLI command. Insert immediately after the last existing WP_CLI::add_command() call inside the bootstrap method. Anchor is a hint when present; AI falls back to pattern sampling. Singleton commands call ::get_instance(); multi-instance use new."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "tests/Cli/{{class}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

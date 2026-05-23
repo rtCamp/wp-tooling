@@ -7,15 +7,25 @@
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace prefix.",
+			"description": "PSR-4 namespace for the cron class. Default 'Inc\\Cron' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Cron') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "Inc"
+			"default": "Inc\\Cron"
 		},
 		{
 			"key": "base_path",
-			"description": "PHP source base directory.",
+			"description": "Directory for the cron file. Default 'includes/Cron' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "includes"
+			"default": "includes/Cron"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cron' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"default": "Inc\\Tests\\Cron"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Cron'.",
+			"default": "tests/Cron"
 		},
 		{
 			"key": "name",
@@ -43,21 +53,21 @@
 	"files": [
 		{
 			"src": "templates/cron.php.mustache",
-			"dest": "{{base_path}}/Cron/{{class}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/Plugin.php",
 			"anchor": "// scaffold:cron-jobs",
-			"snippet_template": "( new \\{{namespace}}\\Cron\\{{class}}() )->register();",
+			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
 			"description": "Instantiate the cron job so it schedules itself and binds its callback. Cron jobs are always multi-instance. Insert in the plugin bootstrap alongside other cron registrations."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "tests/Cron/{{class}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

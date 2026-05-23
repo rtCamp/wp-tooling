@@ -7,15 +7,25 @@
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace prefix.",
+			"description": "PSR-4 namespace for the taxonomy class. Default 'Inc\\Taxonomies' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Taxonomies') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "Inc"
+			"default": "Inc\\Taxonomies"
 		},
 		{
 			"key": "base_path",
-			"description": "PHP source base directory.",
+			"description": "Directory for the taxonomy file. Default 'includes/Taxonomies' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "includes"
+			"default": "includes/Taxonomies"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Taxonomies' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"default": "Inc\\Tests\\Taxonomies"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Taxonomies'.",
+			"default": "tests/Taxonomies"
 		},
 		{
 			"key": "slug",
@@ -52,21 +62,21 @@
 	"files": [
 		{
 			"src": "templates/taxonomy.php.mustache",
-			"dest": "{{base_path}}/Taxonomies/{{class}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/Plugin.php",
 			"anchor": "// scaffold:taxonomies",
-			"snippet_template": "( new \\{{namespace}}\\Taxonomies\\{{class}}() )->register();",
+			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
 			"description": "Instantiate the taxonomy so it registers its init hook. Taxonomies are always multi-instance. Insert in the plugin bootstrap alongside other taxonomy registrations."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "tests/Taxonomies/{{class}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

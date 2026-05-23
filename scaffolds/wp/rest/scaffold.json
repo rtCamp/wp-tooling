@@ -7,15 +7,25 @@
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace prefix.",
+			"description": "PSR-4 namespace for the controller class. Default 'Inc\\Rest' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Rest') to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "Inc"
+			"default": "Inc\\Rest"
 		},
 		{
 			"key": "base_path",
-			"description": "PHP source base directory.",
+			"description": "Directory for the controller file. Default 'includes/Rest' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
 			"discover_from": "composer.json:autoload.psr-4",
-			"default": "includes"
+			"default": "includes/Rest"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"default": "Inc\\Tests\\Rest"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Rest'.",
+			"default": "tests/Rest"
 		},
 		{
 			"key": "name",
@@ -42,21 +52,21 @@
 	"files": [
 		{
 			"src": "templates/controller.php.mustache",
-			"dest": "{{base_path}}/Rest/{{class}}Controller.php"
+			"dest": "{{base_path}}/{{class}}Controller.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/Plugin.php",
 			"anchor": "// scaffold:rest-controllers",
-			"snippet_template": "{{#singleton}}\\{{namespace}}\\Rest\\{{class}}Controller::get_instance();{{/singleton}}{{^singleton}}( new \\{{namespace}}\\Rest\\{{class}}Controller() )->register();{{/singleton}}",
+			"snippet_template": "{{#singleton}}\\{{namespace}}\\{{class}}Controller::get_instance();{{/singleton}}{{^singleton}}( new \\{{namespace}}\\{{class}}Controller() )->register();{{/singleton}}",
 			"description": "Instantiate the REST controller so it registers its rest_api_init hook. Insert in the plugin bootstrap method alongside other REST controllers. Singleton variants self-register on first get_instance(); multi-instance callers explicitly invoke register()."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "tests/Rest/{{class}}ControllerTest.php",
+			"dest": "{{tests_path}}/{{class}}ControllerTest.php",
 			"framework": "phpunit"
 		}
 	],
