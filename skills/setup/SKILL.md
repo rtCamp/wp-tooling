@@ -175,7 +175,7 @@ For `setup/psr4` (use detected or developer-supplied namespace and base path):
 ```bash
 npx @rtcamp/wp-tooling add setup/psr4 \
     --non-interactive --json --cwd . \
-    --namespace='Acme\ImageOptimizer' --base_path='includes'
+    --namespace='Acme\ImageOptimizer' --base-path='includes'
 ```
 
 For lint and test setup scaffolds:
@@ -184,8 +184,8 @@ For lint and test setup scaffolds:
 npx @rtcamp/wp-tooling add lint/phpcs/vip --non-interactive --json --cwd .
 npx @rtcamp/wp-tooling add lint/phpstan    --non-interactive --json --cwd .
 npx @rtcamp/wp-tooling add lint/eslint     --non-interactive --json --cwd .
-npx @rtcamp/wp-tooling add setup/phpunit   --non-interactive --json --cwd . --source_dir=includes
-npx @rtcamp/wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base_url=http://localhost:8888
+npx @rtcamp/wp-tooling add setup/phpunit   --non-interactive --json --cwd . --source-dir=includes
+npx @rtcamp/wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base-url=http://localhost:8888
 ```
 
 Process each result before running the next:
@@ -200,12 +200,13 @@ For each feature scaffold, follow the full workflow from `skills/scaffold.md` �
 
 Do not batch feature scaffolds. Run one at a time, apply its wiring, complete the TDD loop (see `skills/scaffold.md` §5b), then move to the next.
 
-For `wp/cli`:
+For `wp/cli`, pass the same project conventions detected in Stage 1 (namespace, base path, class suffix) — defaults assume the rtCamp skeleton (`Inc\Cli`, `includes/Cli`) and will be wrong for any other project:
 
 ```bash
 npx @rtcamp/wp-tooling add wp/cli \
     --non-interactive --json --cwd . \
-    --name=optimize-images
+    --namespace='Acme\ImageOptimizer\CLI' --base-path='includes/CLI' \
+    --name=optimize-images --class=OptimizeImagesCommand
 ```
 
 The engine emits `ai.wiring` (where to register the command) and a thin test stub at `tests/Cli/OptimizeImagesCommandTest.php`. Show the wiring snippet, get consent, apply. Then turn the stub into a real test suite (happy path, dry-run flag, edge cases, error handling) and implement `__invoke()` test-by-test until the suite is green. Never leave `markTestIncomplete` in the final state.
