@@ -42,7 +42,7 @@ async function promptMissingInputs({
 		const defaultValue = declared.default;
 		const answer = await text({
 			message: `${message}${defaultValue !== undefined ? ` (default: ${defaultValue})` : ''}`,
-			default: defaultValue,
+			defaultValue,
 		});
 		next[key] = answer;
 	}
@@ -64,7 +64,7 @@ async function confirmRun({ scaffoldId, willCreate }) {
 			: `${willCreate.length} files`;
 	return confirm({
 		message: `Scaffold ${scaffoldId} will create ${fileLine}. Proceed?`,
-		default: true,
+		defaultValue: true,
 	});
 }
 

@@ -314,6 +314,33 @@ describe('execute() result shape', () => {
 			)
 		).toBe('original');
 	});
+
+	it('warns on supplied inputs the scaffold does not declare', async () => {
+		const tmp = makeTmpDir();
+		const result = await registry.execute(
+			'wp/cli',
+			{ name: 'qm-export', namspace: 'Inc' }, // typo: declared key is `namespace`
+			{ dryRun: true, cwd: tmp }
+		);
+		const unknown = result.warnings.filter((w) =>
+			w.startsWith('unknown input "namspace"')
+		);
+		expect(unknown).toHaveLength(1);
+		expect(unknown[0]).toContain('Declared inputs:');
+		expect(unknown[0]).toContain('namespace');
+	});
+
+	it('does not warn when every supplied input is declared', async () => {
+		const tmp = makeTmpDir();
+		const result = await registry.execute(
+			'wp/cli',
+			{ name: 'qm-export', namespace: 'Inc\\Cli' },
+			{ dryRun: true, cwd: tmp }
+		);
+		expect(
+			result.warnings.filter((w) => w.startsWith('unknown input'))
+		).toEqual([]);
+	});
 });
 
 describe('execute() error paths', () => {

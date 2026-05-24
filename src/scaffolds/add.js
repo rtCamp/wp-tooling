@@ -248,7 +248,12 @@ function printHumanReport(result) {
 
 async function runInteractive(opts) {
 	// Lazy require so non-interactive callers never load TTY UI.
-	const { Wizard, spinner, confirm } = require('@rtcamp/wp-tooling/ui');
+	const {
+		Wizard,
+		spinner,
+		confirm,
+		CancelledError,
+	} = require('@rtcamp/wp-tooling/ui');
 	const { promptMissingInputs } = require('./prompt-inputs');
 
 	const context = {
@@ -315,10 +320,9 @@ async function runInteractive(opts) {
 			async run(ctx) {
 				const ok = await confirm({
 					message: `Scaffold ${ctx.opts.id} will create ${ctx.result.engine.wrote.length} file(s). Proceed?`,
-					default: true,
+					defaultValue: true,
 				});
 				if (!ok) {
-					const { CancelledError } = require('@rtcamp/wp-tooling/ui');
 					throw new CancelledError('Cancelled by developer');
 				}
 			},

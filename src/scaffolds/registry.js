@@ -191,6 +191,24 @@ class ScaffoldRegistry {
 
 		const resolved = resolveInputs(scaffold, inputs);
 
+		// Warn on supplied keys the scaffold does not declare. Typos like
+		// `--namspace=Inc` would otherwise be silently dropped while the
+		// real `namespace` input falls back to its default. Soft warning,
+		// not a hard error: the CLI parser cannot know per-scaffold
+		// declared inputs at parse time (unlike `detect-changes`, which
+		// has a fixed flag list).
+		const declaredKeys = Array.isArray(scaffold.inputs)
+			? new Set(scaffold.inputs.map((d) => d.key))
+			: new Set(inferPlaceholders(scaffold));
+		for (const key of Object.keys(inputs)) {
+			if (!declaredKeys.has(key)) {
+				const known = [...declaredKeys].sort().join(', ') || '(none)';
+				warnings.push(
+					`unknown input "${key}" supplied — ignored. Declared inputs: ${known}`
+				);
+			}
+		}
+
 		const filesCreated = [];
 		const filesSkipped = [];
 		for (const file of scaffold.files || []) {
