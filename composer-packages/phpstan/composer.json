@@ -1,0 +1,8 @@
+{
+    "name": "rtcamp/wp-phpstan",
+    "description": "rtCamp PHPStan configuration and baseline for WordPress projects.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    }
+}

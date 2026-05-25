@@ -1,0 +1,9 @@
+{
+    "name": "rtcamp/wp-phpcs",
+    "description": "rtCamp PHPCS ruleset for WordPress projects.",
+    "type": "phpcodesniffer-standard",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    }
+}

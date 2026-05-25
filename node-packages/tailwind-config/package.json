@@ -1,0 +1,8 @@
+{
+    "name": "@rtcamp/tailwind-config",
+    "version": "0.0.0",
+    "description": "Placeholder — rtCamp shareable Tailwind config. Real implementation lands from the tailwind-config branch.",
+    "license": "GPL-2.0-or-later",
+    "author": "rtCamp",
+    "private": true
+}

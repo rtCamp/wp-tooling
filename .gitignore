@@ -9,9 +9,17 @@ npm-debug.log*
 .claude/settings.local.json
 .DS_Store
 Thumbs.db
-package-lock.json
 
 # Local skill-creator eval scratch (transcripts, snapshots, iteration outputs).
 # The shippable portion of evals lives at skills/<name>/evals/ and is committed.
 skill-workspace/
 skills/*-workspace/
+
+# Composer
+vendor/
+
+# Monorepo: nested workspace/build artefacts (npm hoists to root, but be defensive)
+node_modules/
+coverage/
+dist/
+build/

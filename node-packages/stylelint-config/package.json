@@ -1,0 +1,8 @@
+{
+    "name": "@rtcamp/stylelint-config",
+    "version": "0.0.0",
+    "description": "Placeholder — rtCamp shareable Stylelint config. Real implementation lands from the lint-configs branch.",
+    "license": "GPL-2.0-or-later",
+    "author": "rtCamp",
+    "private": true
+}
