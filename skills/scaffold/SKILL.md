@@ -155,7 +155,7 @@ Ask: `Apply this change to <targetFile>? [apply / different location / edit snip
 
 #### `ai.tests`
 
-Array of `{ path, framework, command? }`. The engine writes only a thin starter stub — usually one `markTestIncomplete` placeholder per scenario the scaffold could not anticipate. **You are responsible for expanding this into a real test suite and driving development from those tests.** See [Test-driven implementation loop](#test-driven-implementation-loop) below.
+Array of `{ path, framework, command? }`. The engine writes only a thin starter stub — usually one `markTestIncomplete` placeholder per scenario the scaffold could not anticipate. **You are responsible for expanding this into a real test suite and driving development from those tests.** See [Test-driven implementation loop](#5b-test-driven-implementation-loop) below.
 
 #### `warnings`
 
