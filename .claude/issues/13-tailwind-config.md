@@ -20,6 +20,8 @@ rtCamp themes that opt into Tailwind CSS need a way to keep Tailwind design toke
 - [2026-05-18] PostCSS config exported as `./tailwind-config/postcss` — consumers require it directly in `postcss.config.js` rather than manually wiring `@tailwindcss/postcss`
 - [2026-05-18] `tailwindcss` and `@tailwindcss/postcss` added as `peerDependencies` — consumers on `@wordpress/scripts` will already have them after installing the Tailwind packages
 - [2026-05-18] No runtime dependencies — only Node built-ins (`fs`, `path`) used in the plugin
+- [2026-05-25] `@source` directive is computed dynamically, not hardcoded — `generateEntryScaffold()` uses `path.relative(cssDir, process.cwd())` to derive the path from the CSS output directory back to the project root (assumed to be `process.cwd()`, i.e. where webpack is invoked). For the default output path (`src/css/frontend/tailwind.css`) this produces `@source "../../../";`. Tailwind v4 auto-detection is not relied on.
+- [2026-05-25] Plugin split into two outputs: `_tailwind-theme.css` (always regenerated from `theme.json`, gitignored) and `tailwind.css` (scaffolded once, then owned by the consumer). `_tailwind-theme.css` contains only the `@theme {}` WP-preset mapping block. `tailwind.css` imports it and is never overwritten after first run. This resolves the CI dirty-tree concern raised in review — only the gitignored file changes during build.
 
 ---
 
