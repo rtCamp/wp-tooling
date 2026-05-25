@@ -224,7 +224,7 @@ class ScaffoldRegistry {
 			if (!dryRun) {
 				const srcAbs = path.join(scaffold._dir, file.src);
 				const tpl = await fs.readFile(srcAbs, 'utf8');
-				const out = render(tpl, resolved);
+				const out = file.raw === true ? tpl : render(tpl, resolved);
 				await fs.mkdir(path.dirname(destAbs), { recursive: true });
 				await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
 					throw new ScaffoldError(

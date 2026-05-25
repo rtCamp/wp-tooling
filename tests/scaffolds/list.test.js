@@ -84,18 +84,20 @@ describe('list command, human output (default catalogue only)', () => {
 		expect(code).toBe(0);
 		expect(stdout).toContain('Available scaffolds');
 		expect(stdout).toContain('wp/cli');
-		expect(stdout).toContain('utility/cache');
+		expect(stdout).toContain('wp/cpt');
+		expect(stdout).toContain('wp/module');
 		expect(stdout).toContain('ci/cd-wporg');
-		expect(stdout).toContain('block/dynamic');
+		expect(stdout).toContain('wp/block-dynamic');
 	});
 
-	it('shows kind: package for source: package scaffolds', async () => {
+	it('groups scaffolds by category in the human output', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.runCli(['--cwd', cwd, '--category=utility'])
+			list.runCli(['--cwd', cwd, '--category=wp'])
 		);
 		expect(code).toBe(0);
-		expect(stdout).toContain('package');
+		expect(stdout).toContain('wp/');
+		expect(stdout).not.toContain('ci/');
 	});
 });
 
@@ -116,29 +118,29 @@ describe('list command, --json output', () => {
 	it('JSON entries carry the expected shape and counts', async () => {
 		const cwd = makeTmpDir();
 		const { code, stdout } = await withStdoutCapture(() =>
-			list.runCli(['--cwd', cwd, '--json', '--category=utility'])
+			list.runCli(['--cwd', cwd, '--json', '--category=wp'])
 		);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.trim());
-		const cache = parsed.scaffolds.find((s) => s.id === 'utility/cache');
-		expect(cache).toBeDefined();
-		expect(cache).toMatchObject({
-			id: 'utility/cache',
-			slug: 'cache',
-			category: 'utility',
-			kind: 'package',
+		const cpt = parsed.scaffolds.find((s) => s.id === 'wp/cpt');
+		expect(cpt).toBeDefined();
+		expect(cpt).toMatchObject({
+			id: 'wp/cpt',
+			slug: 'cpt',
+			category: 'wp',
+			kind: 'template',
 			origin: 'default',
 		});
-		expect(typeof cache.name).toBe('string');
-		expect(typeof cache.description).toBe('string');
-		expect(cache.counts).toMatchObject({
+		expect(typeof cpt.name).toBe('string');
+		expect(typeof cpt.description).toBe('string');
+		expect(cpt.counts).toMatchObject({
 			inputs: expect.any(Number),
 			wiring: expect.any(Number),
 			tests: expect.any(Number),
 			secrets: expect.any(Number),
 		});
-		expect(cache.counts.inputs).toBeGreaterThanOrEqual(2);
-		expect(cache.counts.wiring).toBeGreaterThanOrEqual(1);
+		expect(cpt.counts.inputs).toBeGreaterThanOrEqual(2);
+		expect(cpt.counts.wiring).toBeGreaterThanOrEqual(1);
 	});
 
 	it('reports secrets for the WPORG workflow scaffold', async () => {

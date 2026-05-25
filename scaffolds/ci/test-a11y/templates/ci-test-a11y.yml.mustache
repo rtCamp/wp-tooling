@@ -1,0 +1,24 @@
+name: CI / Test (a11y)
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-test-a11y.yml from rtCamp/wp-shared-workflows.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-test-a11y.yml
+#
+# Consumers typically gate this with a label (e.g. `if: contains(github.event.pull_request.labels.*.name, 'run-a11y')`)
+# since pa11y runs are heavier than unit tests. See the upstream workflow's README for the recommended trigger pattern.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  test-a11y:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-a11y.yml@{{wsw_ref}}
+    with:
+      node-version: "{{node_version}}"

@@ -1,0 +1,60 @@
+{
+	"slug": "registrable",
+	"category": "wp",
+	"name": "Registrable Service",
+	"description": "Escape hatch for hook-registering classes that don't fit a specific abstract. Generates a class implementing the Registrable interface from rtcamp/wp-framework with an empty register_hooks() body.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the service class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the service file. Default 'includes/Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "PascalCase class name, e.g. 'NavMenuFilter'.",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/registrable.php.mustache",
+			"dest": "{{base_path}}/{{name}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Services.php",
+			"anchor": "// scaffold:wp/registrable:classes",
+			"snippet_template": "\\{{namespace}}\\{{name}}::class,",
+			"description": "Add the class to a Services (or domain-specific) module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{name}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

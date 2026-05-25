@@ -1,0 +1,35 @@
+{
+	"slug": "test-php",
+	"category": "ci",
+	"name": "CI: PHPUnit",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-php.yml. Runs PHPUnit with optional @wordpress/env for full integration tests. Stable (merged into release/v1.0.0).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call.",
+			"default": "v1"
+		},
+		{
+			"key": "php_version",
+			"description": "PHP version to install.",
+			"default": "8.3"
+		},
+		{
+			"key": "node_version",
+			"description": "Node.js version (used only when use-wp-env is true).",
+			"default": "22"
+		},
+		{
+			"key": "use_wp_env",
+			"description": "Boot @wordpress/env before tests. 'true' for full WP integration, 'false' for standalone Composer mode.",
+			"default": "true"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-test-php.yml.mustache",
+			"dest": ".github/workflows/ci-test-php.yml"
+		}
+	]
+}

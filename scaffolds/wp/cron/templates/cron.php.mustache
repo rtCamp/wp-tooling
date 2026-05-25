@@ -3,33 +3,36 @@
  * Cron job: {{name}} (hook: {{hook}}, schedule: {{schedule}}).
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-use RtCamp\WPToolkit\Abstracts\Abstract_Cron_Job;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 
-/**
- * {{class}} cron job.
- */
-class {{class}} extends Abstract_Cron_Job {
+final class {{class}} implements Registrable {
 
-	/**
-	 * WordPress hook name. Used by wp_schedule_event() and add_action().
-	 */
-	protected string $hook = '{{hook}}';
+	public const HOOK     = '{{hook}}';
+	public const SCHEDULE = '{{schedule}}';
 
 	/**
-	 * Recurrence: 'hourly', 'twicedaily', 'daily', or 'weekly'.
+	 * Schedule the event (if not already scheduled) and bind the handler.
+	 * Called by the framework Loader.
 	 */
-	protected string $recurrence = '{{schedule}}';
+	public function register_hooks(): void {
+		if ( ! wp_next_scheduled( self::HOOK ) ) {
+			wp_schedule_event( time(), self::SCHEDULE, self::HOOK );
+		}
+		add_action( self::HOOK, [ $this, 'run' ] );
+	}
 
 	/**
 	 * The job body. Called every time the hook fires.
 	 */
 	public function run(): void {
-		// TODO: implement {{name}} job.
+		// Replace with your job logic.
 	}
 }

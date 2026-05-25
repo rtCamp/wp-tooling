@@ -89,8 +89,8 @@ class {{class}} { }
 ### Sections (conditional blocks)
 
 ```mustache
-{{#singleton}}use RtCamp\WPToolkit\Traits\Singleton;
-{{/singleton}}use WP_CLI;
+{{#with_logging}}use {{namespace}}\Services\Logger;
+{{/with_logging}}use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 ```
 
 `{{#key}}...{{/key}}` renders the inner block when `vars[key]` is truthy. Truthy means a non-empty string that is not one of `"false"`, `"no"`, `"0"` (case-insensitive).
@@ -213,19 +213,20 @@ Look at these existing scaffolds when authoring a new one:
 
 | Need | Look at |
 |---|---|
-| Simple PHP class with PHPUnit stub | `wp/cli` |
-| PHP class extending a base from wp-php-toolkit | `wp/rest`, `wp/cpt`, `wp/taxonomy`, `wp/cron` |
+| Plain class implementing `CLICommand` with PHPUnit stub | `wp/cli` |
+| PHP class extending a framework abstract | `wp/cpt`, `wp/taxonomy`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role` |
+| Cron handler implementing `Registrable` directly | `wp/cron` |
+| Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
-| Block scaffold with `block.json` + render.php | `block/dynamic` |
+| Block with `block.json` + framework class | `wp/block-dynamic` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
-| `source: "package"` (no files, only boot wiring) | `utility/cache` |
 
-Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file.
+Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.
 
 ---
 
-## When to involve `wp-php-toolkit`
+## When to involve `wp-framework`
 
-If your new scaffold extends or uses a class from `rtcamp/wp-php-toolkit` that does not yet exist, add the contract to [docs/wp-php-toolkit-contract.md](wp-php-toolkit-contract.md) and open an issue on `wp-php-toolkit`. Do not ship a scaffold that references an unreleased class — it will break for consumers running `composer install`.
+If your new scaffold extends or uses a class from `rtcamp/wp-framework` that does not yet exist, add the contract to [docs/wp-framework-contract.md](wp-framework-contract.md) and open an issue on `wp-framework`. Do not ship a scaffold that references an unreleased class. It will break for consumers running `composer install`.

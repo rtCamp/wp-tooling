@@ -3,45 +3,49 @@
  * Custom Post Type: {{slug}} ({{singular}} / {{plural}}).
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-use RtCamp\WPToolkit\Abstracts\Abstract_Post_Type;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractPostType;
 
-/**
- * {{class}} post type.
- */
-class {{class}} extends Abstract_Post_Type {
+class {{class}} extends AbstractPostType {
+
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	public function get_singular_label(): string {
+		return __( '{{singular}}', '{{text_domain}}' );
+	}
+
+	public function get_plural_label(): string {
+		return __( '{{plural}}', '{{text_domain}}' );
+	}
+
+	public function get_menu_icon(): string {
+		return '{{menu_icon}}';
+	}
 
 	/**
-	 * Post type slug.
-	 */
-	protected string $slug = '{{slug}}';
-
-	/**
-	 * Post type arguments. Returned to register_post_type().
+	 * Editor features. Override to drop or extend.
 	 *
-	 * @return array<string,mixed>
+	 * @return array<int,string>
 	 */
-	protected function get_args(): array {
-		return [
-			'label'         => __( '{{plural}}', 'text-domain' ),
-			'labels'        => [
-				'name'          => __( '{{plural}}', 'text-domain' ),
-				'singular_name' => __( '{{singular}}', 'text-domain' ),
-				'add_new_item'  => __( 'Add New {{singular}}', 'text-domain' ),
-				'edit_item'     => __( 'Edit {{singular}}', 'text-domain' ),
-				'view_item'     => __( 'View {{singular}}', 'text-domain' ),
-				'search_items'  => __( 'Search {{plural}}', 'text-domain' ),
-			],
-			'public'        => true,
-			'show_in_rest'  => true,
-			'has_archive'   => true,
-			'menu_position' => 20,
-			'supports'      => [ 'title', 'editor', 'thumbnail', 'excerpt' ],
-		];
+	public function get_editor_supports(): array {
+		return [ 'title', 'editor', 'thumbnail', 'excerpt' ];
+	}
+
+	/**
+	 * Taxonomies to associate with this post type. Add taxonomy slug strings.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_supported_taxonomies(): array {
+		return [];
 	}
 }

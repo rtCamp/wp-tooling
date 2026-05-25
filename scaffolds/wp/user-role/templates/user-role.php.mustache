@@ -1,0 +1,46 @@
+<?php
+/**
+ * Custom user role: {{slug}} ({{display_name}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * Bump get_version() whenever get_capabilities() changes so the framework
+ * re-applies the role on the next admin_init.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractUserRole;
+
+class {{class}} extends AbstractUserRole {
+
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	public function get_display_name(): string {
+		return __( '{{display_name}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Capability map. Keys are capability names, values are true/false.
+	 *
+	 * @return array<string,bool>
+	 */
+	public function get_capabilities(): array {
+		return [
+			'read' => true,
+		];
+	}
+
+	/**
+	 * Role version. Increment when get_capabilities() changes.
+	 */
+	public function get_version(): int {
+		return 1;
+	}
+}

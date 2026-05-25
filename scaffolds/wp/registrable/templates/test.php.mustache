@@ -1,0 +1,31 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{name}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ */
+
+declare(strict_types=1);
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{name}};
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+use WP_UnitTestCase;
+
+/**
+ * @covers \{{namespace}}\{{name}}
+ */
+final class {{name}}Test extends WP_UnitTestCase {
+
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{name}}() );
+	}
+
+	public function test_register_hooks_runs_without_error(): void {
+		( new {{name}}() )->register_hooks();
+		$this->addToAssertionCount( 1 );
+	}
+}

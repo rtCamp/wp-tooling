@@ -129,6 +129,11 @@ const FILE_ENTRY = {
 	properties: {
 		src: { type: 'string', minLength: 1 },
 		dest: { type: 'string', minLength: 1 },
+		raw: {
+			type: 'boolean',
+			description:
+				'When true, the file content is copied verbatim (no Mustache rendering). The `dest` path is still rendered. Use for files that contain literal `{{` or `}}` that would otherwise be misinterpreted as placeholders.',
+		},
 	},
 };
 

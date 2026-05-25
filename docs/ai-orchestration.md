@@ -15,7 +15,7 @@ When this doc says "the skill", it means any AI orchestration layer. When it say
 A skill invokes the engine in one of two equivalent ways:
 
 ```bash
-npx @rtcamp/wp-tooling add <category>/<slug> [--<input>=<value>]... \
+npx wp-tooling add <category>/<slug> [--<input>=<value>]... \
     --non-interactive --json [--dry-run] [--cwd <path>]
 ```
 
@@ -87,7 +87,7 @@ The requested `<category>/<slug>` is not in the merged catalogue.
     "code": "ENOSCAFFOLD",
     "message": "No scaffold registered for slug: wp/clu",
     "requested": "wp/clu",
-    "available": ["wp/cli", "wp/rest", "block/dynamic", "utility/cache", "ci/cd-wporg"]
+    "available": ["wp/cpt", "wp/taxonomy", "wp/block-dynamic", "wp/admin-page", "ci/cd-wporg"]
 }
 ```
 

@@ -1,0 +1,45 @@
+<?php
+/**
+ * Dynamic block: {{vendor}}/{{slug}} ({{title}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractBlock;
+use WP_Block;
+
+class {{class}} extends AbstractBlock {
+
+	public static function get_name(): string {
+		return '{{vendor}}/{{slug}}';
+	}
+
+	/**
+	 * Directory containing block.json. The framework calls
+	 * register_block_type_from_metadata() on it.
+	 */
+	public function get_block_dir(): ?string {
+		return dirname( __DIR__, 2 ) . '/{{blocks_dir}}/{{slug}}';
+	}
+
+	/**
+	 * Server-side render.
+	 *
+	 * @param array<string,mixed> $attributes Block attributes from block.json.
+	 * @param string              $content    Inner content rendered by Gutenberg.
+	 * @param WP_Block            $block      The block instance.
+	 */
+	public function render( array $attributes, string $content, WP_Block $block ): string {
+		// Replace with your markup.
+		return sprintf(
+			'<div class="wp-block-{{vendor}}-{{slug}}">%s</div>',
+			esc_html( $attributes['title'] ?? '{{title}}' )
+		);
+	}
+}

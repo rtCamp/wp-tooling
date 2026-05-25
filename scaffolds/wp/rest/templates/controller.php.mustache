@@ -3,41 +3,34 @@
  * REST controller: {{name}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-use RtCamp\WPToolkit\Abstracts\Abstract_REST_Controller;
-{{#singleton}}use RtCamp\WPToolkit\Traits\Singleton;
-{{/singleton}}use WP_REST_Request;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
+use WP_REST_Request;
 use WP_REST_Response;
 
-/**
- * {{class}}Controller — REST endpoints for {{name}}.
- */
-class {{class}}Controller extends Abstract_REST_Controller {
-{{#singleton}}
-	use Singleton;
-{{/singleton}}
+class {{class}}Controller extends AbstractRESTController {
+
+	protected string $namespace = '{{rest_namespace}}';
+	protected string $version   = '{{rest_version}}';
 
 	/**
-	 * REST namespace, e.g. 'myplugin/v1'.
-	 */
-	protected string $rest_namespace = '{{route_namespace}}';
-
-	/**
-	 * REST base, the route segment after the namespace.
+	 * The route segment after the namespace and version, e.g. 'images'.
 	 */
 	protected string $rest_base = '{{name}}';
 
 	/**
-	 * Register routes. Called by Abstract_REST_Controller on rest_api_init.
+	 * Register REST routes. Called by the framework on rest_api_init.
 	 */
 	public function register_routes(): void {
 		register_rest_route(
-			$this->rest_namespace,
+			"{$this->namespace}/v{$this->version}",
 			'/' . $this->rest_base,
 			[
 				[
@@ -49,17 +42,11 @@ class {{class}}Controller extends Abstract_REST_Controller {
 		);
 	}
 
-	/**
-	 * GET /{{route_namespace}}/{{name}}
-	 */
 	public function get_items( WP_REST_Request $request ): WP_REST_Response {
-		// TODO: implement {{name}} listing.
+		// Replace with your collection response.
 		return new WP_REST_Response( [], 200 );
 	}
 
-	/**
-	 * Permission check for GET /{{name}}.
-	 */
 	public function get_items_permissions_check( WP_REST_Request $request ): bool {
 		return current_user_can( 'read' );
 	}
