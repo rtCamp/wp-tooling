@@ -1,8 +1,28 @@
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
+
 const {
+	GenerateTailwindThemePlugin,
 	generateThemeBlock,
 } = require('../../src/tailwind/GenerateTailwindThemePlugin');
+
+const tmpDir = () =>
+	path.join(
+		os.tmpdir(),
+		'wp-tooling-test-' + crypto.randomBytes(6).toString('hex')
+	);
+
+const MINIMAL_THEME_JSON = {
+	settings: {
+		color: {
+			palette: [{ slug: 'primary', color: '#000', name: 'Primary' }],
+		},
+	},
+};
 
 describe('generateThemeBlock', () => {
 	describe('preset sections', () => {
@@ -206,5 +226,137 @@ describe('generateThemeBlock', () => {
 			expect(result).toMatch(/^@theme \{/);
 			expect(result).toMatch(/\}\n$/);
 		});
+	});
+});
+
+describe('GenerateTailwindThemePlugin.generate()', () => {
+	let dir;
+	let themeJsonPath;
+	let tailwindCssPath;
+	let tailwindThemeCssPath;
+	let plugin;
+
+	beforeEach(() => {
+		dir = tmpDir();
+		fs.mkdirSync(dir, { recursive: true });
+		themeJsonPath = path.join(dir, 'theme.json');
+		tailwindCssPath = path.join(
+			dir,
+			'src',
+			'css',
+			'frontend',
+			'tailwind.css'
+		);
+		tailwindThemeCssPath = path.join(
+			dir,
+			'src',
+			'css',
+			'frontend',
+			'_tailwind-theme.css'
+		);
+		fs.writeFileSync(
+			themeJsonPath,
+			JSON.stringify(MINIMAL_THEME_JSON),
+			'utf8'
+		);
+		plugin = new GenerateTailwindThemePlugin({
+			themeJson: themeJsonPath,
+			tailwindCss: tailwindCssPath,
+		});
+	});
+
+	afterEach(() => {
+		jest.restoreAllMocks();
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	test('writes _tailwind-theme.css containing the @theme block', () => {
+		plugin.generate();
+
+		const content = fs.readFileSync(tailwindThemeCssPath, 'utf8');
+		expect(content).toContain('@theme {');
+		expect(content).toContain(
+			'--color-primary: var(--wp--preset--color--primary)'
+		);
+	});
+
+	test('scaffolds tailwind.css with layer and theme imports when absent', () => {
+		plugin.generate();
+
+		const content = fs.readFileSync(tailwindCssPath, 'utf8');
+		expect(content).toContain('@import "tailwindcss/theme.css"');
+		expect(content).toContain('@import "tailwindcss/utilities.css"');
+		expect(content).toContain('@import "./_tailwind-theme.css"');
+		expect(content).toContain('@source');
+	});
+
+	test('does not overwrite tailwind.css when it already exists', () => {
+		fs.mkdirSync(path.dirname(tailwindCssPath), { recursive: true });
+		const customContent =
+			'/* my custom tailwind */\n@import "./_tailwind-theme.css";\n';
+		fs.writeFileSync(tailwindCssPath, customContent, 'utf8');
+
+		plugin.generate();
+
+		expect(fs.readFileSync(tailwindCssPath, 'utf8')).toBe(customContent);
+	});
+
+	test('updates _tailwind-theme.css when theme.json changes', () => {
+		plugin.generate();
+
+		const updatedThemeJson = {
+			settings: {
+				color: {
+					palette: [
+						{ slug: 'accent', color: '#fff', name: 'Accent' },
+					],
+				},
+			},
+		};
+		fs.writeFileSync(
+			themeJsonPath,
+			JSON.stringify(updatedThemeJson),
+			'utf8'
+		);
+		plugin.generate();
+
+		const content = fs.readFileSync(tailwindThemeCssPath, 'utf8');
+		expect(content).toContain('--color-accent');
+		expect(content).not.toContain('--color-primary');
+	});
+
+	test('does not rewrite _tailwind-theme.css when content is unchanged', () => {
+		plugin.generate();
+
+		const writeSpy = jest.spyOn(fs, 'writeFileSync');
+		plugin.generate();
+
+		const themeWrites = writeSpy.mock.calls.filter(
+			([p]) => p === tailwindThemeCssPath
+		);
+		expect(themeWrites).toHaveLength(0);
+	});
+
+	test('logs an error and writes nothing when theme.json is missing', () => {
+		const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+		fs.unlinkSync(themeJsonPath);
+
+		plugin.generate();
+
+		expect(error).toHaveBeenCalledWith(
+			expect.stringContaining('theme.json not found')
+		);
+		expect(fs.existsSync(tailwindThemeCssPath)).toBe(false);
+	});
+
+	test('logs an error when theme.json contains invalid JSON', () => {
+		const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+		fs.writeFileSync(themeJsonPath, 'not valid json', 'utf8');
+
+		plugin.generate();
+
+		expect(error).toHaveBeenCalledWith(
+			expect.stringContaining('Failed to parse theme.json')
+		);
 	});
 });
