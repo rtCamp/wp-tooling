@@ -6,24 +6,28 @@ const path = require('path');
 const PLUGIN_NAME = 'GenerateTailwindThemePlugin';
 
 /**
- * Build the file header for tailwind.css, including an @source directive that
- * points from the CSS file's directory back to the project root so Tailwind v4
- * scans all template files (PHP, Twig, JS, etc.) regardless of where the CSS
- * file lives within the project tree.
+ * Build the one-time scaffold written to tailwind.css on first run.
  *
- * @param {string} tailwindCssPath Absolute path to the output tailwind.css.
- * @return {string} CSS header string.
+ * Imports the Tailwind layers and the generated _tailwind-theme.css file.
+ * After first run this file is owned by the consumer and never overwritten.
+ *
+ * @param {string} tailwindCssPath      Absolute path to tailwind.css.
+ * @param {string} tailwindThemeCssPath Absolute path to _tailwind-theme.css.
+ * @return {string} CSS scaffold string.
  */
-const generateBaseCss = (tailwindCssPath) => {
+const generateEntryScaffold = (tailwindCssPath, tailwindThemeCssPath) => {
 	const cssDir = path.dirname(tailwindCssPath);
 	const relToRoot = path.relative(cssDir, process.cwd());
 	const sourceDir = relToRoot.split(path.sep).join('/') + '/';
-	return `/* Auto-generated from theme.json by GenerateTailwindThemePlugin */
+	const themeImport =
+		'./' +
+		path.relative(cssDir, tailwindThemeCssPath).split(path.sep).join('/');
+	return `/* Tailwind CSS entry — edit freely. WordPress preset tokens live in ${path.basename(tailwindThemeCssPath)}. */
 @source "${sourceDir}";
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
-
+@import "${themeImport}";
 `;
 };
 
@@ -170,10 +174,18 @@ class GenerateTailwindThemePlugin {
 				'frontend',
 				'tailwind.css'
 			);
+		this.tailwindThemeCssPath = path.join(
+			path.dirname(this.tailwindCssPath),
+			'_tailwind-theme.css'
+		);
 	}
 
 	/**
-	 * Generate the tailwind.css file from theme.json.
+	 * Generate _tailwind-theme.css from theme.json, and scaffold tailwind.css on first run.
+	 *
+	 * _tailwind-theme.css is always regenerated — it is a pure build artifact derived
+	 * from theme.json and should be gitignored. tailwind.css is written once and then
+	 * owned by the consumer; subsequent builds never touch it.
 	 *
 	 * @return {void}
 	 */
@@ -195,21 +207,33 @@ class GenerateTailwindThemePlugin {
 			return;
 		}
 
-		const output =
-			generateBaseCss(this.tailwindCssPath) +
+		fs.mkdirSync(path.dirname(this.tailwindThemeCssPath), {
+			recursive: true,
+		});
+
+		// Always keep _tailwind-theme.css in sync with theme.json.
+		const themeOutput =
+			`/* Auto-generated from theme.json by ${PLUGIN_NAME} — do not edit. */\n` +
 			generateThemeBlock(themeJson);
-		fs.mkdirSync(path.dirname(this.tailwindCssPath), { recursive: true });
-
-		const existing = fs.existsSync(this.tailwindCssPath)
-			? fs.readFileSync(this.tailwindCssPath, 'utf8')
+		const existingTheme = fs.existsSync(this.tailwindThemeCssPath)
+			? fs.readFileSync(this.tailwindThemeCssPath, 'utf8')
 			: null;
-
-		if (existing === output) {
-			return;
+		if (existingTheme !== themeOutput) {
+			fs.writeFileSync(this.tailwindThemeCssPath, themeOutput, 'utf8');
+			console.log(
+				`[${PLUGIN_NAME}] Written to ${this.tailwindThemeCssPath}`
+			);
 		}
 
-		fs.writeFileSync(this.tailwindCssPath, output, 'utf8');
-		console.log(`[${PLUGIN_NAME}] Written to ${this.tailwindCssPath}`);
+		// Scaffold tailwind.css once — after first run it belongs to the consumer.
+		if (!fs.existsSync(this.tailwindCssPath)) {
+			const scaffold = generateEntryScaffold(
+				this.tailwindCssPath,
+				this.tailwindThemeCssPath
+			);
+			fs.writeFileSync(this.tailwindCssPath, scaffold, 'utf8');
+			console.log(`[${PLUGIN_NAME}] Scaffolded ${this.tailwindCssPath}`);
+		}
 	}
 
 	/**
