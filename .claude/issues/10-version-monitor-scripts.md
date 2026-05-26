@@ -1,8 +1,8 @@
 # Issue #10 — Add Version Monitor scripts
 
-**Status:** in-progress
+**Status:** in-review
 **Branch:** `v1.0.0/task/version-monitor-scripts`
-**PR:** #<pr-number>
+**PR:** #23
 **Assignee:** @Adi-ty
 
 ---
