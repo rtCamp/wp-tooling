@@ -248,7 +248,7 @@ class ScaffoldRegistry {
 		// files-loop just wrote) reuse a files[].dest. Track those so we don't
 		// re-check existence (always true post-write), don't re-write, and don't
 		// emit a false-positive "already exists" warning.
-		const writtenDestSet = new Set(filesCreated);
+		const writtenDestSet = new Set([...filesCreated, ...filesSkipped]);
 
 		const aiTests = [];
 		for (const t of scaffold.tests || []) {

@@ -315,6 +315,53 @@ describe('execute() result shape', () => {
 		).toBe('original');
 	});
 
+	it('treats a test entry sharing a file dest as declarative, on both clean run and idempotent re-run (D2)', async () => {
+		const lintFixture = path.join(
+			__dirname,
+			'..',
+			'fixtures',
+			'scaffolds-declarative-lint'
+		);
+		const lintRegistry = new ScaffoldRegistry({ defaultsDir: lintFixture });
+		await lintRegistry.scan();
+
+		const dest = '.github/workflows/ci-check.yml';
+		const declarativeTest = {
+			path: dest,
+			framework: 'actionlint',
+			command: null,
+		};
+		const stubWarnings = (result) =>
+			result.warnings.filter((w) => w.includes('test stub already'));
+
+		const tmp = makeTmpDir();
+
+		// Clean run: file is created, the test entry shares its dest so it is a
+		// lint declaration — no stub is written, no warning, but it is still
+		// surfaced to the AI under ai.tests.
+		const first = await lintRegistry.execute(
+			'ci/lint-only',
+			{ slug: 'ci-check' },
+			{ dryRun: false, cwd: tmp }
+		);
+		expect(first.engine.wrote).toEqual([dest]);
+		expect(stubWarnings(first)).toEqual([]);
+		expect(first.ai.tests).toContainEqual(declarativeTest);
+
+		// Idempotent re-run: file already exists → skipped (not created), so the
+		// declarative dest is absent from the created set. It must still be
+		// recognised as declarative — no false "test stub already exists" — and
+		// still surfaced under ai.tests.
+		const second = await lintRegistry.execute(
+			'ci/lint-only',
+			{ slug: 'ci-check' },
+			{ dryRun: false, cwd: tmp }
+		);
+		expect(second.engine.skipped).toEqual([dest]);
+		expect(stubWarnings(second)).toEqual([]);
+		expect(second.ai.tests).toContainEqual(declarativeTest);
+	});
+
 	it('warns on supplied inputs the scaffold does not declare', async () => {
 		const tmp = makeTmpDir();
 		const result = await registry.execute(
