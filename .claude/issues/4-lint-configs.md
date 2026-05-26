@@ -1,4 +1,4 @@
-# Issue #3 — Add shareable lint configs (ESLint + Stylelint)
+# Issue #4 — Add shareable lint configs (ESLint + Stylelint)
 
 **Status:** in-review
 **Branch:** `v1.0.0/task/lint-configs`
