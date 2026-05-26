@@ -5,6 +5,8 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -14,8 +16,16 @@ namespace {{namespace}};
 use rtCamp\WPFramework\Contracts\Abstracts\AbstractBlock;
 use WP_Block;
 
+/**
+ * Registers the {{vendor}}/{{slug}} dynamic block.
+ */
 class {{class}} extends AbstractBlock {
 
+	/**
+	 * Get the block name (including namespace).
+	 *
+	 * @return string
+	 */
 	public static function get_name(): string {
 		return '{{vendor}}/{{slug}}';
 	}
@@ -25,6 +35,8 @@ class {{class}} extends AbstractBlock {
 	 * WordPress registers. Points at the build output (not the source tree),
 	 * so the editor receives the bundled assets and not raw ES modules.
 	 * Run `npm run build` to populate this directory.
+	 *
+	 * @return string|null
 	 */
 	public function get_block_dir(): ?string {
 		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
@@ -36,6 +48,8 @@ class {{class}} extends AbstractBlock {
 	 * @param array<string,mixed> $attributes Block attributes from block.json.
 	 * @param string              $content    Inner content rendered by Gutenberg.
 	 * @param WP_Block            $block      The block instance.
+	 *
+	 * @return string
 	 */
 	public function render( array $attributes, string $content, WP_Block $block ): string {
 		// Replace with your markup.

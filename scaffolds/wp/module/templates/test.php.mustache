@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for {{namespace}}\{{name}}.
+ * Tests for {{namespace}}\{{class}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
@@ -11,20 +11,20 @@ declare(strict_types=1);
 
 namespace {{tests_namespace}};
 
-use {{namespace}}\{{name}};
+use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
- * @covers \{{namespace}}\{{name}}
+ * @covers \{{namespace}}\{{class}}
  */
-final class {{name}}Test extends WP_UnitTestCase {
+final class {{class}}Test extends WP_UnitTestCase {
 
 	public function test_get_classes_returns_array(): void {
-		$this->assertIsArray( ( new {{name}}() )->get_classes() );
+		$this->assertIsArray( ( new {{class}}() )->get_classes() );
 	}
 
 	public function test_each_listed_class_is_loadable(): void {
-		foreach ( ( new {{name}}() )->get_classes() as $class ) {
+		foreach ( ( new {{class}}() )->get_classes() as $class ) {
 			$this->assertTrue( class_exists( $class ), "Class {$class} should be loadable" );
 		}
 	}

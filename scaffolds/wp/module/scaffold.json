@@ -29,8 +29,14 @@
 		},
 		{
 			"key": "name",
-			"description": "PascalCase module name, e.g. 'PostTypes', 'Taxonomies', 'Blocks'.",
+			"description": "Logical module name, e.g. 'PostTypes', 'Taxonomies', 'Blocks'. Normalised to a PascalCase class name, so 'post-types' and 'PostTypes' both yield class PostTypes.",
 			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
 		},
 		{
 			"key": "kind",
@@ -41,21 +47,21 @@
 	"files": [
 		{
 			"src": "templates/module.php.mustache",
-			"dest": "{{base_path}}/{{name}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/../Plugin.php",
 			"anchor": "// scaffold:wp/module:modules",
-			"snippet_template": "\\{{namespace}}\\{{name}}::class,",
-			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the module manually in your plugin bootstrap with ( new \\{{namespace}}\\{{name}}() )->register_hooks()."
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the module manually in your plugin bootstrap with ( new \\{{namespace}}\\{{class}}() )->register_hooks()."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "{{tests_path}}/{{name}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

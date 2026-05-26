@@ -5,6 +5,8 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -13,23 +15,43 @@ namespace {{namespace}};
 
 use rtCamp\WPFramework\Contracts\Abstracts\AbstractTaxonomy;
 
+/**
+ * Registers the {{singular}} taxonomy.
+ */
 class {{class}} extends AbstractTaxonomy {
 
+	/**
+	 * Get the taxonomy slug.
+	 *
+	 * @return string
+	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
 	}
 
 	/**
+	 * Get the object types this taxonomy attaches to.
+	 *
 	 * @return array<int,string>
 	 */
 	public static function get_object_types(): array {
 		return array_map( 'trim', explode( ',', '{{object_type}}' ) );
 	}
 
+	/**
+	 * Get the singular label.
+	 *
+	 * @return string
+	 */
 	public function get_singular_label(): string {
 		return __( '{{singular}}', '{{text_domain}}' );
 	}
 
+	/**
+	 * Get the plural label.
+	 *
+	 * @return string
+	 */
 	public function get_plural_label(): string {
 		return __( '{{plural}}', '{{text_domain}}' );
 	}
@@ -37,6 +59,8 @@ class {{class}} extends AbstractTaxonomy {
 	/**
 	 * Hierarchical (true = like categories) or flat (false = like tags).
 	 * Override to switch behaviour.
+	 *
+	 * @return bool
 	 */
 	public function is_hierarchical(): bool {
 		return true;

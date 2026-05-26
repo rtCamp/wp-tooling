@@ -29,28 +29,34 @@
 		},
 		{
 			"key": "name",
-			"description": "PascalCase class name, e.g. 'NavMenuFilter'.",
+			"description": "Logical service name. Normalised to a PascalCase class name, so 'nav-menu-filter' and 'NavMenuFilter' both yield class NavMenuFilter.",
 			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
 		}
 	],
 	"files": [
 		{
 			"src": "templates/registrable.php.mustache",
-			"dest": "{{base_path}}/{{name}}.php"
+			"dest": "{{base_path}}/{{class}}.php"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "{{base_path}}/../Modules/Services.php",
 			"anchor": "// scaffold:wp/registrable:classes",
-			"snippet_template": "\\{{namespace}}\\{{name}}::class,",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
 			"description": "Add the class to a Services (or domain-specific) module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
 		}
 	],
 	"tests": [
 		{
 			"src": "templates/test.php.mustache",
-			"dest": "{{tests_path}}/{{name}}Test.php",
+			"dest": "{{tests_path}}/{{class}}Test.php",
 			"framework": "phpunit"
 		}
 	],

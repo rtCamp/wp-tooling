@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for {{namespace}}\{{name}}.
+ * Tests for {{namespace}}\{{class}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
@@ -11,21 +11,21 @@ declare(strict_types=1);
 
 namespace {{tests_namespace}};
 
-use {{namespace}}\{{name}};
+use {{namespace}}\{{class}};
 use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 use WP_UnitTestCase;
 
 /**
- * @covers \{{namespace}}\{{name}}
+ * @covers \{{namespace}}\{{class}}
  */
-final class {{name}}Test extends WP_UnitTestCase {
+final class {{class}}Test extends WP_UnitTestCase {
 
 	public function test_implements_registrable(): void {
-		$this->assertInstanceOf( Registrable::class, new {{name}}() );
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
 	}
 
 	public function test_register_hooks_runs_without_error(): void {
-		( new {{name}}() )->register_hooks();
+		( new {{class}}() )->register_hooks();
 		$this->addToAssertionCount( 1 );
 	}
 }

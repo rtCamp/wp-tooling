@@ -1,10 +1,12 @@
 <?php
 /**
- * {{name}}: hook-registering service.
+ * {{class}}: hook-registering service.
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -13,13 +15,17 @@ namespace {{namespace}};
 
 use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 
-final class {{name}} implements Registrable {
+/**
+ * Registers this service's WordPress hooks through the framework Loader.
+ */
+final class {{class}} implements Registrable {
 
 	/**
 	 * Register WordPress hooks. Called by the framework Loader during boot.
+	 *
+	 * @return void
 	 */
 	public function register_hooks(): void {
-		// add_action( '...', [ $this, '...' ] );
-		// add_filter( '...', [ $this, '...' ] );
+		// Register actions and filters here, for example with add_action() or add_filter().
 	}
 }

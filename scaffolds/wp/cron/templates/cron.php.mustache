@@ -5,6 +5,8 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -13,6 +15,9 @@ namespace {{namespace}};
 
 use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 
+/**
+ * Schedules and handles the {{name}} cron job.
+ */
 final class {{class}} implements Registrable {
 
 	public const HOOK     = '{{hook}}';
@@ -21,6 +26,8 @@ final class {{class}} implements Registrable {
 	/**
 	 * Schedule the event (if not already scheduled) and bind the handler.
 	 * Called by the framework Loader.
+	 *
+	 * @return void
 	 */
 	public function register_hooks(): void {
 		if ( ! wp_next_scheduled( self::HOOK ) ) {
@@ -31,6 +38,8 @@ final class {{class}} implements Registrable {
 
 	/**
 	 * The job body. Called every time the hook fires.
+	 *
+	 * @return void
 	 */
 	public function run(): void {
 		// Replace with your job logic.

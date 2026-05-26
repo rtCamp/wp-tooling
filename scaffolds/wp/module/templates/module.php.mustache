@@ -1,10 +1,12 @@
 <?php
 /**
- * {{name}} module: groups Registrable classes hosted by the framework Loader.
+ * {{class}} module: groups Registrable classes hosted by the framework Loader.
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -13,7 +15,10 @@ namespace {{namespace}};
 
 use rtCamp\WPFramework\Contracts\Abstracts\AbstractModule;
 
-final class {{name}} extends AbstractModule {
+/**
+ * Groups related Registrable classes for the framework Loader to boot.
+ */
+final class {{class}} extends AbstractModule {
 
 	/**
 	 * Classes hosted by this module. The framework's Loader instantiates
@@ -23,7 +28,7 @@ final class {{name}} extends AbstractModule {
 	 */
 	public function get_classes(): array {
 		return [
-			// scaffold:wp/{{kind}}:classes
+			// scaffold:wp/{{kind}}:classes (add classes here).
 		];
 	}
 }

@@ -8,6 +8,8 @@
  * re-applies the role on the next admin_init.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
@@ -16,12 +18,25 @@ namespace {{namespace}};
 
 use rtCamp\WPFramework\Contracts\Abstracts\AbstractUserRole;
 
+/**
+ * Registers the {{display_name}} user role.
+ */
 class {{class}} extends AbstractUserRole {
 
+	/**
+	 * Get the role slug (identifier).
+	 *
+	 * @return string
+	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
 	}
 
+	/**
+	 * Get the display name for the role.
+	 *
+	 * @return string
+	 */
 	public function get_display_name(): string {
 		return __( '{{display_name}}', '{{text_domain}}' );
 	}
@@ -39,6 +54,8 @@ class {{class}} extends AbstractUserRole {
 
 	/**
 	 * Role version. Increment when get_capabilities() changes.
+	 *
+	 * @return int
 	 */
 	public function get_version(): int {
 		return 1;
