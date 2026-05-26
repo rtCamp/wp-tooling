@@ -21,11 +21,13 @@ class {{class}} extends AbstractBlock {
 	}
 
 	/**
-	 * Directory containing block.json. The framework calls
-	 * register_block_type_from_metadata() on it.
+	 * Directory containing the compiled block.json + bundled index.js that
+	 * WordPress registers. Points at the build output (not the source tree),
+	 * so the editor receives the bundled assets and not raw ES modules.
+	 * Run `npm run build` to populate this directory.
 	 */
 	public function get_block_dir(): ?string {
-		return dirname( __DIR__, 2 ) . '/{{blocks_dir}}/{{slug}}';
+		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
 	}
 
 	/**

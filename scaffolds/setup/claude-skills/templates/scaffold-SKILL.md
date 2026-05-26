@@ -38,7 +38,7 @@ Match the user's request to one scaffold id (`category/slug`). If multiple candi
 Before invoking `add`, learn what the project actually looks like. Read these in order; cache the result for the rest of the session.
 
 - **`composer.json`**: extract `autoload.psr-4` for the namespace prefix and PHP base path. Example: `"Acme\\Blog\\": "src/"` means namespace `Acme\Blog`, base `src`.
-- **`package.json`**: extract `name`, `scripts`, and any `@wordpress/scripts` config to learn the JS build pipeline.
+- **`package.json`**: extract `name`, `scripts`, and any `@wordpress/scripts` config. For block scaffolds specifically, parse the `build` script for `--output-path=<DIR>` (or the wp-scripts default `build/`). Remember this value as `build_output_dir` and pass it as `--build_dir=<build_output_dir>` to `wp/block-dynamic` so the generated class points at the compiled assets, not the source tree. If the project doesn't yet have a build script, the scaffold's default `build/blocks` is the correct guess.
 - **The main plugin/theme file** (header `Plugin Name:` or `Theme Name:`): find the first `new X(...)` or `X::get_instance()` and follow it to the bootstrap class. Note the class file path and the method used to register subsystems (`register()`, `setup()`, `boot()`, etc.).
 - **Two or three existing implementations of the same scaffold type** in the project. If adding a CLI command, find existing CLI classes and note:
   - The **registration pattern** (the snippet the project uses to wire them).
@@ -180,12 +180,14 @@ Pick the framework that fits each test:
 | `wp/cpt` | PHPUnit | post type registration, supports, REST exposure |
 | `wp/taxonomy` | PHPUnit | taxonomy registration, attached object types, term creation |
 | `wp/cron` | PHPUnit | hook scheduled, callback fires, unschedule works |
-| `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render.php) | renders without crashing, render callback returns expected markup |
+| `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method on the block class) | edit.js renders without crashing; PHP `render()` returns expected markup with a real `WP_Query` fixture, including empty-state and any post-limit cap. |
 | `block/interactive` | Jest + Playwright | interactivity directives, store actions |
 | `utility/*` (PHP) | PHPUnit | unit-level behaviour |
 | `ci/*` workflows | actionlint + yaml-parse | syntactically valid; no runtime test |
 
 Strip every `markTestIncomplete` you reach — leaving even one in the final state is a failure.
+
+**Block scaffolds need a build step before they work in the editor.** After `wp/block-dynamic` writes its files, the generated class's `get_block_dir()` points at the compiled output (`build/<...>/` by default). The compiled assets only exist after `npm run build` (or `npm run start` in dev). Surface this as a developer action in your report: "run `npm run build` before activating, or the editor will report the block as unsupported." Do not run the build yourself; the package-manager prohibition applies.
 
 **B. Run the suite.** Resolve the command:
 

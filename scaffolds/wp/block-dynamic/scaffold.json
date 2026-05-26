@@ -29,8 +29,13 @@
 		},
 		{
 			"key": "blocks_dir",
-			"description": "Directory holding block.json + edit.js + index.js (relative to project root).",
+			"description": "Source directory for block.json + edit.js + index.js (the inputs to @wordpress/scripts). Default 'src/blocks'.",
 			"default": "src/blocks"
+		},
+		{
+			"key": "build_dir",
+			"description": "Compiled-output directory that WordPress actually reads (where block.json + bundled index.js end up after `npm run build`). Default 'build/blocks' matches wp-scripts' default `--output-path`. Override to the consumer project's actual build path if it differs.",
+			"default": "build/blocks"
 		},
 		{
 			"key": "slug",
