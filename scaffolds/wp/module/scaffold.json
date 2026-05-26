@@ -55,7 +55,7 @@
 			"target_file": "{{base_path}}/../Plugin.php",
 			"anchor": "// scaffold:wp/module:modules",
 			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
-			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the module manually in your plugin bootstrap with ( new \\{{namespace}}\\{{class}}() )->register_hooks()."
+			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the generated module manually in your plugin bootstrap and call its register_hooks() method."
 		}
 	],
 	"tests": [
