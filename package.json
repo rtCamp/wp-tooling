@@ -3,7 +3,6 @@
   "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
   "version": "0.1.0",
   "author": "rtCamp",
-  "// overrides": "Forces minimatch off the vulnerable 9.0.0-9.0.6 range (3 high-severity ReDoS CVEs reaching us via the @typescript-eslint/typescript-estree chain that @wordpress/eslint-plugin v22 pulls in). Remove this block once we can bump @wordpress/eslint-plugin to v25, which requires ESLint 9. The bump is gated on @wordpress/scripts officially supporting ESLint 9 (we follow its pin per CLAUDE.md).",
   "bin": {
     "wp-tooling": "./bin/wp-tooling.js"
   },
@@ -46,9 +45,6 @@
     "wordpress"
   ],
   "license": "GPL-2.0-or-later",
-  "overrides": {
-    "minimatch": "^9.0.7"
-  },
   "peerDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@wordpress/eslint-plugin": "^25.1.0",
