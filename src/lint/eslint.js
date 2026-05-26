@@ -6,12 +6,7 @@ const jestPlugin = require('eslint-plugin-jest');
 
 module.exports = [
 	...wordpress.configs.recommended,
-	{
-		...commentsConfigs.recommended,
-		rules: {
-			...commentsConfigs.recommended.rules,
-		},
-	},
+	commentsConfigs.recommended,
 	{
 		...jestPlugin.configs['flat/recommended'],
 		files: ['**/*.test.js'],
