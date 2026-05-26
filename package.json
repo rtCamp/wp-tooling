@@ -1,67 +1,73 @@
 {
-    "name": "@rtcamp/wp-tooling",
-    "version": "0.1.0",
-    "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
-    "license": "GPL-2.0-or-later",
-    "author": "rtCamp",
-    "homepage": "https://github.com/rtCamp/wp-tooling#readme",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/rtCamp/wp-tooling.git"
-    },
-    "bugs": {
-        "url": "https://github.com/rtCamp/wp-tooling/issues"
-    },
-    "publishConfig": {
-        "registry": "https://npm.pkg.github.com",
-        "access": "restricted"
-    },
-    "engines": {
-        "node": ">=22"
-    },
-    "bin": {
-        "wp-tooling": "./bin/wp-tooling.js"
-    },
-    "exports": {
-        "./ui": "./src/ui/index.js",
-        "./scaffolds": "./src/scaffolds/index.js",
-        "./release": "./src/release/index.js",
-        "./hooks": "./src/hooks/index.js",
-        "./ci": "./src/ci/index.js",
-        "./version-monitor": "./src/version-monitor/index.js",
-        "./eslint-config": "./src/lint/eslint.js",
-        "./stylelint-config": "./src/lint/stylelint.js"
-    },
-    "files": [
-        "bin",
-        "src",
-        "README.md",
-        "LICENSE"
-    ],
-    "scripts": {
-        "lint": "eslint src tests",
-        "lint:fix": "eslint src tests --fix",
-        "test": "jest",
-        "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage",
-        "check": "npm run lint && npm test"
-    },
-    "dependencies": {},
-    "// overrides": "Forces minimatch off the vulnerable 9.0.0-9.0.6 range (3 high-severity ReDoS CVEs reaching us via the @typescript-eslint/typescript-estree chain that @wordpress/eslint-plugin v22 pulls in). Remove this block once we can bump @wordpress/eslint-plugin to v25, which requires ESLint 9. The bump is gated on @wordpress/scripts officially supporting ESLint 9 (we follow its pin per CLAUDE.md).",
-    "overrides": {
-        "minimatch": "^9.0.7"
-    },
-    "devDependencies": {
-        "@wordpress/eslint-plugin": "^22.0.0",
-        "eslint": "8.57.1",
-        "jest": "^29.7.0"
-    },
-    "keywords": [
-        "rtcamp",
-        "wordpress",
-        "tooling",
-        "scaffolding",
-        "tty",
-        "cli"
-    ]
+  "name": "@rtcamp/wp-tooling",
+  "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
+  "version": "0.1.0",
+  "author": "rtCamp",
+  "bin": {
+    "wp-tooling": "./bin/wp-tooling.js"
+  },
+  "bugs": {
+    "url": "https://github.com/rtCamp/wp-tooling/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-n": "^18.0.1",
+    "globals": "^17.6.0",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    "./ui": "./src/ui/index.js",
+    "./scaffolds": "./src/scaffolds/index.js",
+    "./release": "./src/release/index.js",
+    "./hooks": "./src/hooks/index.js",
+    "./ci": "./src/ci/index.js",
+    "./version-monitor": "./src/version-monitor/index.js",
+    "./eslint-config": "./src/lint/eslint.js",
+    "./stylelint-config": "./src/lint/stylelint.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "homepage": "https://github.com/rtCamp/wp-tooling#readme",
+  "keywords": [
+    "cli",
+    "rtcamp",
+    "scaffolding",
+    "tooling",
+    "tty",
+    "wordpress"
+  ],
+  "license": "GPL-2.0-or-later",
+  "peerDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
+    "@wordpress/eslint-plugin": "^25.1.0",
+    "@wordpress/stylelint-config": "^23.37.0",
+    "eslint": "^10.0.0",
+    "eslint-plugin-jest": "^29.0.0",
+    "stylelint": "^16.8.2",
+    "stylelint-scss": "^6.4.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rtCamp/wp-tooling.git"
+  },
+  "scripts": {
+    "check": "npm run lint && npm test",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  }
 }
