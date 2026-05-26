@@ -1,0 +1,14 @@
+{
+	"name": "fixture-plugin",
+	"version": "1.0.0",
+	"dependencies": {
+		"lodash": "^4.17.0"
+	},
+	"devDependencies": {
+		"jest": "^29.0.0",
+		"left-pad": "*"
+	},
+	"engines": {
+		"node": ">=22.11.0"
+	}
+}
