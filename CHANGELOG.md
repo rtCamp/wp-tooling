@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `./tailwind-config` — `GenerateTailwindThemePlugin` webpack plugin that generates a Tailwind CSS v4 entry point from `theme.json`, mapping WordPress preset tokens to Tailwind utility namespaces (`--color-*`, `--text-*`, `--font-*`, `--spacing-*`, `--shadow-*`)
 - `./tailwind-config/postcss` — shareable PostCSS config for `@tailwindcss/postcss`
+- Shareable ESLint config exported via `@rtcamp/wp-tooling/eslint-config` — extends `@wordpress/eslint-plugin` recommended (flat config, ESLint v10), `@eslint-community/eslint-plugin-eslint-comments`, and `eslint-plugin-jest` scoped to `**/*.test.js`
+- Shareable Stylelint config exported via `@rtcamp/wp-tooling/stylelint-config` — extends `@wordpress/stylelint-config` and `@wordpress/stylelint-config/scss`
+- `eslint.config.js` — repo-local flat config extending the shared export, with Node globals and `n/no-restricted-require` banning runtime deps
 - TTY UI kit (`src/ui/`) with nine public exports: `Wizard`, `text`, `confirm`, `password`, `checkbox`, `radio`, `checkboxTree`, `spinner`, and `CancelledError`.
 - `Wizard` class -- runs steps in order, sharing a mutable context object; supports `skip(ctx)` predicate. Validates that `steps` is an array. Omits ANSI formatting in non-TTY mode.
 - `spinner` -- async progress feedback with ASCII animation in TTY and plain text fallback. Guards against multiple intervals when `start()` called twice.
