@@ -17,13 +17,13 @@ use WP_REST_Response;
 
 class {{class}}Controller extends AbstractRESTController {
 
-	protected string $namespace = '{{rest_namespace}}';
-	protected string $version   = '{{rest_version}}';
+	protected $namespace      = '{{rest_namespace}}';
+	protected string $version = '{{rest_version}}';
 
 	/**
 	 * The route segment after the namespace and version, e.g. 'images'.
 	 */
-	protected string $rest_base = '{{name}}';
+	protected $rest_base = '{{name}}';
 
 	/**
 	 * Register REST routes. Called by the framework on rest_api_init.
