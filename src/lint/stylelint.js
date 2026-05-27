@@ -1,6 +1,8 @@
-/**
- * Shareable Stylelint config -- stub.
- */
 'use strict';
 
-module.exports = {};
+module.exports = {
+	extends: [
+		'@wordpress/stylelint-config',
+		'@wordpress/stylelint-config/scss',
+	],
+};

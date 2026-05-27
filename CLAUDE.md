@@ -14,7 +14,6 @@ An npm package of shared tooling for rtCamp WordPress projects. Provides the TTY
 
 - No runtime dependencies in `dependencies` — dev deps are fine.
 - Banned from `dependencies`: `chalk`, `inquirer`, `@inquirer/prompts`, `clack`, `@clack/prompts`, `ora`, `listr2`.
-- ESLint pinned at `8.57.1` — matches `@wordpress/scripts` range.
 - `Mustache.escape = (text) => text` — never HTML-encode generated code.
 - Every UI primitive works in non-TTY environments (CI) — no crash when `process.stdout.isTTY` is false.
 - Every CLI command supports `--dry-run`.
@@ -33,13 +32,13 @@ Before adding any new tool, package, or convention: check if an official WordPre
 
 ## Language & versions
 
-| | |
-|---|---|
-| Node | 22 LTS (`^22.x`) |
-| npm | 10.x |
-| ESLint | `8.57.1` pinned (not `^`) |
-| Jest | `^29` |
-| Mustache | `^4` |
+|          |                  |
+| -------- | ---------------- |
+| Node     | 22 LTS (`^22.x`) |
+| npm      | 10.x             |
+| ESLint   | `^10.0.0`        |
+| Jest     | `^29`            |
+| Mustache | `^4`             |
 
 Whole package is CommonJS for broad Node compatibility. No ESM mix.
 
@@ -68,12 +67,12 @@ PascalCase for class names, camelCase for functions, kebab-case for filenames.
 
 ## Architecture patterns
 
-| Pattern | Shape |
-|---|---|
-| **Wizard step** | Class with `name`, `description`, `skip(ctx)`, `run(ctx)`. Extends `AbstractStep` (if defined) or exports an object matching that shape |
-| **Scaffold** | JSON spec + Mustache templates. Discovered by `ScaffoldRegistry.scan()` — no hardcoded registration |
-| **UI primitive** | Function returning a Promise. Zero deps. Works without TTY (reads from `stdin`, falls back gracefully) |
-| **CI script** | Subcommand under `bin/wp-tooling <command>`. Exports a function that takes `{ args, env }` |
+| Pattern          | Shape                                                                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wizard step**  | Class with `name`, `description`, `skip(ctx)`, `run(ctx)`. Extends `AbstractStep` (if defined) or exports an object matching that shape |
+| **Scaffold**     | JSON spec + Mustache templates. Discovered by `ScaffoldRegistry.scan()` — no hardcoded registration                                     |
+| **UI primitive** | Function returning a Promise. Zero deps. Works without TTY (reads from `stdin`, falls back gracefully)                                  |
+| **CI script**    | Subcommand under `bin/wp-tooling <command>`. Exports a function that takes `{ args, env }`                                              |
 
 Rule of thumb: prefer small, pure functions with explicit inputs over classes with internal state.
 

@@ -48,7 +48,6 @@ async function text(options) {
 			: '';
 	const prompt = `${ANSI.cyan}?${ANSI.reset} ${ANSI.bold}${message}${ANSI.reset}${defaultHint} `;
 
-	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		const answer = await readLine(isTTY() ? prompt : `${message}: `);
 		const value = answer.trim() || defaultValue || '';
