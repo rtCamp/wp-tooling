@@ -1,0 +1,98 @@
+{
+	"slug": "block-dynamic",
+	"category": "wp",
+	"name": "Dynamic block",
+	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-framework (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the block class. Default 'Inc\\Blocks' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Blocks"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the block class file. Default 'includes/Blocks'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Blocks"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Blocks'.",
+			"default": "Inc\\Tests\\Blocks"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Blocks'.",
+			"default": "tests/Blocks"
+		},
+		{
+			"key": "blocks_dir",
+			"description": "Source directory for block.json + edit.js + index.js (the inputs to @wordpress/scripts). Default 'src/blocks'.",
+			"default": "src/blocks"
+		},
+		{
+			"key": "build_dir",
+			"description": "Compiled-output directory that WordPress actually reads (where block.json + bundled index.js end up after `npm run build`). Default 'build/blocks' matches wp-scripts' default `--output-path`. Override to the consumer project's actual build path if it differs.",
+			"default": "build/blocks"
+		},
+		{
+			"key": "slug",
+			"description": "Block slug, kebab-case, no vendor prefix, e.g. 'hero-banner'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "title",
+			"description": "Human-readable block title shown in the editor.",
+			"required": true
+		},
+		{
+			"key": "vendor",
+			"description": "Vendor prefix for the block name, e.g. 'rtcamp' produces 'rtcamp/hero-banner'.",
+			"default": "rtcamp"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/block-class.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		},
+		{
+			"src": "templates/block.json.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/block.json"
+		},
+		{
+			"src": "templates/index.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/index.js"
+		},
+		{
+			"src": "templates/edit.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/edit.js"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Blocks.php",
+			"anchor": "// scaffold:wp/block-dynamic:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the block class to the Blocks module so the framework Loader registers it on init. If the Blocks module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Blocks --kind=block-dynamic`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

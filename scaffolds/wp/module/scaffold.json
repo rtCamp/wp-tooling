@@ -1,0 +1,71 @@
+{
+	"slug": "module",
+	"category": "wp",
+	"name": "Framework Module",
+	"description": "An AbstractModule subclass that groups related Registrable classes for the framework's Loader. The wp/cpt, wp/taxonomy, wp/cli and other scaffolds wire their generated classes into a module of the matching kind.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the module class. Default 'Inc\\Modules' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Modules"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the module file. Default 'includes/Modules'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Modules"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Modules'.",
+			"default": "Inc\\Tests\\Modules"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Modules'.",
+			"default": "tests/Modules"
+		},
+		{
+			"key": "name",
+			"description": "Logical module name, e.g. 'PostTypes', 'Taxonomies', 'Blocks'. Normalised to a PascalCase class name, so 'post-types' and 'PostTypes' both yield class PostTypes.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "kind",
+			"description": "Scaffold kind this module hosts. One of: cpt, taxonomy, block-dynamic, shortcode, admin-page, settings-page, user-role, rest, cron, registrable, cli. Determines the anchor inserted into get_classes() so the matching add scaffold can wire into it.",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/module.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Plugin.php",
+			"anchor": "// scaffold:wp/module:modules",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the generated module manually in your plugin bootstrap and call its register_hooks() method."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

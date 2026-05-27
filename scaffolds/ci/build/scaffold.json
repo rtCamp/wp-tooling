@@ -1,0 +1,40 @@
+{
+	"slug": "build",
+	"category": "ci",
+	"name": "CI: production build",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build.yml. Produces a production build (npm and/or composer) and optionally uploads the result as an artifact for downstream CD jobs. Stable (merged into release/v1.0.0).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call. Default 'v1' tracks the v1 line; pin to a SHA in security-sensitive repos.",
+			"default": "v1"
+		},
+		{
+			"key": "node_version",
+			"description": "Node.js version for the build.",
+			"default": "22"
+		},
+		{
+			"key": "php_version",
+			"description": "PHP version (used only when install-composer-deps is true).",
+			"default": "8.3"
+		},
+		{
+			"key": "install_composer_deps",
+			"description": "Install Composer dependencies before the build. Pass 'true' or 'false'.",
+			"default": "false"
+		},
+		{
+			"key": "upload_artifact",
+			"description": "Upload the build output as a GitHub Actions artifact. Pass 'true' or 'false'.",
+			"default": "false"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-build.yml.mustache",
+			"dest": ".github/workflows/ci-build.yml"
+		}
+	]
+}

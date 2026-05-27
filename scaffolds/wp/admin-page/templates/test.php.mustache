@@ -1,0 +1,31 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ */
+
+declare(strict_types=1);
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_UnitTestCase;
+
+/**
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	public function test_slug_matches_manifest(): void {
+		$this->assertSame( '{{slug}}', {{class}}::get_slug() );
+	}
+
+	public function test_register_hooks_attaches_to_admin_menu(): void {
+		$instance = new {{class}}();
+		$instance->register_hooks();
+		$this->assertNotFalse( has_action( 'admin_menu', [ $instance, 'register_page' ] ) );
+	}
+}

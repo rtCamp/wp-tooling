@@ -2,24 +2,24 @@
 	"slug": "taxonomy",
 	"category": "wp",
 	"name": "Taxonomy",
-	"description": "Adds a Taxonomy class extending Abstract_Taxonomy from rtcamp/wp-php-toolkit. Always multi-instance (one class per taxonomy).",
+	"description": "Adds a taxonomy class extending AbstractTaxonomy from rtcamp/wp-framework. One class per taxonomy; the consumer's Taxonomies module instantiates it via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace for the taxonomy class. Default 'Inc\\Taxonomies' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Taxonomies') to override.",
+			"description": "PSR-4 namespace for the taxonomy class. Default 'Inc\\Taxonomies' matches the rtCamp skeleton; pass the project's actual sub-namespace to override.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "Inc\\Taxonomies"
 		},
 		{
 			"key": "base_path",
-			"description": "Directory for the taxonomy file. Default 'includes/Taxonomies' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
+			"description": "Directory for the taxonomy file. Default 'includes/Taxonomies'.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "includes/Taxonomies"
 		},
 		{
 			"key": "tests_namespace",
-			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Taxonomies' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Taxonomies'.",
 			"default": "Inc\\Tests\\Taxonomies"
 		},
 		{
@@ -28,8 +28,14 @@
 			"default": "tests/Taxonomies"
 		},
 		{
+			"key": "text_domain",
+			"description": "i18n text domain. Usually matches the plugin slug.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
 			"key": "slug",
-			"description": "Taxonomy slug (kebab-case, used as the key in register_taxonomy(), e.g. 'product-category').",
+			"description": "Taxonomy slug, lowercase, kebab- or snake-case, e.g. 'product-category'.",
 			"required": true
 		},
 		{
@@ -50,13 +56,8 @@
 		},
 		{
 			"key": "object_type",
-			"description": "Post type slug(s) this taxonomy attaches to (comma-separated for multiple, e.g. 'product' or 'product,page').",
+			"description": "Post type slug this taxonomy attaches to. For multiple, comma-separate (e.g. 'product,page').",
 			"required": true
-		},
-		{
-			"key": "hierarchical",
-			"description": "Hierarchical taxonomy (like categories) or flat (like tags). Pass 'true' or 'false'. Default 'true'.",
-			"default": "true"
 		}
 	],
 	"files": [
@@ -67,10 +68,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/Plugin.php",
-			"anchor": "// scaffold:taxonomies",
-			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
-			"description": "Instantiate the taxonomy so it registers its init hook. Taxonomies are always multi-instance. Insert in the plugin bootstrap alongside other taxonomy registrations."
+			"target_file": "{{base_path}}/../Modules/Taxonomies.php",
+			"anchor": "// scaffold:wp/taxonomy:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the new taxonomy class to the Taxonomies module's get_classes() array. The framework's Loader will instantiate it and call register_hooks() on init. If the Taxonomies module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Taxonomies --kind=taxonomy`."
 		}
 	],
 	"tests": [
@@ -81,6 +82,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-php-toolkit": "^1.0"
+		"rtcamp/wp-framework": "^1.0"
 	}
 }

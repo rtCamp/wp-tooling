@@ -3,25 +3,34 @@
  * Tests for {{namespace}}\{{class}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
  */
 
 declare(strict_types=1);
 
 namespace {{tests_namespace}};
 
-use PHPUnit\Framework\TestCase;
 use {{namespace}}\{{class}};
+use WP_UnitTestCase;
 
 /**
  * @covers \{{namespace}}\{{class}}
  */
-final class {{class}}Test extends TestCase {
+final class {{class}}Test extends WP_UnitTestCase {
 
-	public function test_post_type_instantiates(): void {
-		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
+	public function test_slug_matches_manifest(): void {
+		$this->assertSame( '{{slug}}', {{class}}::get_slug() );
 	}
 
-	public function test_post_type_registers(): void {
-		$this->markTestIncomplete( 'TODO: assert post_type_exists("{{slug}}") after register() is called.' );
+	public function test_register_hooks_attaches_to_init(): void {
+		$instance = new {{class}}();
+		$instance->register_hooks();
+		$this->assertNotFalse( has_action( 'init', [ $instance, 'register' ] ) );
+	}
+
+	public function test_post_type_is_registered_after_init(): void {
+		( new {{class}}() )->register();
+		$this->assertTrue( post_type_exists( '{{slug}}' ) );
 	}
 }

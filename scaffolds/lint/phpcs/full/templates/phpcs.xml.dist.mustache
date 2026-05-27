@@ -4,11 +4,11 @@
 
 	<!--
 		Scaffolded by @rtcamp/wp-tooling. The shared rules live at
-		vendor/rtcamp/wp-php-toolkit/phpcs.xml. Override a rule for this
-		project by adding it below the include line.
+		vendor/rtcamp/wp-framework/phpcs.xml.dist. Override a rule for
+		this project by adding it below the include line.
 	-->
 
-	<rule ref="vendor/rtcamp/wp-php-toolkit/phpcs.xml"/>
+	<rule ref="vendor/rtcamp/wp-framework/phpcs.xml.dist"/>
 
 	<file>./</file>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
@@ -17,4 +17,16 @@
 	<exclude-pattern>*/tests/*</exclude-pattern>
 
 	<!-- Project-specific overrides go here. -->
+
+	<!--
+		Allow unused function parameters. WordPress hook/filter callbacks,
+		interface methods, and REST/CLI handlers routinely carry
+		signature-mandated parameters they do not use. Unused local variables
+		are still reported.
+	-->
+	<rule ref="VariableAnalysis.CodeAnalysis.VariableAnalysis">
+		<properties>
+			<property name="allowUnusedFunctionParameters" value="true"/>
+		</properties>
+	</rule>
 </ruleset>

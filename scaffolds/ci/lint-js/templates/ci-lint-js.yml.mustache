@@ -1,0 +1,28 @@
+name: CI / Lint (JS)
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-lint-js.yml from rtCamp/wp-shared-workflows.
+#
+# EXPERIMENTAL: this reusable workflow is currently in rtCamp/wp-shared-workflows
+# PR #2 and has not yet shipped on the `v1` tag. The `uses:` line below pins to
+# the PR branch; switch to `@v1` (or a SHA) once the PR is merged.
+#
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-lint-js.yml
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/*"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-js:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-lint-js.yml@{{wsw_ref}}
+    with:
+      node-version: "{{node_version}}"
+      validate-package-json: {{validate_package_json}}

@@ -1,0 +1,53 @@
+<?php
+/**
+ * Shortcode: [{{tag}}].
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractShortcode;
+
+/**
+ * Registers the [{{tag}}] shortcode.
+ */
+class {{class}} extends AbstractShortcode {
+
+	/**
+	 * Get the shortcode tag.
+	 *
+	 * @return string
+	 */
+	public static function get_tag(): string {
+		return '{{tag}}';
+	}
+
+	/**
+	 * Default attributes merged with the user-supplied ones.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function default_atts(): array {
+		return [];
+	}
+
+	/**
+	 * Render the shortcode output.
+	 *
+	 * @param array<string,mixed> $atts    Parsed attributes.
+	 * @param string|null         $content Inner content for enclosing shortcodes.
+	 *
+	 * @return string
+	 */
+	public function render( array $atts, ?string $content ): string {
+		// Replace with your markup.
+		return '';
+	}
+}

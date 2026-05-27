@@ -49,15 +49,15 @@ Confirm?
 **AI runs each scaffold:**
 
 ```bash
-npx @rtcamp/wp-tooling add setup/editorconfig --non-interactive --json --cwd .
-npx @rtcamp/wp-tooling add setup/psr4         --non-interactive --json --cwd . --namespace='Acme\InventoryManager' --base_path=includes
-npx @rtcamp/wp-tooling add lint/phpcs/full    --non-interactive --json --cwd .
-npx @rtcamp/wp-tooling add lint/phpstan       --non-interactive --json --cwd .
-npx @rtcamp/wp-tooling add lint/eslint        --non-interactive --json --cwd .
-npx @rtcamp/wp-tooling add setup/phpunit      --non-interactive --json --cwd . --source_dir=includes
-npx @rtcamp/wp-tooling add wp/cpt             --non-interactive --json --cwd . --slug=product --singular=Product --plural=Products --namespace='Acme\InventoryManager' --base_path=includes
-npx @rtcamp/wp-tooling add wp/taxonomy        --non-interactive --json --cwd . --slug=product-category --singular=Category --plural=Categories --object_type=product --namespace='Acme\InventoryManager' --base_path=includes
-npx @rtcamp/wp-tooling add wp/cli             --non-interactive --json --cwd . --name=import-products --namespace='Acme\InventoryManager' --base_path=includes
+npx wp-tooling add setup/editorconfig --non-interactive --json --cwd .
+npx wp-tooling add setup/psr4         --non-interactive --json --cwd . --namespace='Acme\InventoryManager' --base_path=includes
+npx wp-tooling add lint/phpcs/full    --non-interactive --json --cwd .
+npx wp-tooling add lint/phpstan       --non-interactive --json --cwd .
+npx wp-tooling add lint/eslint        --non-interactive --json --cwd .
+npx wp-tooling add setup/phpunit      --non-interactive --json --cwd . --source_dir=includes
+npx wp-tooling add wp/cpt             --non-interactive --json --cwd . --slug=product --singular=Product --plural=Products --namespace='Acme\InventoryManager' --base_path=includes
+npx wp-tooling add wp/taxonomy        --non-interactive --json --cwd . --slug=product-category --singular=Category --plural=Categories --object_type=product --namespace='Acme\InventoryManager' --base_path=includes
+npx wp-tooling add wp/cli             --non-interactive --json --cwd . --name=import-products --namespace='Acme\InventoryManager' --base_path=includes
 ```
 
 **Wiring step** (one consent at a time):
@@ -89,7 +89,7 @@ Developer actions:
 
   composer dump-autoload --optimize
 
-  composer require rtcamp/wp-php-toolkit:^1.0
+  composer require rtcamp/wp-framework:^1.0
   composer require --dev squizlabs/php_codesniffer:^3.7 wp-coding-standards/wpcs:^3.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
   npm install --save-dev eslint@8.57.1 @wordpress/eslint-plugin:^22.0.0 @rtcamp/wp-tooling:^1.0.0
 
@@ -124,7 +124,7 @@ Scripts to add to package.json:
 **AI invokes:**
 
 ```bash
-npx @rtcamp/wp-tooling add wp/cli --non-interactive --json \
+npx wp-tooling add wp/cli --non-interactive --json \
     --namespace='Acme\Blog' --base_path='src' \
     --name=qm-export --class=QmExportCommand --singleton=false
 ```
@@ -212,7 +212,7 @@ No outstanding developer actions.
 > - vendor prefix sampled: `acme/` (from `acme/hero-image`)
 > - bootstrap registers blocks via `register_block_type()` in `includes/Blocks/Registry.php`
 >
-> Plan: `npx @rtcamp/wp-tooling add block/dynamic --non-interactive --json --name=testimonial-grid --vendor=acme`
+> Plan: `npx wp-tooling add wp/block-dynamic --non-interactive --json --name=testimonial-grid --vendor=acme`
 >
 > Proceed?
 
@@ -309,7 +309,7 @@ Build green, lint clean.
 > - no `.github/workflows/` directory yet
 > - composer + npm both present
 >
-> Plan: `npx @rtcamp/wp-tooling add ci/cd-wporg --non-interactive --json --plugin_slug=acme-blog`
+> Plan: `npx wp-tooling add ci/cd-wporg --non-interactive --json --plugin_slug=acme-blog`
 >
 > Proceed? (This scaffold has no wiring; it writes a standalone workflow file. It does declare two GitHub secrets you will need to set yourself.)
 
@@ -353,7 +353,7 @@ Tests:
 >   2. wp/taxonomy   → includes/Taxonomies/Category.php
 >   3. wp/rest       → includes/Rest/ProductController.php
 >
-> All three pull `rtcamp/wp-php-toolkit:^1.0`. The REST controller will be a singleton (default for REST).
+> All three pull `rtcamp/wp-framework:^1.0`. Each class extends the matching abstract from the framework and is wired through the consumer's module.
 >
 > Confirm?
 
@@ -362,15 +362,15 @@ Tests:
 **AI runs three sequential invocations:**
 
 ```bash
-npx @rtcamp/wp-tooling add wp/cpt --non-interactive --json \
+npx wp-tooling add wp/cpt --non-interactive --json \
     --namespace='Acme\Store' --base_path=includes \
     --slug=product --singular=Product --plural=Products
 
-npx @rtcamp/wp-tooling add wp/taxonomy --non-interactive --json \
+npx wp-tooling add wp/taxonomy --non-interactive --json \
     --namespace='Acme\Store' --base_path=includes \
     --slug=category --singular=Category --plural=Categories --object_type=product
 
-npx @rtcamp/wp-tooling add wp/rest --non-interactive --json \
+npx wp-tooling add wp/rest --non-interactive --json \
     --namespace='Acme\Store' --base_path=includes \
     --name=products --class=Product --route_namespace='acmestore/v1' --singleton=true
 ```
@@ -390,7 +390,7 @@ Files written: 6 (3 production + 3 tests).
 Wiring applied: 3 entries in includes/Plugin.php.
 
 Developer actions:
-  composer require rtcamp/wp-php-toolkit:^1.0
+  composer require rtcamp/wp-framework:^1.0
   composer dump-autoload --optimize
 ```
 
@@ -421,7 +421,7 @@ The engine never overwrites. The right flow is: delete the file, re-scaffold wit
 
 ```bash
 rm includes/Cli/ImportProducts.php
-npx @rtcamp/wp-tooling add wp/cli --non-interactive --json \
+npx wp-tooling add wp/cli --non-interactive --json \
     --namespace='Acme\InventoryManager' --base_path=includes \
     --name=import-products --singleton=true
 ```

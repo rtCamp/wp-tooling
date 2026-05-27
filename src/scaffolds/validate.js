@@ -172,8 +172,11 @@ function validateFiles(files) {
 		if (typeof entry.dest !== 'string' || entry.dest.length === 0) {
 			errors.push(`${fieldPath}.dest: must be a non-empty string`);
 		}
+		if (entry.raw !== undefined && typeof entry.raw !== 'boolean') {
+			errors.push(`${fieldPath}.raw: must be a boolean`);
+		}
 		for (const k of Object.keys(entry)) {
-			if (k !== 'src' && k !== 'dest') {
+			if (k !== 'src' && k !== 'dest' && k !== 'raw') {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}

@@ -2,24 +2,24 @@
 	"slug": "rest",
 	"category": "wp",
 	"name": "REST controller",
-	"description": "Adds a REST API controller extending Abstract_REST_Controller from rtcamp/wp-php-toolkit. Singleton by default (REST controllers wire hooks once per request).",
+	"description": "Adds a REST API controller extending AbstractRESTController from rtcamp/wp-framework. The base extends WP_REST_Controller; the consumer's Rest module instantiates each controller via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace for the controller class. Default 'Inc\\Rest' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Rest') to override.",
+			"description": "PSR-4 namespace for the controller class. Default 'Inc\\Rest' matches the rtCamp skeleton; pass the project's actual sub-namespace to override.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "Inc\\Rest"
 		},
 		{
 			"key": "base_path",
-			"description": "Directory for the controller file. Default 'includes/Rest' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
+			"description": "Directory for the controller file. Default 'includes/Rest'.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "includes/Rest"
 		},
 		{
 			"key": "tests_namespace",
-			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest'.",
 			"default": "Inc\\Tests\\Rest"
 		},
 		{
@@ -29,7 +29,7 @@
 		},
 		{
 			"key": "name",
-			"description": "Resource slug (kebab-case, used as the REST route segment, e.g. 'images' for /wp-json/myplugin/v1/images).",
+			"description": "Resource slug, kebab- or snake-case, used as the REST route segment, e.g. 'images' for /wp-json/myplugin/v1/images.",
 			"required": true
 		},
 		{
@@ -39,14 +39,14 @@
 			"transform": "pascal-case"
 		},
 		{
-			"key": "route_namespace",
-			"description": "REST API namespace (e.g. 'myplugin/v1'). Used as the first argument to register_rest_route().",
+			"key": "rest_namespace",
+			"description": "REST namespace prefix used in the URL path, e.g. 'myplugin'. Final route becomes /wp-json/{rest_namespace}/v{version}/{name}.",
 			"required": true
 		},
 		{
-			"key": "singleton",
-			"description": "Use rtcamp/wp-php-toolkit Singleton trait. Pass 'true' or 'false'. Default 'true' is appropriate for most REST controllers (one controller per resource, hook wiring happens once).",
-			"default": "true"
+			"key": "rest_version",
+			"description": "API version number, e.g. '1'.",
+			"default": "1"
 		}
 	],
 	"files": [
@@ -57,10 +57,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/Plugin.php",
-			"anchor": "// scaffold:rest-controllers",
-			"snippet_template": "{{#singleton}}\\{{namespace}}\\{{class}}Controller::get_instance();{{/singleton}}{{^singleton}}( new \\{{namespace}}\\{{class}}Controller() )->register();{{/singleton}}",
-			"description": "Instantiate the REST controller so it registers its rest_api_init hook. Insert in the plugin bootstrap method alongside other REST controllers. Singleton variants self-register on first get_instance(); multi-instance callers explicitly invoke register()."
+			"target_file": "{{base_path}}/../Modules/Rest.php",
+			"anchor": "// scaffold:wp/rest:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}Controller::class,",
+			"description": "Add the controller to the Rest module so the framework Loader registers its routes on rest_api_init. If the Rest module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Rest --kind=rest`."
 		}
 	],
 	"tests": [
@@ -71,6 +71,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-php-toolkit": "^1.0"
+		"rtcamp/wp-framework": "^1.0"
 	}
 }

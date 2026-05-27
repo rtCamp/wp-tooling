@@ -1,0 +1,77 @@
+{
+	"slug": "user-role",
+	"category": "wp",
+	"name": "User Role",
+	"description": "Adds a versioned custom user role class extending AbstractUserRole from rtcamp/wp-framework. The framework re-registers the role only when get_version() increases.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the role class. Default 'Inc\\Roles' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Roles"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the role file. Default 'includes/Roles'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Roles"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Roles'.",
+			"default": "Inc\\Tests\\Roles"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Roles'.",
+			"default": "tests/Roles"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "slug",
+			"description": "Role slug, lowercase, snake- or kebab-case, e.g. 'shop_manager'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "display_name",
+			"description": "Human-readable role name, e.g. 'Shop Manager'.",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/user-role.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Roles.php",
+			"anchor": "// scaffold:wp/user-role:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the role to the Roles module so the framework Loader runs maybe_update_role() on admin_init. If the Roles module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Roles --kind=user-role`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

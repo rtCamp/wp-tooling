@@ -1,0 +1,30 @@
+{
+	"slug": "test-js",
+	"category": "ci",
+	"name": "CI: Jest",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-js.yml. Runs Jest with optional cache. Stable (merged into release/v1.0.0).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call.",
+			"default": "v1"
+		},
+		{
+			"key": "node_version",
+			"description": "Node.js version.",
+			"default": "22"
+		},
+		{
+			"key": "enable_cache",
+			"description": "Cache Jest transform/result data across runs. Pass 'true' or 'false'.",
+			"default": "true"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-test-js.yml.mustache",
+			"dest": ".github/workflows/ci-test-js.yml"
+		}
+	]
+}

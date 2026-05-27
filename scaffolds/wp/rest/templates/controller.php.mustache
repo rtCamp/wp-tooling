@@ -3,41 +3,54 @@
  * REST controller: {{name}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-use RtCamp\WPToolkit\Abstracts\Abstract_REST_Controller;
-{{#singleton}}use RtCamp\WPToolkit\Traits\Singleton;
-{{/singleton}}use WP_REST_Request;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
+use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * {{class}}Controller — REST endpoints for {{name}}.
+ * Registers REST routes for the {{name}} resource.
  */
-class {{class}}Controller extends Abstract_REST_Controller {
-{{#singleton}}
-	use Singleton;
-{{/singleton}}
+class {{class}}Controller extends AbstractRESTController {
 
 	/**
-	 * REST namespace, e.g. 'myplugin/v1'.
+	 * REST route namespace (URL prefix before the version).
+	 *
+	 * @var string
 	 */
-	protected string $rest_namespace = '{{route_namespace}}';
+	protected $namespace = '{{rest_namespace}}';
 
 	/**
-	 * REST base, the route segment after the namespace.
+	 * REST API version segment.
+	 *
+	 * @var string
 	 */
-	protected string $rest_base = '{{name}}';
+	protected string $version = '{{rest_version}}';
 
 	/**
-	 * Register routes. Called by Abstract_REST_Controller on rest_api_init.
+	 * The route segment after the namespace and version, e.g. 'images'.
+	 *
+	 * @var string
+	 */
+	protected $rest_base = '{{name}}';
+
+	/**
+	 * Register REST routes. Called by the framework on rest_api_init.
+	 *
+	 * @return void
 	 */
 	public function register_routes(): void {
 		register_rest_route(
-			$this->rest_namespace,
+			"{$this->namespace}/v{$this->version}",
 			'/' . $this->rest_base,
 			[
 				[
@@ -50,15 +63,23 @@ class {{class}}Controller extends Abstract_REST_Controller {
 	}
 
 	/**
-	 * GET /{{route_namespace}}/{{name}}
+	 * Return the collection of items.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response
 	 */
 	public function get_items( WP_REST_Request $request ): WP_REST_Response {
-		// TODO: implement {{name}} listing.
+		// Replace with your collection response.
 		return new WP_REST_Response( [], 200 );
 	}
 
 	/**
-	 * Permission check for GET /{{name}}.
+	 * Permission check for the collection endpoint.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return bool
 	 */
 	public function get_items_permissions_check( WP_REST_Request $request ): bool {
 		return current_user_can( 'read' );

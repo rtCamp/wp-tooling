@@ -3,51 +3,66 @@
  * Taxonomy: {{slug}} ({{singular}} / {{plural}}), attached to {{object_type}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-use RtCamp\WPToolkit\Abstracts\Abstract_Taxonomy;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractTaxonomy;
 
 /**
- * {{class}} taxonomy.
+ * Registers the {{singular}} taxonomy.
  */
-class {{class}} extends Abstract_Taxonomy {
+class {{class}} extends AbstractTaxonomy {
 
 	/**
-	 * Taxonomy slug.
-	 */
-	protected string $slug = '{{slug}}';
-
-	/**
-	 * Object types this taxonomy attaches to.
+	 * Get the taxonomy slug.
 	 *
-	 * @return string[]
+	 * @return string
 	 */
-	protected function get_object_types(): array {
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	/**
+	 * Get the object types this taxonomy attaches to.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function get_object_types(): array {
 		return array_map( 'trim', explode( ',', '{{object_type}}' ) );
 	}
 
 	/**
-	 * Taxonomy arguments. Returned to register_taxonomy().
+	 * Get the singular label.
 	 *
-	 * @return array<string,mixed>
+	 * @return string
 	 */
-	protected function get_args(): array {
-		return [
-			'hierarchical'      => {{hierarchical}},
-			'labels'            => [
-				'name'          => __( '{{plural}}', 'text-domain' ),
-				'singular_name' => __( '{{singular}}', 'text-domain' ),
-				'add_new_item'  => __( 'Add New {{singular}}', 'text-domain' ),
-				'edit_item'     => __( 'Edit {{singular}}', 'text-domain' ),
-				'search_items'  => __( 'Search {{plural}}', 'text-domain' ),
-			],
-			'public'            => true,
-			'show_in_rest'      => true,
-			'show_admin_column' => true,
-		];
+	public function get_singular_label(): string {
+		return __( '{{singular}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Get the plural label.
+	 *
+	 * @return string
+	 */
+	public function get_plural_label(): string {
+		return __( '{{plural}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Hierarchical (true = like categories) or flat (false = like tags).
+	 * Override to switch behaviour.
+	 *
+	 * @return bool
+	 */
+	public function is_hierarchical(): bool {
+		return true;
 	}
 }

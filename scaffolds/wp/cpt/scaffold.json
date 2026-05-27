@@ -2,7 +2,7 @@
 	"slug": "cpt",
 	"category": "wp",
 	"name": "Custom Post Type",
-	"description": "Adds a Custom Post Type class extending Abstract_Post_Type from rtcamp/wp-php-toolkit. Always multi-instance (one class per post type).",
+	"description": "Adds a CPT class extending AbstractPostType from rtcamp/wp-framework. One class per post type; the consumer's PostTypes module instantiates it via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
@@ -19,13 +19,19 @@
 		},
 		{
 			"key": "tests_namespace",
-			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\PostTypes' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\PostTypes'.",
 			"default": "Inc\\Tests\\PostTypes"
 		},
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/PostTypes'.",
 			"default": "tests/PostTypes"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain. Usually matches the plugin slug.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
 		},
 		{
 			"key": "slug",
@@ -47,6 +53,11 @@
 			"key": "plural",
 			"description": "Plural human-readable label, e.g. 'Products'.",
 			"required": true
+		},
+		{
+			"key": "menu_icon",
+			"description": "Dashicon class or SVG URL for the admin sidebar.",
+			"default": "dashicons-admin-post"
 		}
 	],
 	"files": [
@@ -57,10 +68,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/Plugin.php",
-			"anchor": "// scaffold:post-types",
-			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
-			"description": "Instantiate the post type so it registers its init hook. Post types are always multi-instance (each instance carries the configuration for one post type). Insert in the plugin bootstrap alongside other post type registrations."
+			"target_file": "{{base_path}}/../Modules/PostTypes.php",
+			"anchor": "// scaffold:wp/cpt:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the new CPT class to the PostTypes module's get_classes() array. The framework's Loader will instantiate it and call register_hooks() on init. If the PostTypes module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=PostTypes --kind=cpt`."
 		}
 	],
 	"tests": [
@@ -71,6 +82,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-php-toolkit": "^1.0"
+		"rtcamp/wp-framework": "^1.0"
 	}
 }

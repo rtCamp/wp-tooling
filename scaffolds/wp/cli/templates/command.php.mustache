@@ -3,30 +3,43 @@
  * WP-CLI command: {{name}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
  */
 
 declare(strict_types=1);
 
 namespace {{namespace}};
 
-{{#singleton}}use RtCamp\WPToolkit\Traits\Singleton;
-
-{{/singleton}}use WP_CLI;
+use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
+use WP_CLI;
 
 /**
- * {{class}} command.
+ * Registers the {{name}} WP-CLI command.
  */
-class {{class}} {
-{{^singleton}}
-{{/singleton}}{{#singleton}}
-	use Singleton;
+final class {{class}} implements CLICommand {
 
 	/**
-	 * Boot the command. Called once by the Singleton trait.
+	 * Get the command name.
+	 *
+	 * @return string
 	 */
-	public function setup(): void {}
+	public static function get_name(): string {
+		return '{{name}}';
+	}
 
-{{/singleton}}	/**
+	/**
+	 * Get the command description.
+	 *
+	 * @return string
+	 */
+	public static function get_description(): string {
+		return '{{description}}';
+	}
+
+	/**
 	 * Run the command.
 	 *
 	 * ## OPTIONS
@@ -36,11 +49,13 @@ class {{class}} {
 	 *
 	 * @param array<int,string>    $args       Positional arguments.
 	 * @param array<string,string> $assoc_args Named arguments.
+	 *
+	 * @return void
 	 */
-	public function __invoke( array $args, array $assoc_args ): void {
+	public static function run( array $args, array $assoc_args ): void {
 		$dry_run = isset( $assoc_args['dry-run'] );
 
-		// TODO: implement {{name}}.
+		// Replace with your command logic.
 		WP_CLI::success( $dry_run ? '{{name}} dry-run complete.' : '{{name}} complete.' );
 	}
 }

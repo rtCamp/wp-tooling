@@ -2,24 +2,24 @@
 	"slug": "cron",
 	"category": "wp",
 	"name": "Cron job",
-	"description": "Adds a cron job class extending Abstract_Cron_Job from rtcamp/wp-php-toolkit. Always multi-instance (one class per scheduled hook).",
+	"description": "Adds a cron job class implementing the Registrable interface from rtcamp/wp-framework. The class schedules a wp-cron event in register_hooks() and binds its handler to the chosen action.",
 	"source": "template",
 	"inputs": [
 		{
 			"key": "namespace",
-			"description": "PSR-4 namespace for the cron class. Default 'Inc\\Cron' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\Cron') to override.",
+			"description": "PSR-4 namespace for the cron class. Default 'Inc\\Cron' matches the rtCamp skeleton; pass the project's actual sub-namespace to override.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "Inc\\Cron"
 		},
 		{
 			"key": "base_path",
-			"description": "Directory for the cron file. Default 'includes/Cron' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
+			"description": "Directory for the cron file. Default 'includes/Cron'.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "includes/Cron"
 		},
 		{
 			"key": "tests_namespace",
-			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cron' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cron'.",
 			"default": "Inc\\Tests\\Cron"
 		},
 		{
@@ -29,7 +29,7 @@
 		},
 		{
 			"key": "name",
-			"description": "Cron job slug (kebab-case, e.g. 'sync-feed'). Used to derive the hook name and class.",
+			"description": "Cron job slug, kebab- or snake-case, e.g. 'sync-feed'. Used to derive the hook name and class.",
 			"required": true
 		},
 		{
@@ -40,13 +40,13 @@
 		},
 		{
 			"key": "hook",
-			"description": "WordPress action hook name (snake_case, e.g. 'acme_sync_feed'). Used in wp_schedule_event() and add_action().",
+			"description": "WordPress action hook name, snake_case, e.g. 'myplugin_sync_feed'. Used in wp_schedule_event() and add_action().",
 			"discover_from": "input:name",
 			"transform": "snake-case"
 		},
 		{
 			"key": "schedule",
-			"description": "WP cron schedule key. One of: 'hourly', 'twicedaily', 'daily', 'weekly'. Default 'daily'.",
+			"description": "WP cron schedule key: hourly | twicedaily | daily | weekly.",
 			"default": "daily"
 		}
 	],
@@ -58,10 +58,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/Plugin.php",
-			"anchor": "// scaffold:cron-jobs",
-			"snippet_template": "( new \\{{namespace}}\\{{class}}() )->register();",
-			"description": "Instantiate the cron job so it schedules itself and binds its callback. Cron jobs are always multi-instance. Insert in the plugin bootstrap alongside other cron registrations."
+			"target_file": "{{base_path}}/../Modules/Cron.php",
+			"anchor": "// scaffold:wp/cron:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the cron class to the Cron module so the framework Loader calls register_hooks() during boot. If the Cron module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cron --kind=cron`."
 		}
 	],
 	"tests": [
@@ -72,6 +72,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-php-toolkit": "^1.0"
+		"rtcamp/wp-framework": "^1.0"
 	}
 }

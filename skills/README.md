@@ -4,7 +4,7 @@ Copy-pasteable skill files for AI assistants (Claude Code, Cursor, etc.) that dr
 
 ## What's here
 
-- [`scaffold/`](scaffold/SKILL.md) — End-to-end AI skill for `npx @rtcamp/wp-tooling add`. Tells the AI how to discover scaffolds, introspect the project, apply naming conventions, invoke the engine, handle adaptive wiring, surface secrets without writing them, drive the TDD loop, and report.
+- [`scaffold/`](scaffold/SKILL.md) — End-to-end AI skill for `npx wp-tooling add`. Tells the AI how to discover scaffolds, introspect the project, apply naming conventions, invoke the engine, handle adaptive wiring, surface secrets without writing them, drive the TDD loop, and report.
 - [`setup/`](setup/SKILL.md) — Bootstraps a whole plugin or theme from one natural-language request. Detects existing tooling, plans the right sequence of setup + lint + test + feature scaffolds, confirms the plan with the developer, executes it in two phases, then emits one consolidated report of files written + developer actions outstanding.
 
 Each skill is a directory containing a `SKILL.md` file. Same layout as the Claude Code Skills convention.

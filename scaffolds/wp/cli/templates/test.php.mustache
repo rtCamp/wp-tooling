@@ -3,26 +3,32 @@
  * Tests for {{namespace}}\{{class}}.
  *
  * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
  */
 
 declare(strict_types=1);
 
 namespace {{tests_namespace}};
 
-use PHPUnit\Framework\TestCase;
 use {{namespace}}\{{class}};
+use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends TestCase {
 
-	public function test_command_instantiates(): void {
-{{#singleton}}		$this->assertInstanceOf( {{class}}::class, {{class}}::get_instance() );
-{{/singleton}}{{^singleton}}		$this->assertInstanceOf( {{class}}::class, new {{class}}() );
-{{/singleton}}	}
+	public function test_implements_cli_command(): void {
+		$this->assertTrue( in_array( CLICommand::class, class_implements( {{class}}::class ), true ) );
+	}
 
-	public function test_command_runs_without_args(): void {
-		$this->markTestIncomplete( 'TODO: implement {{name}} test.' );
+	public function test_name_matches_manifest(): void {
+		$this->assertSame( '{{name}}', {{class}}::get_name() );
+	}
+
+	public function test_description_is_non_empty(): void {
+		$this->assertNotEmpty( {{class}}::get_description() );
 	}
 }

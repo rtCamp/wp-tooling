@@ -2,7 +2,7 @@
 	"slug": "cli",
 	"category": "wp",
 	"name": "WP-CLI command",
-	"description": "Adds a WP-CLI command class with a PHPUnit test stub. Optionally uses the Singleton trait from rtcamp/wp-php-toolkit for shared-state commands.",
+	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-framework. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
 	"source": "template",
 	"inputs": [
 		{
@@ -13,13 +13,13 @@
 		},
 		{
 			"key": "base_path",
-			"description": "Directory for the command file. Default 'includes/Cli' matches the rtCamp skeleton; pass the project's actual sub-path (e.g. 'src/CLI') to override.",
+			"description": "Directory for the command file. Default 'includes/Cli'.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "includes/Cli"
 		},
 		{
 			"key": "tests_namespace",
-			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cli' matches the rtCamp skeleton; override alongside 'namespace' for non-default projects.",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cli'.",
 			"default": "Inc\\Tests\\Cli"
 		},
 		{
@@ -29,7 +29,7 @@
 		},
 		{
 			"key": "name",
-			"description": "Slug for the command (kebab-case).",
+			"description": "Command slug, kebab- or snake-case, e.g. 'sync-feed'. Used as the WP-CLI command name.",
 			"required": true
 		},
 		{
@@ -39,9 +39,9 @@
 			"transform": "pascal-case"
 		},
 		{
-			"key": "singleton",
-			"description": "Use rtcamp/wp-php-toolkit Singleton trait for shared state. Pass 'true' or 'false'. Default 'false' (multi-instance) is appropriate for most CLI commands; choose 'true' when the command needs to share state across multiple invocations within a request.",
-			"default": "false"
+			"key": "description",
+			"description": "One-line command description shown in `wp help`.",
+			"default": "TODO: describe what this command does."
 		}
 	],
 	"files": [
@@ -52,10 +52,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/Plugin.php",
-			"anchor": "// scaffold:cli-commands",
-			"snippet_template": "{{#singleton}}WP_CLI::add_command( '{{name}}', \\{{namespace}}\\{{class}}::get_instance() );{{/singleton}}{{^singleton}}WP_CLI::add_command( '{{name}}', new \\{{namespace}}\\{{class}}() );{{/singleton}}",
-			"description": "Register the new CLI command. Insert immediately after the last existing WP_CLI::add_command() call inside the bootstrap method. Anchor is a hint when present; AI falls back to pattern sampling. Singleton commands call ::get_instance(); multi-instance use new."
+			"target_file": "{{base_path}}/../Modules/Cli.php",
+			"anchor": "// scaffold:wp/cli:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the command class to the Cli module. The module's register_hooks() should iterate get_classes() and call WP_CLI::add_command( $class::get_name(), $class::class ) when defined('WP_CLI'). If the Cli module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cli --kind=cli`."
 		}
 	],
 	"tests": [
@@ -65,7 +65,7 @@
 			"framework": "phpunit"
 		}
 	],
-	"composer_suggest": {
-		"rtcamp/wp-php-toolkit": "^1.0"
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
 	}
 }
