@@ -1,0 +1,23 @@
+{
+	"slug": "core",
+	"category": "lint/phpcs",
+	"name": "PHPCS - WordPress",
+	"description": "PHP_CodeSniffer with the WordPress combined standard (Core + Extra + Docs) from wp-coding-standards/wpcs.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/phpcs.xml.dist.mustache",
+			"dest": "phpcs.xml.dist"
+		}
+	],
+	"composer_dev_dependencies": {
+		"squizlabs/php_codesniffer": "^3.7",
+		"wp-coding-standards/wpcs": "^3.0"
+	},
+	"scripts": {
+		"composer": {
+			"lint:php": "phpcs --standard=phpcs.xml.dist",
+			"lint:php:fix": "phpcbf --standard=phpcs.xml.dist"
+		}
+	}
+}

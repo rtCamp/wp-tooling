@@ -1,0 +1,16 @@
+/**
+ * {{vendor}}/{{slug}} block editor view.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ */
+import { useBlockProps } from '@wordpress/block-editor';
+import { __ } from '@wordpress/i18n';
+
+export default function Edit() {
+	const blockProps = useBlockProps();
+	return (
+		<div { ...blockProps }>
+			<p>{ __( '{{title}}', '{{vendor}}-{{slug}}' ) }</p>
+		</div>
+	);
+}

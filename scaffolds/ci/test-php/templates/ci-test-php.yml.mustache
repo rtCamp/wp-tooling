@@ -1,0 +1,24 @@
+name: CI / Test (PHP)
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-test-php.yml from rtCamp/wp-shared-workflows.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-test-php.yml
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/*"
+
+permissions:
+  contents: read
+
+jobs:
+  test-php:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-php.yml@{{wsw_ref}}
+    with:
+      php-version: "{{php_version}}"
+      node-version: "{{node_version}}"
+      use-wp-env: {{use_wp_env}}

@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<ruleset name="Project">
+	<description>WordPress VIP Minimum standard for VIP Go platform deployments.</description>
+
+	<!--
+		Scaffolded by @rtcamp/wp-tooling. WordPressVIPMinimum carries the VIP
+		platform checks (security, performance); WordPress-Docs is added
+		separately for docblock coverage.
+
+		Requires automattic/vipwpcs in your composer.json dev dependencies.
+	-->
+
+	<rule ref="WordPressVIPMinimum"/>
+	<rule ref="WordPress-Docs"/>
+
+	<file>./</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+
+	<!-- Project-specific overrides go here. -->
+
+	<!--
+		Allow unused function parameters. WordPress hook/filter callbacks,
+		interface methods, and REST/CLI handlers routinely carry
+		signature-mandated parameters they do not use. Unused local variables
+		are still reported.
+	-->
+	<rule ref="VariableAnalysis.CodeAnalysis.VariableAnalysis">
+		<properties>
+			<property name="allowUnusedFunctionParameters" value="true"/>
+		</properties>
+	</rule>
+</ruleset>

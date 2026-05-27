@@ -1,0 +1,34 @@
+<?php
+/**
+ * {{class}} module: groups Registrable classes hosted by the framework Loader.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractModule;
+
+/**
+ * Groups related Registrable classes for the framework Loader to boot.
+ */
+final class {{class}} extends AbstractModule {
+
+	/**
+	 * Classes hosted by this module. The framework's Loader instantiates
+	 * each one and calls register_hooks() during boot.
+	 *
+	 * @return array<int,class-string>
+	 */
+	public function get_classes(): array {
+		return [
+			// scaffold:wp/{{kind}}:classes (add classes here).
+		];
+	}
+}

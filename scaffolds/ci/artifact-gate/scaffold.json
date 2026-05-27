@@ -1,0 +1,25 @@
+{
+	"slug": "artifact-gate",
+	"category": "ci",
+	"name": "CI: Block committed build artifacts",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build-artifact-gate.yml. Fails the PR if build outputs (assets/build/ by default) are committed. Stable (merged into release/v1.0.0).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call.",
+			"default": "v1"
+		},
+		{
+			"key": "gated_paths",
+			"description": "Path prefix(es) whose contents must not be committed in a PR. Multiple paths can be newline-separated; for the scaffold default we use a single path.",
+			"default": "assets/build/"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-build-artifact-gate.yml.mustache",
+			"dest": ".github/workflows/ci-build-artifact-gate.yml"
+		}
+	]
+}

@@ -1,0 +1,76 @@
+<?php
+/**
+ * Custom Post Type: {{slug}} ({{singular}} / {{plural}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractPostType;
+
+/**
+ * Registers the {{singular}} custom post type.
+ */
+class {{class}} extends AbstractPostType {
+
+	/**
+	 * Get the post type slug.
+	 *
+	 * @return string
+	 */
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	/**
+	 * Get the singular label.
+	 *
+	 * @return string
+	 */
+	public function get_singular_label(): string {
+		return __( '{{singular}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Get the plural label.
+	 *
+	 * @return string
+	 */
+	public function get_plural_label(): string {
+		return __( '{{plural}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Get the menu icon (Dashicon class, SVG data URI, or 'none').
+	 *
+	 * @return string
+	 */
+	public function get_menu_icon(): string {
+		return '{{menu_icon}}';
+	}
+
+	/**
+	 * Editor features. Override to drop or extend.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_editor_supports(): array {
+		return [ 'title', 'editor', 'thumbnail', 'excerpt' ];
+	}
+
+	/**
+	 * Taxonomies to associate with this post type. Add taxonomy slug strings.
+	 *
+	 * @return array<int,string>
+	 */
+	public function get_supported_taxonomies(): array {
+		return [];
+	}
+}

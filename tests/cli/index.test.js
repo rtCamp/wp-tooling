@@ -196,6 +196,52 @@ describe('cli COMMANDS registry', () => {
 		expect(typeof cli.COMMANDS['install-hooks'].summary).toBe('string');
 		expect(typeof cli.COMMANDS['install-hooks'].run).toBe('function');
 	});
+
+	test.each(['add', 'list', 'validate'])(
+		'scaffold subcommand "%s" is registered with a summary and run handler',
+		(name) => {
+			expect(cli.COMMANDS[name]).toBeDefined();
+			expect(typeof cli.COMMANDS[name].summary).toBe('string');
+			expect(typeof cli.COMMANDS[name].run).toBe('function');
+		}
+	);
+});
+
+describe('cli main() routes scaffold subcommands', () => {
+	let stdoutChunks;
+	let stdoutSpy;
+
+	beforeEach(() => {
+		stdoutChunks = [];
+		stdoutSpy = jest
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((chunk) => {
+				stdoutChunks.push(chunk.toString());
+				return true;
+			});
+	});
+
+	afterEach(() => {
+		stdoutSpy.mockRestore();
+	});
+
+	test('routes add --help to src/scaffolds/add runCli', async () => {
+		const code = await cli.main(['add', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling add/);
+	});
+
+	test('routes list --help to src/scaffolds/list runCli', async () => {
+		const code = await cli.main(['list', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling list/);
+	});
+
+	test('routes validate --help to src/scaffolds/validate runCli', async () => {
+		const code = await cli.main(['validate', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: wp-tooling validate/);
+	});
 });
 
 describe('cli main() routes install-hooks', () => {

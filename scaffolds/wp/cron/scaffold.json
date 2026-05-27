@@ -1,0 +1,77 @@
+{
+	"slug": "cron",
+	"category": "wp",
+	"name": "Cron job",
+	"description": "Adds a cron job class implementing the Registrable interface from rtcamp/wp-framework. The class schedules a wp-cron event in register_hooks() and binds its handler to the chosen action.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the cron class. Default 'Inc\\Cron' matches the rtCamp skeleton; pass the project's actual sub-namespace to override.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Cron"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the cron file. Default 'includes/Cron'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Cron"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cron'.",
+			"default": "Inc\\Tests\\Cron"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Cron'.",
+			"default": "tests/Cron"
+		},
+		{
+			"key": "name",
+			"description": "Cron job slug, kebab- or snake-case, e.g. 'sync-feed'. Used to derive the hook name and class.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "hook",
+			"description": "WordPress action hook name, snake_case, e.g. 'myplugin_sync_feed'. Used in wp_schedule_event() and add_action().",
+			"discover_from": "input:name",
+			"transform": "snake-case"
+		},
+		{
+			"key": "schedule",
+			"description": "WP cron schedule key: hourly | twicedaily | daily | weekly.",
+			"default": "daily"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/cron.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Cron.php",
+			"anchor": "// scaffold:wp/cron:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the cron class to the Cron module so the framework Loader calls register_hooks() during boot. If the Cron module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cron --kind=cron`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}
