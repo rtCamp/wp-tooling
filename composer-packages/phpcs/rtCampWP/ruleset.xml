@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <ruleset
-	name="RTCampWP"
+	name="rtCampWP"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
 >
-	<description>rtCamp WordPress standards — full strict superset. Everything in RTCampWP-Basic plus short-array enforcement and the Slevomat strict-typing, code-quality and doc-block sniffs. Recommended for new and public projects ready to adopt strict types. Override individual sniffs in your own phpcs.xml.dist as needed.</description>
+	<description>rtCamp WordPress standards — full strict superset. Everything in rtCampWP-Basic plus short-array enforcement and the Slevomat strict-typing, code-quality and doc-block sniffs. Recommended for new and public projects ready to adopt strict types. Override individual sniffs in your own phpcs.xml.dist as needed.</description>
 
 	<!-- Everything in Basic: WPCS + VIP-Go + Docs + PHPCompatibilityWP + FunctionSpacing. -->
-	<rule ref="RTCampWP-Basic" />
+	<rule ref="rtCampWP-Basic" />
 
 	<!-- ==========================================================
 	     Array / syntax

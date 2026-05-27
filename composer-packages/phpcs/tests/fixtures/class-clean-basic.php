@@ -1,14 +1,14 @@
 <?php
 /**
- * Clean fixture for the RTCampWP-Basic standard.
+ * Clean fixture for the rtCampWP-Basic standard.
  *
- * @package RTCampWP\Tests
+ * @package rtCamp\WPPhpcs\Tests
  */
 
-namespace RTCampWP\Tests\Fixtures;
+namespace rtCamp\WPPhpcs\Tests\Fixtures;
 
 /**
- * Sample class that passes RTCampWP-Basic with no violations.
+ * Sample class that passes rtCampWP-Basic with no violations.
  */
 class Clean_Basic {
 

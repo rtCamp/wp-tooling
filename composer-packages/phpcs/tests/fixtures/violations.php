@@ -1,6 +1,6 @@
 <?php
 
-// Deliberately non-compliant fixture: trips RTCampWP's strict layer.
+// Deliberately non-compliant fixture: trips rtCampWP's strict layer.
 // Missing declare(strict_types=1), untyped parameter, no return type, and
 // long array syntax — exercises DeclareStrictTypes, MissingAnyTypeHint and
 // DisallowLongArraySyntax, among other sniffs.

@@ -46,11 +46,11 @@
 	<!-- ==========================================================
 	     The shared rtCamp WordPress standard.
 
-	     RTCampWP        — full strict (recommended for new / public projects).
-	     RTCampWP-Basic  — WPCS + VIP + Docs + PHP compatibility, no strict typing
+	     rtCampWP        — full strict (recommended for new / public projects).
+	     rtCampWP-Basic  — WPCS + VIP + Docs + PHP compatibility, no strict typing
 	                       (recommended when adopting on an existing codebase).
 	     ========================================================== -->
-	<rule ref="RTCampWP" />
+	<rule ref="rtCampWP" />
 
 	<!-- ==========================================================
 	     Project-specific configuration.

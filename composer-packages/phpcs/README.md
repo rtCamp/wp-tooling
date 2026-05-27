@@ -16,10 +16,10 @@ config. The rules curate and combine:
 
 | Standard | What it is | Use when |
 | --- | --- | --- |
-| **`RTCampWP`** | The full strict superset: everything in `RTCampWP-Basic` **plus** short-array enforcement and the Slevomat strict-typing, code-quality and doc-block sniffs (`declare(strict_types=1)`, mandatory parameter/property/return type hints, etc.). | New or public projects ready to adopt strict types. **Default for greenfield work.** |
-| **`RTCampWP-Basic`** | WPCS (`WordPress-Extra`) + `WordPress-VIP-Go` + `WordPress-Docs` + `PHPCompatibilityWP`, with modern idioms (`[]`, `?:`) allowed and one-blank-line function spacing. No strict-typing requirements. | Adopting standards on an existing codebase, or when strict types are not yet practical. |
+| **`rtCampWP`** | The full strict superset: everything in `rtCampWP-Basic` **plus** short-array enforcement and the Slevomat strict-typing, code-quality and doc-block sniffs (`declare(strict_types=1)`, mandatory parameter/property/return type hints, etc.). | New or public projects ready to adopt strict types. **Default for greenfield work.** |
+| **`rtCampWP-Basic`** | WPCS (`WordPress-Extra`) + `WordPress-VIP-Go` + `WordPress-Docs` + `PHPCompatibilityWP`, with modern idioms (`[]`, `?:`) allowed and one-blank-line function spacing. No strict-typing requirements. | Adopting standards on an existing codebase, or when strict types are not yet practical. |
 
-`RTCampWP` is `RTCampWP-Basic` plus the strict layer, so the two never diverge — there is a
+`rtCampWP` is `rtCampWP-Basic` plus the strict layer, so the two never diverge — there is a
 single source of truth.
 
 ## Installation
@@ -43,8 +43,8 @@ registers the standards automatically — just allow the plugin in your `compose
 }
 ```
 
-Confirm they registered with `vendor/bin/phpcs -i` — you should see `RTCampWP` and
-`RTCampWP-Basic` in the list.
+Confirm they registered with `vendor/bin/phpcs -i` — you should see `rtCampWP` and
+`rtCampWP-Basic` in the list.
 
 ## Usage
 
@@ -61,7 +61,7 @@ scan, `testVersion`, `minimum_wp_version`, global prefixes, text domain, and fil
     <config name="testVersion" value="8.2-" />
     <config name="minimum_wp_version" value="6.5" />
 
-    <rule ref="RTCampWP" />
+    <rule ref="rtCampWP" />
 
     <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
         <properties>
@@ -90,7 +90,7 @@ Both standards are a starting point. Exclude or down-tune any sniff in your own
 `phpcs.xml.dist`:
 
 ```xml
-<rule ref="RTCampWP">
+<rule ref="rtCampWP">
     <exclude name="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />
 </rule>
 ```

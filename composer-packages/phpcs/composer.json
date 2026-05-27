@@ -1,6 +1,6 @@
 {
     "name": "rtcamp/wp-phpcs",
-    "description": "rtCamp PHP_CodeSniffer standards for WordPress projects (RTCampWP + RTCampWP-Basic).",
+    "description": "rtCamp PHP_CodeSniffer standards for WordPress projects (rtCampWP + rtCampWP-Basic).",
     "type": "phpcodesniffer-standard",
     "license": "GPL-2.0-or-later",
     "keywords": [

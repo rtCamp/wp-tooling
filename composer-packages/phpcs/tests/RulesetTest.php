@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RTCampWP\Tests;
+namespace rtCamp\WPPhpcs\Tests;
 
 use PHPUnit\Framework\TestCase;
 
 /**
- * Smoke tests for the RTCampWP and RTCampWP-Basic standards.
+ * Smoke tests for the rtCampWP and rtCampWP-Basic standards.
  *
  * These shell out to the phpcs binary rather than the sniff API, so they
  * exercise the standards exactly as a consumer would and stay decoupled from
@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class RulesetTest extends TestCase
 {
-	/** Package root — the directory that holds RTCampWP/ and RTCampWP-Basic/. */
+	/** Package root — the directory that holds rtCampWP/ and rtCampWP-Basic/. */
 	private static function packageDir(): string
 	{
 		return dirname(__DIR__);
@@ -40,7 +40,7 @@ final class RulesetTest extends TestCase
 
 	/**
 	 * The installer-configured installed_paths (for the external standards) with
-	 * this package's directory appended, so RTCampWP / RTCampWP-Basic resolve too.
+	 * this package's directory appended, so rtCampWP / rtCampWP-Basic resolve too.
 	 *
 	 * In a real consumer the Composer installer registers this package
 	 * automatically; in the monorepo it is `replace`d, so we add it here.
@@ -87,28 +87,28 @@ final class RulesetTest extends TestCase
 	{
 		[, $output] = self::runPhpcs(['-i']);
 
-		$this->assertStringContainsString('RTCampWP-Basic', $output);
-		$this->assertStringContainsString('RTCampWP', $output);
+		$this->assertStringContainsString('rtCampWP-Basic', $output);
+		$this->assertStringContainsString('rtCampWP', $output);
 	}
 
 	public function test_clean_fixture_passes_basic(): void
 	{
 		[$code, $output] = self::runPhpcs([
-			'--standard=RTCampWP-Basic',
+			'--standard=rtCampWP-Basic',
 			self::packageDir() . '/tests/fixtures/class-clean-basic.php',
 		]);
 
-		$this->assertSame(0, $code, "Expected the clean fixture to pass RTCampWP-Basic:\n" . $output);
+		$this->assertSame(0, $code, "Expected the clean fixture to pass rtCampWP-Basic:\n" . $output);
 	}
 
 	public function test_violations_fixture_trips_full_strict(): void
 	{
 		[$code, $output] = self::runPhpcs([
-			'--standard=RTCampWP',
+			'--standard=rtCampWP',
 			self::packageDir() . '/tests/fixtures/violations.php',
 		]);
 
-		$this->assertNotSame(0, $code, 'Expected the violations fixture to fail RTCampWP.');
+		$this->assertNotSame(0, $code, 'Expected the violations fixture to fail rtCampWP.');
 		$this->assertStringContainsString('DeclareStrictTypes', $output);
 		$this->assertStringContainsString('MissingAnyTypeHint', $output);
 		$this->assertStringContainsString('DisallowLongArraySyntax', $output);
