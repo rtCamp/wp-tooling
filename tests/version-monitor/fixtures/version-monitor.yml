@@ -1,0 +1,13 @@
+sources:
+  npm:        { enabled: true,  paths: [package.json] }
+  actions:    { enabled: true,  paths: [.github/workflows/*.yml] }
+  php:        { enabled: true,  paths: [composer.json, .github/workflows/*.yml] }
+  node:       { enabled: true,  paths: [.nvmrc, package.json, .github/workflows/*.yml] }
+  wp-cli:     { enabled: false }
+  container:  { enabled: false }
+
+policy:
+  draft_pr: true
+  pr_label: "version-monitor"
+  pr_assignees: []
+  schedule: monthly
