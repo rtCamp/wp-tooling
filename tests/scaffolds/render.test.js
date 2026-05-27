@@ -36,12 +36,14 @@ describe('render', () => {
 
 	it('throws ERENDERFAIL on undefined placeholder', () => {
 		expect(() => render('{{missing}}', {})).toThrow(RenderError);
+		let err;
 		try {
 			render('{{missing}}', {});
-		} catch (err) {
-			expect(err.code).toBe('ERENDERFAIL');
-			expect(err.placeholder).toBe('missing');
+		} catch (caught) {
+			err = caught;
 		}
+		expect(err.code).toBe('ERENDERFAIL');
+		expect(err.placeholder).toBe('missing');
 	});
 
 	it('does NOT HTML-escape (critical for code generation)', () => {

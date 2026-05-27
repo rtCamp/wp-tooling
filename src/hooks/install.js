@@ -56,7 +56,7 @@ function resolveHooksDir(repoRoot) {
 		})
 			.toString()
 			.trim();
-	} catch (err) {
+	} catch {
 		throw new Error(
 			`not a git repository (or git is unavailable): ${repoRoot}`
 		);

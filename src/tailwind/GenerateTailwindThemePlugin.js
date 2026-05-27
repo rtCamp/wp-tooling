@@ -1,5 +1,9 @@
 'use strict';
 
+/* eslint-disable no-console -- this is a build-time webpack plugin; console
+   output is its diagnostic channel (skipped entries, missing/invalid
+   theme.json, files written) and runs outside the WordPress runtime. */
+
 const fs = require('fs');
 const path = require('path');
 
@@ -264,3 +268,5 @@ class GenerateTailwindThemePlugin {
 }
 
 module.exports = { GenerateTailwindThemePlugin, generateThemeBlock };
+
+/* eslint-enable no-console */

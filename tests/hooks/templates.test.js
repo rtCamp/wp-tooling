@@ -239,10 +239,13 @@ describe('shellcheck (optional)', () => {
 	try {
 		execFileSync('shellcheck', ['--version'], { stdio: 'ignore' });
 		shellcheckAvailable = true;
-	} catch (_err) {
+	} catch {
 		shellcheckAvailable = false;
 	}
 
+	// maybeTest is a thin test/test.skip wrapper; register it so the jest rule
+	// recognises the expects below as living inside a test block.
+	/* eslint jest/no-standalone-expect: ["error", { "additionalTestBlockFunctions": ["maybeTest"] }] */
 	const maybeTest = shellcheckAvailable ? test : test.skip;
 
 	maybeTest('commit-msg passes shellcheck -s sh', () => {

@@ -293,7 +293,6 @@ async function runInteractive(opts) {
 			async run(ctx) {
 				// Loop: try execute(dry-run), on EMISSINGINPUT prompt and retry.
 				while (true) {
-					// eslint-disable-line no-constant-condition
 					try {
 						ctx.result = await ctx.registry.execute(
 							ctx.opts.id,

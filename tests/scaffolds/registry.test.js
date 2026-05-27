@@ -398,28 +398,30 @@ describe('execute() error paths', () => {
 	});
 
 	it('throws ENOSCAFFOLD with available list', async () => {
-		try {
-			await registry.execute('does/not-exist', {}, {});
-			throw new Error('should have thrown');
-		} catch (err) {
-			expect(err.code).toBe('ENOSCAFFOLD');
-			expect(err.available).toContain('wp/cli');
-		}
+		const err = await registry.execute('does/not-exist', {}, {}).then(
+			() => {
+				throw new Error('should have thrown');
+			},
+			(caught) => caught
+		);
+		expect(err.code).toBe('ENOSCAFFOLD');
+		expect(err.available).toContain('wp/cli');
 	});
 
 	it('throws EMISSINGINPUT with missingDetails when required input is absent', async () => {
-		try {
-			await registry.execute('wp/cli', {}, { dryRun: true });
-			throw new Error('should have thrown');
-		} catch (err) {
-			expect(err.code).toBe('EMISSINGINPUT');
-			expect(err.missing).toEqual(['name']);
-			expect(err.missingDetails[0]).toEqual({
-				key: 'name',
-				description: 'Slug for the command.',
-				discover_from: null,
-			});
-		}
+		const err = await registry.execute('wp/cli', {}, { dryRun: true }).then(
+			() => {
+				throw new Error('should have thrown');
+			},
+			(caught) => caught
+		);
+		expect(err.code).toBe('EMISSINGINPUT');
+		expect(err.missing).toEqual(['name']);
+		expect(err.missingDetails[0]).toEqual({
+			key: 'name',
+			description: 'Slug for the command.',
+			discover_from: null,
+		});
 	});
 });
 

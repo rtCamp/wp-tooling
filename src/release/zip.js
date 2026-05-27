@@ -475,3 +475,5 @@ module.exports = {
 	DEFAULT_IGNORE_PATTERNS,
 	FALLBACK_EPOCH,
 };
+
+/* eslint-enable no-bitwise */

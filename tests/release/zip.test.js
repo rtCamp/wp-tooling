@@ -324,3 +324,5 @@ describe('release/zip - integration', () => {
 		expect(decoded).toBe('Hello, world!\n');
 	});
 });
+
+/* eslint-enable no-bitwise */
