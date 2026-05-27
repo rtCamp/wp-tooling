@@ -1,0 +1,214 @@
+<?xml version="1.0"?>
+<ruleset
+	name="RTCampWP"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
+>
+	<description>rtCamp WordPress standards — full strict superset. Everything in RTCampWP-Basic plus short-array enforcement and the Slevomat strict-typing, code-quality and doc-block sniffs. Recommended for new and public projects ready to adopt strict types. Override individual sniffs in your own phpcs.xml.dist as needed.</description>
+
+	<!-- Everything in Basic: WPCS + VIP-Go + Docs + PHPCompatibilityWP + FunctionSpacing. -->
+	<rule ref="RTCampWP-Basic" />
+
+	<!-- ==========================================================
+	     Array / syntax
+	     ========================================================== -->
+
+	<!-- Enforce short array syntax: ban array(). Basic only stopped flagging []. -->
+	<rule ref="Generic.Arrays.DisallowLongArraySyntax" />
+
+	<!-- ==========================================================
+	     Severity restorations — sniffs that WordPress-VIP-Go / WordPress-Extra
+	     suppress upstream but which we want enforced.
+	     ========================================================== -->
+
+	<rule ref="WordPress.WhiteSpace.ControlStructureSpacing">
+		<properties>
+			<property name="blank_line_check" value="true" />
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.ValidHookName.UseUnderscores">
+		<severity>5</severity>
+	</rule>
+	<rule ref="WordPress.NamingConventions.ValidVariableName">
+		<severity>5</severity>
+	</rule>
+	<rule ref="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid">
+		<severity>5</severity>
+	</rule>
+	<rule ref="WordPress.WP.Capabilities.Undetermined">
+		<severity>5</severity>
+	</rule>
+	<rule ref="Generic.CodeAnalysis.UnusedFunctionParameter">
+		<severity>5</severity>
+	</rule>
+	<rule ref="PEAR.Functions.FunctionCallSignature.CloseBracketLine">
+		<severity>5</severity>
+	</rule>
+	<rule ref="PEAR.Functions.FunctionCallSignature.ContentAfterOpenBracket">
+		<severity>5</severity>
+	</rule>
+	<rule ref="PEAR.Functions.FunctionCallSignature.MultipleArguments">
+		<severity>5</severity>
+	</rule>
+	<rule ref="Squiz.WhiteSpace.SuperfluousWhitespace">
+		<severity>5</severity>
+	</rule>
+	<rule ref="Squiz.WhiteSpace.SuperfluousWhitespace.EmptyLines">
+		<severity>5</severity>
+	</rule>
+	<rule ref="Squiz.WhiteSpace.SuperfluousWhitespace.EndLine">
+		<severity>5</severity>
+	</rule>
+
+	<!-- ==========================================================
+	     Doc blocks
+	     ========================================================== -->
+
+	<!-- VariableComment.MissingVar is better covered by SlevomatCodingStandard.TypeHints.PropertyTypeHint. -->
+	<rule ref="Squiz.Commenting.VariableComment.MissingVar">
+		<severity>0</severity>
+	</rule>
+
+	<rule ref="Squiz.Commenting.FunctionComment">
+		<exclude name="Squiz.Commenting.FunctionComment.ParamCommentFullStop" />
+		<exclude name="Squiz.Commenting.FunctionComment.EmptyThrows" />
+		<properties>
+			<property name="skipIfInheritdoc" value="true" />
+		</properties>
+	</rule>
+
+	<!-- ==========================================================
+	     Slevomat — autofixable / code quality
+	     ========================================================== -->
+
+	<rule ref="SlevomatCodingStandard.Arrays.ArrayAccess" />
+	<rule ref="SlevomatCodingStandard.Arrays.DisallowImplicitArrayCreation" />
+	<rule ref="SlevomatCodingStandard.Arrays.MultiLineArrayEndBracketPlacement" />
+	<rule ref="SlevomatCodingStandard.Arrays.TrailingArrayComma" />
+
+	<rule ref="SlevomatCodingStandard.Classes.BackedEnumTypeSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.ClassConstantVisibility" />
+	<rule ref="SlevomatCodingStandard.Classes.ClassMemberSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.ConstantSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.DisallowLateStaticBindingForConstants" />
+	<rule ref="SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition" />
+	<rule ref="SlevomatCodingStandard.Classes.DisallowMultiPropertyDefinition" />
+	<rule ref="SlevomatCodingStandard.Classes.DisallowStringExpressionPropertyFetch" />
+	<rule ref="SlevomatCodingStandard.Classes.EmptyLinesAroundClassBraces">
+		<properties>
+			<property name="linesCountAfterOpeningBrace" value="0" />
+			<property name="linesCountBeforeClosingBrace" value="0" />
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Classes.EnumCaseSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.MethodSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.ModernClassNameReference">
+		<properties>
+			<!-- Doesn't use PHPCompatibility. -->
+			<property name="enableOnObjects" value="false" />
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Classes.ParentCallSpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.PropertyDeclaration" />
+	<rule ref="SlevomatCodingStandard.Classes.PropertySpacing" />
+	<rule ref="SlevomatCodingStandard.Classes.RequireSelfReference" />
+	<rule ref="SlevomatCodingStandard.Classes.TraitUseDeclaration" />
+	<rule ref="SlevomatCodingStandard.Classes.TraitUseSpacing">
+		<properties>
+			<property name="linesCountBeforeFirstUseWhenFirstInClass" value="0" />
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Classes.UselessLateStaticBinding" />
+
+	<rule ref="SlevomatCodingStandard.ControlStructures.DisallowContinueWithoutIntegerOperandInSwitch" />
+	<rule ref="SlevomatCodingStandard.ControlStructures.DisallowTrailingMultiLineTernaryOperator" />
+	<rule ref="SlevomatCodingStandard.ControlStructures.NewWithParentheses" />
+	<rule ref="SlevomatCodingStandard.ControlStructures.UselessIfConditionWithReturn" />
+	<rule ref="SlevomatCodingStandard.ControlStructures.UselessTernaryOperator" />
+
+	<rule ref="SlevomatCodingStandard.Exceptions.ReferenceThrowableOnly" />
+
+	<rule ref="SlevomatCodingStandard.Functions.ArrowFunctionDeclaration" />
+	<rule ref="SlevomatCodingStandard.Functions.DisallowEmptyFunction" />
+	<rule ref="SlevomatCodingStandard.Functions.StaticClosure" />
+	<rule ref="SlevomatCodingStandard.Functions.UnusedInheritedVariablePassedToClosure" />
+
+	<rule ref="SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses">
+		<properties>
+			<property name="caseSensitive" value="true" />
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameInAnnotation">
+		<properties>
+			<property name="ignoredAnnotationNames" type="array">
+				<element value="@phpstan-import-type" />
+				<element value="@phpstan-param" />
+				<element value="@phpstan-return" />
+				<element value="@phpstan-template" />
+				<element value="@phpstan-type" />
+				<element value="@phpstan-var" />
+			</property>
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Namespaces.NamespaceSpacing" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UseDoesNotStartWithBackslash" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UseFromSameNamespace" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UselessAlias" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UseSpacing" />
+
+	<rule ref="SlevomatCodingStandard.PHP.DisallowDirectMagicInvokeCall" />
+	<rule ref="SlevomatCodingStandard.PHP.OptimizedFunctionsWithoutUnpacking" />
+	<rule ref="SlevomatCodingStandard.PHP.ShortList" />
+	<rule ref="SlevomatCodingStandard.PHP.TypeCast" />
+	<rule ref="SlevomatCodingStandard.PHP.UselessParentheses" />
+	<rule ref="SlevomatCodingStandard.PHP.UselessSemicolon" />
+
+	<rule ref="SlevomatCodingStandard.TypeHints.NullableTypeForNullDefaultValue" />
+	<rule ref="SlevomatCodingStandard.TypeHints.NullTypeHintOnLastPosition" />
+
+	<rule ref="SlevomatCodingStandard.Variables.UnusedVariable">
+		<properties>
+			<property name="ignoreUnusedValuesWhenOnlyKeysAreUsedInForeach" value="true" />
+		</properties>
+	</rule>
+	<rule ref="SlevomatCodingStandard.Variables.UselessVariable" />
+
+	<!-- ==========================================================
+	     Slevomat — strict functional sniffs
+	     ========================================================== -->
+
+	<rule ref="SlevomatCodingStandard.Classes.DisallowConstructorPropertyPromotion" />
+	<rule ref="SlevomatCodingStandard.ControlStructures.RequireNullCoalesceOperator" />
+	<rule ref="SlevomatCodingStandard.Exceptions.DeadCatch" />
+	<rule ref="SlevomatCodingStandard.Exceptions.DisallowNonCapturingCatch" />
+	<rule ref="SlevomatCodingStandard.Functions.UnusedParameter" />
+	<rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue" />
+	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions" />
+	<rule ref="SlevomatCodingStandard.Namespaces.MultipleUsesPerLine" />
+	<rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />
+	<rule ref="SlevomatCodingStandard.Variables.DisallowVariableVariable" />
+	<rule ref="SlevomatCodingStandard.Variables.DuplicateAssignmentToVariable" />
+
+	<!-- ==========================================================
+	     Slevomat — type-hint completeness & spacing (docs-grade)
+	     ========================================================== -->
+
+	<rule ref="SlevomatCodingStandard.TypeHints.LongTypeHints" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingAnyTypeHint" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingTraversableTypeHintSpecification" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint.UselessAnnotation" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint.UselessSuppress" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHintSpacing" />
+	<rule ref="SlevomatCodingStandard.TypeHints.PropertyTypeHint.MissingAnyTypeHint" />
+	<rule ref="SlevomatCodingStandard.TypeHints.PropertyTypeHint.MissingTraversableTypeHintSpecification" />
+	<rule ref="SlevomatCodingStandard.TypeHints.PropertyTypeHint.UselessSuppress" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingAnyTypeHint" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingTraversableTypeHintSpecification" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint.LessSpecificNativeTypeHint" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint.UselessAnnotation" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHint.UselessSuppress" />
+	<rule ref="SlevomatCodingStandard.TypeHints.ReturnTypeHintSpacing" />
+
+</ruleset>
