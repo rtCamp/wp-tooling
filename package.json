@@ -17,9 +17,5 @@
         "test": "npm test --workspaces --if-present",
         "test:coverage": "npm run test:coverage --workspaces --if-present",
         "check": "npm run check --workspaces --if-present"
-    },
-    "// overrides": "Forces minimatch off the vulnerable 9.0.0-9.0.6 range (3 high-severity ReDoS CVEs reaching us via the @typescript-eslint/typescript-estree chain that @wordpress/eslint-plugin v22 pulls in). Lives at the workspace root because npm only honours `overrides` in the root package.json. Remove once @wordpress/eslint-plugin can move to v25 (gated on @wordpress/scripts supporting ESLint 9).",
-    "overrides": {
-        "minimatch": "^9.0.7"
     }
 }
