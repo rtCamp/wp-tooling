@@ -1,0 +1,14 @@
+name: Deploy to WordPress.org
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/cd-wp-org.yml@v1.0.0
+    with:
+      plugin-slug: {{plugin_slug}}
+    secrets:
+      svn-username: ${{ secrets.WPORG_USERNAME }}
+      svn-password: ${{ secrets.WPORG_PASSWORD }}

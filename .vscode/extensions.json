@@ -1,0 +1,11 @@
+{
+    // Team-wide editor recommendations. Verified-publisher only — see docs/editor-setup.md.
+
+    "recommendations": [
+        "EditorConfig.EditorConfig",            // EditorConfig Foundation
+        "dbaeumer.vscode-eslint",               // Microsoft — the official ESLint integration
+        "GitHub.vscode-pull-request-github",    // GitHub (Microsoft)
+        "GitHub.vscode-github-actions",         // GitHub
+        "redhat.vscode-yaml"                    // Red Hat
+    ]
+}

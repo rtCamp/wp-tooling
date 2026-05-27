@@ -1,0 +1,41 @@
+{
+	"slug": "cd-wporg",
+	"category": "ci",
+	"name": "WordPress.org deploy",
+	"description": "Deploys built plugin asset to WordPress.org SVN on each GitHub release. Wraps the wp-shared-workflows reusable.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "plugin_slug",
+			"description": "WordPress.org plugin slug (must match the slug registered with .org).",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/cd-wporg.yml.mustache",
+			"dest": ".github/workflows/cd-wporg.yml"
+		}
+	],
+	"secrets": [
+		{
+			"key": "WPORG_USERNAME",
+			"scope": "github-actions",
+			"description": "WordPress.org SVN username with commit access to the plugin slug.",
+			"required": true
+		},
+		{
+			"key": "WPORG_PASSWORD",
+			"scope": "github-actions",
+			"description": "Password matching WPORG_USERNAME. Treat as write-only.",
+			"required": true
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/cd-wporg.yml.mustache",
+			"dest": ".github/workflows/cd-wporg.yml",
+			"framework": "actionlint"
+		}
+	]
+}

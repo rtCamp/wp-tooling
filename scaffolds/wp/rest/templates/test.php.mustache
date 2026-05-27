@@ -1,0 +1,33 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}Controller.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ */
+
+declare(strict_types=1);
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}}Controller;
+use WP_UnitTestCase;
+
+/**
+ * @covers \{{namespace}}\{{class}}Controller
+ */
+final class {{class}}ControllerTest extends WP_UnitTestCase {
+
+	public function test_register_hooks_attaches_to_rest_api_init(): void {
+		$instance = new {{class}}Controller();
+		$instance->register_hooks();
+		$this->assertNotFalse( has_action( 'rest_api_init', [ $instance, 'register_routes' ] ) );
+	}
+
+	public function test_route_is_registered_after_rest_api_init(): void {
+		( new {{class}}Controller() )->register_routes();
+		$routes = rest_get_server()->get_routes();
+		$this->assertArrayHasKey( '/{{rest_namespace}}/v{{rest_version}}/{{name}}', $routes );
+	}
+}

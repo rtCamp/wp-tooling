@@ -1,0 +1,36 @@
+{
+	"slug": "claude-skills",
+	"category": "setup",
+	"name": "Claude Code skills",
+	"description": "Installs the rtCamp scaffold and setup Claude Code skills into .claude/skills/. Drop-in copy of the SKILL.md and evals.json that ship with @rtcamp/wp-tooling. Run this once per project to let Claude drive the scaffolding flow.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "skills_dir",
+			"description": "Target directory for the skills. Default '.claude/skills' is what Claude Code reads automatically.",
+			"default": ".claude/skills"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/scaffold-SKILL.md",
+			"dest": "{{skills_dir}}/scaffold/SKILL.md",
+			"raw": true
+		},
+		{
+			"src": "templates/scaffold-evals.json",
+			"dest": "{{skills_dir}}/scaffold/evals/evals.json",
+			"raw": true
+		},
+		{
+			"src": "templates/setup-SKILL.md",
+			"dest": "{{skills_dir}}/setup/SKILL.md",
+			"raw": true
+		},
+		{
+			"src": "templates/setup-evals.json",
+			"dest": "{{skills_dir}}/setup/evals/evals.json",
+			"raw": true
+		}
+	]
+}
