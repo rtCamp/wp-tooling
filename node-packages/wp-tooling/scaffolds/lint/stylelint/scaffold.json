@@ -2,7 +2,7 @@
 	"slug": "stylelint",
 	"category": "lint",
 	"name": "Stylelint setup",
-	"description": "Installs Stylelint with rtCamp's shared config (extends `@rtcamp/wp-tooling/stylelint-config`) and adds lint:css scripts.",
+	"description": "Installs Stylelint with rtCamp's shared config (extends `@rtcamp/stylelint-config`) and adds lint:css scripts.",
 	"source": "template",
 	"files": [
 		{
@@ -11,9 +11,10 @@
 		}
 	],
 	"npm_dev_dependencies": {
-		"stylelint": "^16.0.0",
-		"@wordpress/stylelint-config": "^23.0.0",
-		"@rtcamp/wp-tooling": "^1.0.0"
+		"stylelint": "^16.8.2",
+		"@wordpress/stylelint-config": "^23.37.0",
+		"stylelint-scss": "^6.4.0",
+		"@rtcamp/stylelint-config": "^0.1.0"
 	},
 	"scripts": {
 		"npm": {

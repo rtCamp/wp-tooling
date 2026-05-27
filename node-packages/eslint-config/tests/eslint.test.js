@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('../../src/lint/eslint');
+const config = require('../index');
 
 describe('eslint config', () => {
 	it('exports a non-empty array', () => {

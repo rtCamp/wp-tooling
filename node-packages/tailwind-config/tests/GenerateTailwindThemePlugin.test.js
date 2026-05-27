@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const {
 	GenerateTailwindThemePlugin,
 	generateThemeBlock,
-} = require('../../src/tailwind/GenerateTailwindThemePlugin');
+} = require('../GenerateTailwindThemePlugin');
 
 const tmpDir = () =>
 	path.join(

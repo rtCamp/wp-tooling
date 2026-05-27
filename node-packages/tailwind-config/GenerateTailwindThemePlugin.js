@@ -143,7 +143,7 @@ const generateThemeBlock = (themeJson) => {
  *
  * Usage in webpack.config.js:
  *
- *   const { GenerateTailwindThemePlugin } = require( '@rtcamp/wp-tooling/tailwind-config' );
+ *   const { GenerateTailwindThemePlugin } = require( '@rtcamp/tailwind-config' );
  *
  *   plugins: [
  *     new GenerateTailwindThemePlugin(),

@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('../../src/lint/stylelint');
+const config = require('../index');
 
 describe('stylelint config', () => {
 	it('exports a plain object', () => {

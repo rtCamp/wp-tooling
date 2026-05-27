@@ -2,7 +2,7 @@
 
 const globals = require('globals');
 const nPlugin = require('eslint-plugin-n').default;
-const wpToolingConfig = require('./src/lint/eslint');
+const wpToolingConfig = require('@rtcamp/eslint-config');
 
 module.exports = [
 	...wpToolingConfig,
