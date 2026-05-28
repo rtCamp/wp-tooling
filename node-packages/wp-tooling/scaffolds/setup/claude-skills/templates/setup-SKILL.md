@@ -82,7 +82,7 @@ grep -A 8 '"autoload"' composer.json 2>/dev/null
 **Existing tooling configs (skip if present):**
 
 ```bash
-ls .editorconfig phpcs.xml.dist phpstan.neon.dist .eslintrc.js .stylelintrc.js \
+ls .editorconfig phpcs.xml.dist phpstan.neon.dist eslint.config.js .stylelintrc.js \
    phpunit.xml.dist jest.config.js .pa11yci.json 2>/dev/null
 ```
 
@@ -108,7 +108,7 @@ Construct the plan in two phases: **project setup** and **feature scaffolds**.
 | Non-VIP project | `lint/phpcs/full` | `phpcs.xml.dist` exists |
 | Developer explicitly chose core-only PHPCS | `lint/phpcs/core` | `phpcs.xml.dist` exists |
 | PHP present | `lint/phpstan` | `phpstan.neon.dist` exists |
-| JS present | `lint/eslint` | `.eslintrc.js` exists |
+| JS present | `lint/eslint` | `eslint.config.js` exists |
 | CSS or SCSS present | `lint/stylelint` | `.stylelintrc.js` exists |
 | Developer wants PHP tests | `setup/phpunit` | `phpunit.xml.dist` exists |
 | Developer wants JS tests | `setup/jest` | `jest.config.js` exists |
@@ -143,7 +143,7 @@ Phase A — Project setup:
   2. setup/psr4            → wiring in composer.json  (namespace: Acme\ImageOptimizer, path: includes/)
   3. lint/phpcs/vip        → phpcs.xml.dist           (WordPress-VIP-Minimum + WordPress-Docs)
   4. lint/phpstan          → phpstan.neon.dist         (level 5)
-  5. lint/eslint           → .eslintrc.js
+  5. lint/eslint           → eslint.config.js
   6. setup/phpunit         → phpunit.xml.dist, tests/bootstrap.php
 
 Phase B — Feature scaffolds:
@@ -266,7 +266,7 @@ Files written (Phase A):
   .editorconfig
   phpcs.xml.dist       (WordPress VIP Minimum + Docs)
   phpstan.neon.dist    (level 5)
-  .eslintrc.js
+  eslint.config.js
   phpunit.xml.dist
   tests/bootstrap.php
   composer.json        (PSR-4 autoload added, Acme\ImageOptimizer → includes/)
@@ -294,9 +294,9 @@ Developer actions (run these yourself):
     brain/monkey:^2.6
 
   npm install --save-dev \
-    eslint@8.57.1 \
-    @wordpress/eslint-plugin:^22.0.0 \
-    @rtcamp/wp-tooling:^1.0.0
+    eslint@^10.0.0 \
+    @wordpress/eslint-plugin@^25.1.0 \
+    @rtcamp/eslint-config@^0.1.0
 
 Scripts to add to composer.json:
 
@@ -320,7 +320,7 @@ Skipped: none.
 Outstanding manual tasks: none.
 ```
 
-Deduplicate packages. Sort alphabetically within each block. Pinned packages use exact versions (e.g. `eslint@8.57.1`); everything else uses range specifiers.
+Deduplicate packages. Sort alphabetically within each block. Pinned packages use exact versions; everything else uses range specifiers.
 
 ## PHPCS standard reference
 

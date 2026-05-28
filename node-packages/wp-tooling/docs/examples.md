@@ -32,7 +32,7 @@ Phase A — Project setup:
   2. setup/psr4               → composer.json wiring (Acme\InventoryManager → includes/)
   3. lint/phpcs/full          → phpcs.xml.dist (rtCamp full standard)
   4. lint/phpstan             → phpstan.neon.dist (level 5)
-  5. lint/eslint              → .eslintrc.js
+  5. lint/eslint              → eslint.config.js
   6. setup/phpunit            → phpunit.xml.dist, tests/bootstrap.php
 
 Phase B — Feature scaffolds:
@@ -78,7 +78,7 @@ npx wp-tooling add wp/cli             --non-interactive --json --cwd . --name=im
 Setup complete.
 
 Files written:
-  .editorconfig, phpcs.xml.dist, phpstan.neon.dist, .eslintrc.js, phpunit.xml.dist, tests/bootstrap.php
+  .editorconfig, phpcs.xml.dist, phpstan.neon.dist, eslint.config.js, phpunit.xml.dist, tests/bootstrap.php
   includes/PostTypes/Product.php           + tests/PostTypes/ProductTest.php
   includes/Taxonomies/ProductCategory.php  + tests/Taxonomies/ProductCategoryTest.php
   includes/Cli/ImportProducts.php          + tests/Cli/ImportProductsTest.php
@@ -91,7 +91,7 @@ Developer actions:
 
   composer require rtcamp/wp-framework:^1.0
   composer require --dev squizlabs/php_codesniffer:^3.7 wp-coding-standards/wpcs:^3.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
-  npm install --save-dev eslint@8.57.1 @wordpress/eslint-plugin:^22.0.0 @rtcamp/wp-tooling:^1.0.0
+  npm install --save-dev eslint@^10.0.0 @wordpress/eslint-plugin@^25.1.0 @rtcamp/eslint-config@^0.1.0
 
 Scripts to add to composer.json:
   "lint:php": "phpcs --standard=phpcs.xml.dist", "test": "phpunit", ...

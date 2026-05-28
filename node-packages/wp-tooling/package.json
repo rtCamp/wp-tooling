@@ -27,15 +27,13 @@
     "./ci": "./src/ci/index.js",
     "./version-monitor": "./src/version-monitor/index.js"
   },
-  "files": [
-    "bin",
-    "src",
-    "scaffolds",
-    "skills",
-    "docs",
-    "README.md",
-    "LICENSE"
-  ],
+    "files": [
+        "bin",
+        "src",
+        "scaffolds",
+        "docs",
+        "README.md"
+    ],
   "homepage": "https://github.com/rtCamp/wp-tooling#readme",
   "keywords": [
     "cli",

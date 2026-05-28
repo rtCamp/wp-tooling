@@ -66,7 +66,7 @@ Collect these before drafting the entry. Do the investigation first, then ask on
      ```bash
      git diff release/<milestone>...HEAD | grep -E '(TODO|FIXME|XXX)'
      ```
-   - Check for suppression directives added to `phpstan.neon.dist`, `phpcs.xml.dist`, or `.eslintrc.js` — those are non-obvious state the incoming engineer needs to know about.
+   - Check for suppression directives added to `phpstan.neon.dist`, `phpcs.xml.dist`, or `eslint.config.js` — those are non-obvious state the incoming engineer needs to know about.
    - Check if any config files changed (`composer.json`, `package.json`, `phpcs.xml.dist`, etc.).
 
 5. **Blockers / open questions:**
