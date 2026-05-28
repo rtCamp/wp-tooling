@@ -18,6 +18,12 @@ skills/*-workspace/
 
 # Composer
 vendor/
+# Per-package locks are not committed for libraries (root composer.lock is).
+/composer-packages/*/composer.lock
+
+# Static-analysis / test caches
+.phpstan-cache/
+.phpunit.cache/
 
 # Monorepo: nested workspace/build artefacts (npm hoists to root, but be defensive)
 node_modules/

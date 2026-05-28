@@ -1,0 +1,15 @@
+# rtCamp shared PHPStan baseline for WordPress projects.
+#
+# Relative path on purpose: it resolves to the sibling vendor/szepeviktor install
+# (this file lives at vendor/rtcamp/wp-phpstan/), so a consumer includes only this
+# one file. Don't also enable phpstan/extension-installer for szepeviktor, or the
+# extension loads twice and PHPStan fails on the duplicate services.
+includes:
+    - ../../szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    # WordPress doc-blocks are unreliable; don't treat their types as certain.
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true
+    ignoreErrors: []

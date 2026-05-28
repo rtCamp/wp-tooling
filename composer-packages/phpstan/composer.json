@@ -1,8 +1,28 @@
 {
     "name": "rtcamp/wp-phpstan",
     "description": "rtCamp PHPStan configuration and baseline for WordPress projects.",
+    "type": "library",
     "license": "GPL-2.0-or-later",
+    "keywords": [
+        "phpstan",
+        "static analysis",
+        "wordpress",
+        "rtcamp"
+    ],
     "require": {
-        "php": ">=8.1"
+        "php": ">=8.1",
+        "phpstan/phpstan": "^2.0",
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "rtCamp\\WPPhpstan\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }
