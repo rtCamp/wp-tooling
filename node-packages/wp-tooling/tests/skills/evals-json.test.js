@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SKILLS_DIR = path.join(__dirname, '..', '..', '..', '..', 'skills');
+const SKILLS_DIR = path.join(__dirname, '..', '..', 'skills');
 
 function findSkillDirs() {
 	if (!fs.existsSync(SKILLS_DIR)) {

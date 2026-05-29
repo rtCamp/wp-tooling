@@ -1,8 +1,0 @@
-{
-    "name": "@rtcamp/tooling-skills",
-    "version": "0.0.0",
-    "description": "Placeholder — rtCamp AI skills bundle (scaffold/setup SKILL.md). Real implementation lands from the scaffold-engine branch.",
-    "license": "GPL-2.0-or-later",
-    "author": "rtCamp",
-    "private": true
-}
