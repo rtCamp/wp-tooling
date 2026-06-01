@@ -14,6 +14,7 @@ Thumbs.db
 # The shippable portion of evals lives at skills/<name>/evals/ and is committed.
 skill-workspace/
 skills/*-workspace/
+**/skills/*-workspace/
 
 # Composer
 vendor/
