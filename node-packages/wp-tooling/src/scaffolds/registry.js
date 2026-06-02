@@ -29,15 +29,13 @@ const path = require('path');
 
 const { validate } = require('./validate');
 const { render, collectPlaceholders, applyTransform } = require('./render');
-
-class ScaffoldError extends Error {
-	constructor(code, message, details = {}) {
-		super(message);
-		this.name = 'ScaffoldError';
-		this.code = code;
-		Object.assign(this, details);
-	}
-}
+const { ScaffoldError } = require('./errors');
+const { fetchRemoteFile } = require('./fetch');
+const {
+	readInventory,
+	validateInventory,
+	entryToRecord,
+} = require('./inventory');
 
 class ScaffoldRegistry {
 	/**
@@ -95,6 +93,39 @@ class ScaffoldRegistry {
 				record._dir = root;
 				const key = makeKey(record);
 				this._entries.set(key, record); // last write wins (project)
+			}
+		}
+
+		// Remote scaffolds: thin records from inventory.json in the same dirs.
+		// Loaded after the local walk so a remote id can be rejected when it
+		// collides with a local scaffold. A remote scaffold's full manifest is
+		// fetched lazily on execute() (see hydrateRemote); here we only know
+		// where it lives. `origin: 'remote'` distinguishes it from default/project.
+		for (const { dir } of sources) {
+			const inv = await readInventory(dir);
+			if (!inv) {
+				continue;
+			}
+			const errs = validateInventory(inv.parsed);
+			if (errs.length) {
+				throw new ScaffoldError(
+					'EBADSCAFFOLD',
+					`Invalid inventory ${inv.file}:\n  - ${errs.join('\n  - ')}`,
+					{ file: inv.file, errors: errs }
+				);
+			}
+			for (const entry of inv.parsed.scaffolds) {
+				const record = entryToRecord(entry);
+				const key = makeKey(record);
+				const existing = this._entries.get(key);
+				if (existing && existing.origin !== 'remote') {
+					throw new ScaffoldError(
+						'EBADSCAFFOLD',
+						`inventory id '${entry.id}' collides with a local scaffold`,
+						{ file: inv.file, id: entry.id }
+					);
+				}
+				this._entries.set(key, record); // project inventory overrides default
 			}
 		}
 		return this;
@@ -170,13 +201,14 @@ class ScaffoldRegistry {
 	 * @param {string}                id     - `<category>/<slug>` or `<slug>`.
 	 * @param {Object<string,string>} inputs - Caller-supplied input values.
 	 * @param {Object}                opts
-	 *                                       dryRun {boolean=}  - When true, do not write files (still returns the plan).
-	 *                                       cwd    {string=}   - Target directory. Defaults to process.cwd().
+	 *                                       dryRun    {boolean=} - When true, do not write files (still returns the plan).
+	 *                                       cwd       {string=}  - Target directory. Defaults to process.cwd().
+	 *                                       fetchOpts {Object=}  - Forwarded to `fetchRemoteFile` for remote (inventory) scaffolds (cacheDir, refresh, token).
 	 * @return {Promise<Object>} Result with scaffold/engine/developer/ai/warnings blocks.
-	 * @throws {ScaffoldError} ENOSCAFFOLD, EMISSINGINPUT, EWRITEFAIL, ERENDERFAIL.
+	 * @throws {ScaffoldError} ENOSCAFFOLD, EMISSINGINPUT, EBADSCAFFOLD, EWRITEFAIL, ERENDERFAIL, EFETCHFAIL.
 	 */
 	async execute(id, inputs = {}, opts = {}) {
-		const scaffold = this.get(id);
+		let scaffold = this.get(id);
 		if (!scaffold) {
 			throw new ScaffoldError(
 				'ENOSCAFFOLD',
@@ -188,6 +220,17 @@ class ScaffoldRegistry {
 		const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
 		const dryRun = !!opts.dryRun;
 		const warnings = [];
+		const fetchOpts = { ...(opts.fetchOpts || {}), warnings };
+
+		// Remote scaffold: fetch + validate its manifest before doing anything
+		// else, so the rest of execute() works on a fully-shaped record exactly
+		// like a local one. This happens even on a dry run — the plan (which
+		// files, which inputs) is meaningless without the manifest — but only
+		// the manifest is fetched on a dry run, never the template bodies. The
+		// manifest is a single small file, cached for pinned (tag/SHA) refs.
+		if (scaffold.origin === 'remote') {
+			scaffold = await hydrateRemote(scaffold, fetchOpts);
+		}
 
 		const resolved = resolveInputs(scaffold, inputs);
 
@@ -209,6 +252,61 @@ class ScaffoldRegistry {
 			}
 		}
 
+		// Pre-fetch the template bodies of a remote scaffold in parallel. The
+		// sequential file/test loops below then read from this map instead of
+		// hitting the network N times.
+		//
+		// Only fetch a src whose dest is actually missing — this mirrors the
+		// local path (which skips an existing dest before ever reading its
+		// template) so a re-run of an already-scaffolded remote scaffold does
+		// no network I/O and, crucially, does not fail offline. Test entries
+		// that reuse a files[].dest are declarative-lint markers (no body of
+		// their own) and are excluded. Dedupe via Set so a shared src fetches
+		// once.
+		let remoteBodies = null;
+		if (scaffold.origin === 'remote' && !dryRun) {
+			const fileDests = (scaffold.files || []).map((f) =>
+				render(f.dest, resolved)
+			);
+			const fileDestSet = new Set(fileDests);
+			const neededSrcs = new Set();
+			for (let i = 0; i < (scaffold.files || []).length; i++) {
+				const destAbs = path.join(cwd, fileDests[i]);
+				if (!(await pathExists(destAbs))) {
+					neededSrcs.add(scaffold.files[i].src);
+				}
+			}
+			for (const t of scaffold.tests || []) {
+				const destRel = render(t.dest, resolved);
+				if (fileDestSet.has(destRel)) {
+					continue; // declarative lint — no template body to fetch
+				}
+				const destAbs = path.join(cwd, destRel);
+				if (!(await pathExists(destAbs))) {
+					neededSrcs.add(t.src);
+				}
+			}
+			const uniqueSrcs = [...neededSrcs];
+			const bodies = await Promise.all(
+				uniqueSrcs.map((src) =>
+					fetchRemoteFile(scaffold._repository, src, fetchOpts)
+				)
+			);
+			remoteBodies = new Map(
+				uniqueSrcs.map((src, i) => [src, bodies[i]])
+			);
+		}
+
+		const loadTemplate = async (fileSrc) => {
+			// For remote scaffolds every src whose dest is missing was
+			// prefetched above; the file/test loops only call loadTemplate on
+			// a missing dest, so the body is always present in the map.
+			if (remoteBodies) {
+				return remoteBodies.get(fileSrc);
+			}
+			return fs.readFile(path.join(scaffold._dir, fileSrc), 'utf8');
+		};
+
 		const filesCreated = [];
 		const filesSkipped = [];
 		for (const file of scaffold.files || []) {
@@ -222,8 +320,7 @@ class ScaffoldRegistry {
 				continue;
 			}
 			if (!dryRun) {
-				const srcAbs = path.join(scaffold._dir, file.src);
-				const tpl = await fs.readFile(srcAbs, 'utf8');
+				const tpl = await loadTemplate(file.src);
 				const out = file.raw === true ? tpl : render(tpl, resolved);
 				await fs.mkdir(path.dirname(destAbs), { recursive: true });
 				await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
@@ -261,8 +358,7 @@ class ScaffoldRegistry {
 						`test stub already exists, not overwritten: ${destRel}`
 					);
 				} else if (!dryRun) {
-					const srcAbs = path.join(scaffold._dir, t.src);
-					const tpl = await fs.readFile(srcAbs, 'utf8');
+					const tpl = await loadTemplate(t.src);
 					const out = render(tpl, resolved);
 					await fs.mkdir(path.dirname(destAbs), { recursive: true });
 					await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
@@ -286,6 +382,9 @@ class ScaffoldRegistry {
 			scaffold: {
 				id: makeId(scaffold),
 				slug: scaffold.slug,
+				// `kind: 'template'` covers both local and remote (inventory)
+				// template scaffolds — the AI orchestrator doesn't need to
+				// branch on where the body came from; both render Mustache.
 				kind: scaffold.source === 'package' ? 'package' : 'template',
 				dryRun,
 			},
@@ -310,6 +409,65 @@ class ScaffoldRegistry {
 			warnings,
 		};
 	}
+}
+
+/**
+ * Hydrate a thin remote (inventory) record into a full scaffold record by
+ * fetching, parsing, and validating its `scaffold.json` from the owning repo.
+ * The parsed manifest is memoized on the thin record so a repeat execute in
+ * the same process skips the fetch (the on-disk fetch cache covers pinned
+ * refs across processes). `--refresh` re-fetches the manifest too.
+ *
+ * The remote manifest is an ordinary scaffold.json (no special fields). The
+ * returned record carries the manifest's fields plus the inventory's identity
+ * (slug/category) and the remote markers (`origin`, `_repository`).
+ *
+ * @param {Object} record    - Thin remote record from the inventory.
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile`.
+ * @return {Promise<Object>} A full scaffold record.
+ * @throws {ScaffoldError} EBADSCAFFOLD (bad JSON / schema), EFETCHFAIL (network).
+ */
+async function hydrateRemote(record, fetchOpts) {
+	const ref = `${record._repository.github}@${record._repository.ref}/${record._repository.path}/scaffold.json`;
+	if (!record._manifest || (fetchOpts && fetchOpts.refresh)) {
+		const text = await fetchRemoteFile(
+			record._repository,
+			'scaffold.json',
+			fetchOpts
+		);
+		let parsed;
+		try {
+			parsed = JSON.parse(text);
+		} catch (err) {
+			throw new ScaffoldError(
+				'EBADSCAFFOLD',
+				`Invalid JSON in remote scaffold ${makeId(record)} (${ref}): ${err.message}`,
+				{ id: makeId(record), repository: record._repository }
+			);
+		}
+		const errs = validate(parsed);
+		if (errs.length) {
+			throw new ScaffoldError(
+				'EBADSCAFFOLD',
+				`Invalid remote scaffold ${makeId(record)} (${ref}):\n  - ${errs.join(
+					'\n  - '
+				)}`,
+				{
+					id: makeId(record),
+					repository: record._repository,
+					errors: errs,
+				}
+			);
+		}
+		record._manifest = parsed;
+	}
+	return {
+		...record._manifest,
+		slug: record.slug,
+		category: record.category,
+		origin: 'remote',
+		_repository: record._repository,
+	};
 }
 
 /**
@@ -358,7 +516,6 @@ function resolveInputs(scaffold, supplied) {
 				resolved[decl.key] = applyTransform(value, decl.transform);
 			}
 		}
-		// Anything still missing and required is an error.
 		for (const decl of declared) {
 			if (!(decl.key in resolved) && decl.required) {
 				missing.push(decl.key);

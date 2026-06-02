@@ -19,6 +19,12 @@ const REQUIRED_FIELDS = ['slug', 'name', 'description', 'source', 'files'];
 /**
  * `template` renders files from Mustache templates; `package` registers
  * boot wiring for a class shipped in vendor and writes zero files.
+ *
+ * A scaffold can also be served from a remote repo, but that is NOT a
+ * `source` value — remoteness is expressed by an inventory entry
+ * (`src/scaffolds/inventory.js`) that points at an ordinary `template`
+ * scaffold living in another repo. The manifest shape is identical either
+ * way; only its discovery + template loading differ.
  */
 const ALLOWED_SOURCES = ['template', 'package'];
 
@@ -66,6 +72,8 @@ const SLUG_PATTERN = '^[a-z0-9-]+$';
 const CATEGORY_PATTERN = '^[a-z][a-z0-9/-]*$';
 const INPUT_KEY_PATTERN = '^[a-z][a-z0-9_]*$';
 const SECRET_KEY_PATTERN = '^[A-Z][A-Z0-9_]*$';
+/** `owner/repo` on github.com — used by the inventory validator. */
+const GITHUB_REPO_PATTERN = '^[\\w.-]+/[\\w.-]+$';
 
 /** Reusable Draft-07 entry shapes. */
 const INPUT_ENTRY = {
@@ -255,4 +263,5 @@ module.exports = {
 	CATEGORY_PATTERN,
 	INPUT_KEY_PATTERN,
 	SECRET_KEY_PATTERN,
+	GITHUB_REPO_PATTERN,
 };

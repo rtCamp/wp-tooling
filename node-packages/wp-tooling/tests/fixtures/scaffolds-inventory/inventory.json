@@ -1,0 +1,14 @@
+{
+	"scaffolds": [
+		{
+			"id": "ci/test-remote",
+			"name": "CI: remote-template fixture",
+			"description": "Fixture remote scaffold. Its scaffold.json + templates are served from mocked https responses in the test suite; nothing here lives on disk.",
+			"repository": {
+				"github": "rtCamp/wp-shared-workflows",
+				"ref": "v1",
+				"path": "scaffolds/ci/test-remote"
+			}
+		}
+	]
+}
