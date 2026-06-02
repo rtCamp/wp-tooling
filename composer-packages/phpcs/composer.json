@@ -12,7 +12,7 @@
         "static analysis"
     ],
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.3",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "wp-coding-standards/wpcs": "^3.2",
         "automattic/vipwpcs": "^3.0",

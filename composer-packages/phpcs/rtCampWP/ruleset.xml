@@ -97,7 +97,7 @@
 	<rule ref="SlevomatCodingStandard.Classes.DisallowStringExpressionPropertyFetch" />
 	<rule ref="SlevomatCodingStandard.Classes.EmptyLinesAroundClassBraces">
 		<properties>
-			<property name="linesCountAfterOpeningBrace" value="0" />
+			<property name="linesCountAfterOpeningBrace" value="1" />
 			<property name="linesCountBeforeClosingBrace" value="0" />
 		</properties>
 	</rule>
@@ -186,7 +186,6 @@
 	<rule ref="SlevomatCodingStandard.Functions.UnusedParameter" />
 	<rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue" />
 	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions" />
-	<rule ref="SlevomatCodingStandard.Namespaces.MultipleUsesPerLine" />
 	<rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />
 	<rule ref="SlevomatCodingStandard.Variables.DisallowVariableVariable" />
 	<rule ref="SlevomatCodingStandard.Variables.DuplicateAssignmentToVariable" />
