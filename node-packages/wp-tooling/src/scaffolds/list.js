@@ -62,7 +62,7 @@ function printHelp() {
 			'',
 			'Flags:',
 			'  --category <name>    Show only scaffolds in this category (e.g., wp, ci, block, utility).',
-			'  --origin <default|project>  Show only default-catalogue or only project-local scaffolds.',
+			'  --origin <default|project|remote>  Show only default-catalogue, project-local, or remote (inventory) scaffolds.',
 			'  --json               Emit machine-readable JSON instead of the human table.',
 			'  --cwd <path>         Project directory whose bin/scaffolds is merged in (default: cwd).',
 			'  --help, -h           Show this help text.',
@@ -110,6 +110,21 @@ function applyFilters(scaffolds, opts) {
 }
 
 function summarise(scaffold) {
+	// Remote (inventory) scaffolds are listed from their inventory entry
+	// without fetching the manifest, so their detailed counts are unknown
+	// until `add`. They render Mustache like any template scaffold.
+	if (scaffold.origin === 'remote') {
+		return {
+			id: makeId(scaffold),
+			slug: scaffold.slug,
+			category: scaffold.category || null,
+			name: scaffold.name,
+			description: scaffold.description,
+			kind: 'template',
+			origin: 'remote',
+			counts: null,
+		};
+	}
 	return {
 		id: makeId(scaffold),
 		slug: scaffold.slug,
@@ -182,6 +197,9 @@ function printHumanTable(summaries) {
 }
 
 function formatCounts(counts) {
+	if (!counts) {
+		return '';
+	}
 	const parts = [];
 	if (counts.inputs) {
 		parts.push(`inputs:${counts.inputs}`);
@@ -207,9 +225,12 @@ async function runCli(argv) {
 		printHelp();
 		return 0;
 	}
-	if (opts.origin && !['default', 'project'].includes(opts.origin)) {
+	if (
+		opts.origin &&
+		!['default', 'project', 'remote'].includes(opts.origin)
+	) {
 		process.stderr.write(
-			`Error: --origin must be 'default' or 'project' (got '${opts.origin}')\n`
+			`Error: --origin must be 'default', 'project', or 'remote' (got '${opts.origin}')\n`
 		);
 		return 1;
 	}

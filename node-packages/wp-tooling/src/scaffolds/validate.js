@@ -33,6 +33,8 @@ const {
 	SECRET_KEY_PATTERN,
 } = require('./schema');
 const { render, collectPlaceholders } = require('./render');
+const { INVENTORY_FILENAME, validateInventory } = require('./inventory');
+const { fetchRemoteFile } = require('./fetch');
 
 const SLUG_RE = new RegExp(SLUG_PATTERN);
 const CATEGORY_RE = new RegExp(CATEGORY_PATTERN);
@@ -457,7 +459,15 @@ function validateScripts(scripts) {
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-	const opts = { ids: [], cwd: null, json: false, help: false };
+	const opts = {
+		ids: [],
+		cwd: null,
+		json: false,
+		help: false,
+		remote: false,
+		refresh: false,
+		cacheDir: null,
+	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === '--help' || a === '-h') {
@@ -468,6 +478,14 @@ function parseArgs(argv) {
 			opts.cwd = argv[++i];
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
+		} else if (a === '--remote') {
+			opts.remote = true;
+		} else if (a === '--refresh') {
+			opts.refresh = true;
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = argv[++i];
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
 			throw new Error(`Unexpected flag: ${a}`);
 		} else {
@@ -484,11 +502,17 @@ function printHelp() {
 			'',
 			'Validates scaffold manifests. With no id, checks the whole bundled catalogue.',
 			'With one or more ids (e.g. wp/cli, lint/phpcs/vip), only those are checked.',
+			'Remote (inventory) scaffolds are recognised; by default only their inventory',
+			'shape is checked offline. Pass --remote to also fetch and schema-validate the',
+			'manifest at each pinned ref.',
 			'',
 			'Flags:',
-			'  --cwd <path>   Also include project-local scaffolds at <path>/bin/scaffolds.',
-			'  --json         Machine-readable output.',
-			'  --help, -h     Show this help.',
+			'  --cwd <path>      Also include project-local scaffolds at <path>/bin/scaffolds.',
+			'  --remote          Fetch + schema-validate each remote scaffold manifest (network).',
+			'  --refresh         With --remote, bypass the cache and re-fetch.',
+			'  --cache-dir <p>   With --remote, override the remote-fetch cache directory.',
+			'  --json            Machine-readable output.',
+			'  --help, -h        Show this help.',
 			'',
 			'Exit code: 0 if all valid, 1 if any errors.',
 			'',
@@ -638,6 +662,145 @@ function collectFiles(opts) {
 	return files;
 }
 
+/**
+ * Validate the inventory file(s) and the remote scaffolds they declare.
+ *
+ * Emits two kinds of rows (shaped like `validateOne` output):
+ *   - one file-level row per inventory file (`id: 'inventory'`) carrying its
+ *     shape result (malformed JSON, bad entries, duplicate ids, and any remote
+ *     id that collides with a local scaffold), and
+ *   - one row per remote scaffold (`id: <entry.id>`, `remote: true`) so that
+ *     `validate <remote-id>` resolves instead of erroring.
+ *
+ * Default is fully offline: a remote row is valid on inventory shape alone.
+ * With `opts.remote`, each remote manifest is fetched at its pinned ref and
+ * schema-validated (reusing the same `validate()` the registry runs on `add`);
+ * a network/HTTP failure becomes an `EFETCHFAIL`-tagged error on its row. Per-id
+ * rows are only produced when the inventory shape is sound — a malformed
+ * inventory yields just its file-level row, and we never fetch from a broken pin.
+ *
+ * Absent inventory files contribute nothing — the dormant default leaves
+ * `validate` behaving exactly as before.
+ *
+ * @param {Object}      opts     - Parsed CLI options (`cwd`, `remote`, `refresh`, `cacheDir`, `ids`).
+ * @param {Set<string>} localIds - Ids of the discovered local scaffolds.
+ * @return {Promise<Array<{file: string, id: string, valid: boolean, errors: string[], remote?: boolean}>>} Result rows.
+ */
+async function collectInventoryResults(opts, localIds) {
+	const dirs = [defaultsDir()];
+	if (opts.cwd) {
+		dirs.push(projectDir(opts.cwd));
+	}
+	const fetchOpts = {};
+	if (opts.refresh) {
+		fetchOpts.refresh = true;
+	}
+	if (opts.cacheDir) {
+		fetchOpts.cacheDir = opts.cacheDir;
+	}
+	const wanted = opts.ids.length ? new Set(opts.ids) : null;
+
+	const results = [];
+	for (const dir of dirs) {
+		const file = path.join(dir, INVENTORY_FILENAME);
+		if (!fs.existsSync(file)) {
+			continue;
+		}
+		const fileRow = { file, id: 'inventory', valid: true, errors: [] };
+		let parsed;
+		try {
+			parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+		} catch (err) {
+			fileRow.valid = false;
+			fileRow.errors.push(`Invalid JSON: ${err.message}`);
+			results.push(fileRow);
+			continue;
+		}
+		const shapeErrs = validateInventory(parsed);
+		const entries = Array.isArray(parsed && parsed.scaffolds)
+			? parsed.scaffolds
+			: [];
+		for (const entry of entries) {
+			if (
+				entry &&
+				typeof entry.id === 'string' &&
+				localIds.has(entry.id)
+			) {
+				shapeErrs.push(
+					`scaffolds: id '${entry.id}' collides with a local scaffold`
+				);
+			}
+		}
+		if (shapeErrs.length) {
+			fileRow.valid = false;
+			fileRow.errors.push(...shapeErrs);
+		}
+		results.push(fileRow);
+
+		// Per-remote-id rows require a sound inventory: a malformed manifest
+		// can't yield trustworthy per-entry rows, and we must never fetch from
+		// a broken pin.
+		if (!fileRow.valid) {
+			continue;
+		}
+		for (const entry of entries) {
+			if (wanted && !wanted.has(entry.id)) {
+				continue;
+			}
+			const row = {
+				file,
+				id: entry.id,
+				valid: true,
+				errors: [],
+				remote: true,
+			};
+			if (opts.remote) {
+				await validateRemoteManifest(entry, fetchOpts, row);
+			}
+			results.push(row);
+		}
+	}
+	return results;
+}
+
+/**
+ * Fetch a remote scaffold's `scaffold.json` at its pinned ref and schema-validate
+ * it, mutating `row` in place. A fetch failure (`EFETCHFAIL`) or invalid manifest
+ * (bad JSON / schema errors) marks the row invalid with attributed messages.
+ *
+ * @param {Object} entry     - A validated inventory entry (`id`, `repository`).
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile` (`refresh`, `cacheDir`).
+ * @param {Object} row       - The result row to annotate.
+ * @return {Promise<void>} Resolves once `row` reflects the manifest's validity.
+ */
+async function validateRemoteManifest(entry, fetchOpts, row) {
+	const repo = entry.repository;
+	const ref = `${repo.github}@${repo.ref}/${repo.path}/scaffold.json`;
+	let text;
+	try {
+		text = await fetchRemoteFile(repo, 'scaffold.json', fetchOpts);
+	} catch (err) {
+		row.valid = false;
+		row.errors.push(`${err.code || 'EFETCHFAIL'}: ${err.message}`);
+		return;
+	}
+	let manifest;
+	try {
+		manifest = JSON.parse(text);
+	} catch (err) {
+		row.valid = false;
+		row.errors.push(
+			`remote manifest not valid JSON (${ref}): ${err.message}`
+		);
+		return;
+	}
+	const errs = validate(manifest);
+	if (errs.length) {
+		row.valid = false;
+		row.errors.push(...errs.map((e) => `remote manifest (${ref}): ${e}`));
+	}
+}
+
 function filterByIds(results, ids) {
 	if (!ids.length) {
 		return results;
@@ -650,12 +813,13 @@ function printHuman(results) {
 	const writeln = (s) => process.stdout.write(`${s}\n`);
 	const totals = { valid: 0, invalid: 0 };
 	for (const r of results) {
+		const tag = r.remote ? ' (remote)' : '';
 		if (r.valid) {
 			totals.valid++;
-			writeln(`ok   ${r.id || '(unknown)'}`);
+			writeln(`ok   ${r.id || '(unknown)'}${tag}`);
 		} else {
 			totals.invalid++;
-			writeln(`FAIL ${r.id || '(unknown)'}  (${r.file})`);
+			writeln(`FAIL ${r.id || '(unknown)'}${tag}  (${r.file})`);
 			for (const e of r.errors) {
 				writeln(`     - ${e}`);
 			}
@@ -681,6 +845,8 @@ async function runCli(argv) {
 	}
 	const files = collectFiles(opts);
 	const allResults = files.map(validateOne);
+	const localIds = new Set(allResults.map((r) => r.id).filter(Boolean));
+	allResults.push(...(await collectInventoryResults(opts, localIds)));
 	const results = filterByIds(allResults, opts.ids);
 	if (opts.ids.length && results.length === 0) {
 		const available = allResults.map((r) => r.id).filter(Boolean);

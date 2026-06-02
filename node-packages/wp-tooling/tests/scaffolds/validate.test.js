@@ -359,7 +359,57 @@ const fssync = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { runCli } = require('../../src/scaffolds/validate');
+const { runCli, validateOne } = require('../../src/scaffolds/validate');
+
+describe('validate rejects the removed repository field', () => {
+	it("treats 'repository' as an unknown top-level field", () => {
+		const errors = validate({
+			...baseValid(),
+			repository: {
+				github: 'rtCamp/wp-shared-workflows',
+				ref: 'v1',
+				path: 'scaffolds/ci/test-php',
+			},
+		});
+		expect(errors).toContain("unknown top-level field 'repository'");
+	});
+
+	it("rejects source: 'repository' (no longer an allowed source)", () => {
+		const errors = validate({ ...baseValid(), source: 'repository' });
+		expect(errors[0]).toMatch(/source: must be one of/);
+	});
+});
+
+function makeOnDiskScaffold(scaffoldJson) {
+	const dir = fssync.mkdtempSync(
+		path.join(os.tmpdir(), 'wp-tooling-validate-disk-')
+	);
+	const file = path.join(dir, 'scaffold.json');
+	fssync.writeFileSync(file, JSON.stringify(scaffoldJson), 'utf8');
+	return { dir, file };
+}
+
+describe('validateOne on-disk checks', () => {
+	test('source: template still reports missing files', () => {
+		const { dir, file } = makeOnDiskScaffold({
+			slug: 'local',
+			category: 'wp',
+			name: 'Local',
+			description: 'fixture',
+			source: 'template',
+			files: [{ src: 'not-on-disk.mustache', dest: 'a.php' }],
+		});
+		try {
+			const result = validateOne(file);
+			expect(result.valid).toBe(false);
+			expect(
+				result.errors.some((e) => /template not found on disk/.test(e))
+			).toBe(true);
+		} finally {
+			fssync.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+});
 
 function makeTmpDir() {
 	return fssync.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-validate-'));
@@ -480,5 +530,256 @@ describe('validate runCli', () => {
 		);
 		expect(code).toBe(1);
 		expect(stderr).toMatch(/Unexpected flag: --bogus/);
+	});
+
+	function writeProjectInventory(cwd, entries) {
+		const dir = path.join(cwd, 'bin', 'scaffolds');
+		fssync.mkdirSync(dir, { recursive: true });
+		fssync.writeFileSync(
+			path.join(dir, 'inventory.json'),
+			JSON.stringify({ scaffolds: entries }),
+			'utf8'
+		);
+	}
+
+	const remoteEntry = (overrides = {}) => ({
+		id: 'ci/remote-thing',
+		name: 'Remote Thing',
+		description: 'a remote scaffold',
+		repository: {
+			github: 'rtCamp/wp-shared-workflows',
+			ref: 'v1',
+			path: 'scaffolds/ci/remote-thing',
+		},
+		...overrides,
+	});
+
+	it('validates a valid project inventory (offline, no fetch)', async () => {
+		const cwd = makeTmpDir();
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['--cwd', cwd])
+		);
+		expect(code).toBe(0);
+		expect(stdout).toMatch(/ok\s+inventory/);
+	});
+
+	it('fails when an inventory entry has a bad github slug', async () => {
+		const cwd = makeTmpDir();
+		writeProjectInventory(cwd, [
+			remoteEntry({
+				repository: {
+					github: 'no-slash',
+					ref: 'v1',
+					path: 'scaffolds/ci/remote-thing',
+				},
+			}),
+		]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['--cwd', cwd])
+		);
+		expect(code).toBe(1);
+		expect(stdout).toMatch(/must match 'owner\/repo'/);
+	});
+
+	it('flags an inventory id that collides with a local scaffold', async () => {
+		const cwd = makeTmpDir();
+		const localDir = path.join(
+			cwd,
+			'bin',
+			'scaffolds',
+			'ci',
+			'remote-thing'
+		);
+		fssync.mkdirSync(localDir, { recursive: true });
+		fssync.writeFileSync(
+			path.join(localDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'remote-thing',
+				category: 'ci',
+				name: 'Local',
+				description: 'local',
+				source: 'package',
+				files: [],
+			}),
+			'utf8'
+		);
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['--cwd', cwd])
+		);
+		expect(code).toBe(1);
+		expect(stdout).toMatch(/collides with a local scaffold/);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// validate --remote — fetch + schema-validate the remote manifest at its pin.
+// Default validate is offline; only --remote touches the network. node:https
+// is mocked the same way as registry.test.js.
+// ---------------------------------------------------------------------------
+
+describe('validate --remote (inventory)', () => {
+	const { EventEmitter } = require('events');
+	const https = require('https');
+
+	let httpsSpy;
+
+	function setHttpsRoutes(routes, { statusCode = 200 } = {}) {
+		httpsSpy = jest
+			.spyOn(https, 'get')
+			.mockImplementation((url, options, cb) => {
+				const req = new EventEmitter();
+				req.destroy = () => {};
+				const res = new EventEmitter();
+				res.statusCode = statusCode;
+				res.setEncoding = () => {};
+				let body = '';
+				for (const [key, val] of Object.entries(routes)) {
+					if (url.endsWith(key)) {
+						body = val;
+						break;
+					}
+				}
+				process.nextTick(() => {
+					cb(res);
+					res.emit('data', body);
+					res.emit('end');
+				});
+				return req;
+			});
+	}
+
+	function writeProjectInventory(cwd, entries) {
+		const dir = path.join(cwd, 'bin', 'scaffolds');
+		fssync.mkdirSync(dir, { recursive: true });
+		fssync.writeFileSync(
+			path.join(dir, 'inventory.json'),
+			JSON.stringify({ scaffolds: entries }),
+			'utf8'
+		);
+	}
+
+	const remoteEntry = (overrides = {}) => ({
+		id: 'ci/remote-thing',
+		name: 'Remote Thing',
+		description: 'a remote scaffold',
+		repository: {
+			github: 'rtCamp/wp-shared-workflows',
+			ref: 'v1',
+			path: 'scaffolds/ci/remote-thing',
+		},
+		...overrides,
+	});
+
+	const manifest = (overrides = {}) =>
+		JSON.stringify({
+			slug: 'remote-thing',
+			category: 'ci',
+			name: 'Remote Thing',
+			description: 'a remote scaffold',
+			source: 'template',
+			files: [{ src: 'a.mustache', dest: '.github/workflows/a.yml' }],
+			...overrides,
+		});
+
+	let cwd;
+	let cacheDir;
+
+	beforeEach(() => {
+		cwd = makeTmpDir();
+		cacheDir = makeTmpDir();
+		jest.restoreAllMocks();
+	});
+
+	afterEach(() => {
+		for (const d of [cwd, cacheDir]) {
+			fssync.rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it('recognises a remote id offline and makes no network call', async () => {
+		setHttpsRoutes({ 'scaffold.json': manifest() });
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli(['ci/remote-thing', '--cwd', cwd, '--json'])
+		);
+		expect(code).toBe(0);
+		const parsed = JSON.parse(stdout.trim());
+		const row = parsed.results.find((r) => r.id === 'ci/remote-thing');
+		expect(row).toBeDefined();
+		expect(row.remote).toBe(true);
+		expect(row.valid).toBe(true);
+		expect(httpsSpy).not.toHaveBeenCalled(); // no --remote => offline
+	});
+
+	it('default validate (no --remote) over an inventory makes no network call', async () => {
+		setHttpsRoutes({ 'scaffold.json': manifest() });
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code } = await withStdoutCapture(() => runCli(['--cwd', cwd]));
+		expect(code).toBe(0);
+		expect(httpsSpy).not.toHaveBeenCalled();
+	});
+
+	it('--remote fetches and schema-validates a sound manifest (ok)', async () => {
+		setHttpsRoutes({ 'scaffold.json': manifest() });
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli([
+				'ci/remote-thing',
+				'--remote',
+				'--cwd',
+				cwd,
+				'--cache-dir',
+				cacheDir,
+			])
+		);
+		expect(code).toBe(0);
+		expect(httpsSpy).toHaveBeenCalledTimes(1); // manifest only, no templates
+		expect(stdout).toMatch(/ok\s+ci\/remote-thing \(remote\)/);
+	});
+
+	it('--remote surfaces EFETCHFAIL when the manifest 404s', async () => {
+		setHttpsRoutes({ 'scaffold.json': 'not found' }, { statusCode: 404 });
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli([
+				'ci/remote-thing',
+				'--remote',
+				'--cwd',
+				cwd,
+				'--cache-dir',
+				cacheDir,
+			])
+		);
+		expect(code).toBe(1);
+		expect(stdout).toMatch(/FAIL\s+ci\/remote-thing \(remote\)/);
+		expect(stdout).toMatch(/EFETCHFAIL/);
+	});
+
+	it('--remote reports schema errors from a fetched-but-invalid manifest', async () => {
+		// Missing required fields (source, files) — validate() should reject.
+		setHttpsRoutes({
+			'scaffold.json': JSON.stringify({ slug: 'remote-thing' }),
+		});
+		writeProjectInventory(cwd, [remoteEntry()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli([
+				'ci/remote-thing',
+				'--remote',
+				'--json',
+				'--cwd',
+				cwd,
+				'--cache-dir',
+				cacheDir,
+			])
+		);
+		expect(code).toBe(1);
+		const parsed = JSON.parse(stdout.trim());
+		const row = parsed.results.find((r) => r.id === 'ci/remote-thing');
+		expect(row.valid).toBe(false);
+		expect(row.errors.join('\n')).toMatch(
+			/remote manifest .*missing required field/
+		);
 	});
 });

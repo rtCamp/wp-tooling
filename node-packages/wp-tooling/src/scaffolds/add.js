@@ -28,6 +28,8 @@ function parseArgs(argv) {
 		dryRun: false,
 		json: false,
 		cwd: process.cwd(),
+		refresh: false,
+		cacheDir: undefined,
 		help: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
@@ -41,10 +43,16 @@ function parseArgs(argv) {
 		} else if (a === '--json') {
 			opts.json = true;
 			opts.nonInteractive = true;
+		} else if (a === '--refresh') {
+			opts.refresh = true;
 		} else if (a === '--cwd') {
 			opts.cwd = argv[++i];
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = argv[++i];
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
 			const eq = a.indexOf('=');
 			if (eq === -1) {
@@ -63,6 +71,17 @@ function parseArgs(argv) {
 	return opts;
 }
 
+function fetchOptsFrom(opts) {
+	const fetchOpts = {};
+	if (opts.refresh) {
+		fetchOpts.refresh = true;
+	}
+	if (opts.cacheDir) {
+		fetchOpts.cacheDir = opts.cacheDir;
+	}
+	return fetchOpts;
+}
+
 function snakify(key) {
 	return key.replace(/-/g, '_');
 }
@@ -77,6 +96,8 @@ function printHelp() {
 			'  --dry-run            Print the plan without writing files.',
 			'  --json               Emit a single JSON line on stdout. Implies --non-interactive.',
 			'  --cwd <path>         Target directory. Defaults to the current working directory.',
+			'  --refresh            Force re-fetch of remote (inventory) scaffold manifests + templates.',
+			'  --cache-dir <path>   Override the default cache directory for remote templates.',
 			'  --help, -h           Show this help text.',
 			'',
 			'Examples:',
@@ -119,6 +140,11 @@ function formatErrorPayload(err) {
 			'errno',
 			'placeholder',
 			'template',
+			'url',
+			'statusCode',
+			'rateLimited',
+			'timeout',
+			'cause',
 		]) {
 			if (err[k] !== undefined) {
 				payload[k] = err[k];
@@ -297,7 +323,11 @@ async function runInteractive(opts) {
 						ctx.result = await ctx.registry.execute(
 							ctx.opts.id,
 							ctx.inputs,
-							{ dryRun: true, cwd: ctx.opts.cwd }
+							{
+								dryRun: true,
+								cwd: ctx.opts.cwd,
+								fetchOpts: fetchOptsFrom(ctx.opts),
+							}
 						);
 						return;
 					} catch (err) {
@@ -341,7 +371,11 @@ async function runInteractive(opts) {
 					ctx.result = await ctx.registry.execute(
 						ctx.opts.id,
 						ctx.inputs,
-						{ dryRun: false, cwd: ctx.opts.cwd }
+						{
+							dryRun: false,
+							cwd: ctx.opts.cwd,
+							fetchOpts: fetchOptsFrom(ctx.opts),
+						}
 					);
 					s.succeed(`Scaffolded ${ctx.opts.id}`);
 				} catch (err) {
@@ -363,6 +397,7 @@ async function runNonInteractive(opts) {
 	const result = await registry.execute(opts.id, opts.inputs, {
 		dryRun: opts.dryRun,
 		cwd: opts.cwd,
+		fetchOpts: fetchOptsFrom(opts),
 	});
 	if (opts.json) {
 		process.stdout.write(JSON.stringify(result) + '\n');
