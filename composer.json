@@ -6,7 +6,7 @@
     "require": {
         "automattic/vipwpcs": "^3.0",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
-        "php": ">=8.1",
+        "php": ">=8.4.1",
         "phpcompatibility/phpcompatibility-wp": "^2.1",
         "slevomat/coding-standard": "^8.12",
         "wp-coding-standards/wpcs": "^3.2"
