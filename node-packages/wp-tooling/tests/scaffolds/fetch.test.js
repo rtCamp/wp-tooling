@@ -12,8 +12,8 @@ const https = require('https');
 
 const {
 	fetchRemoteFile,
+	readCached,
 	defaultCacheDir,
-	isCacheableRef,
 	_internal,
 } = require('../../src/scaffolds/fetch');
 
@@ -21,53 +21,40 @@ function makeTmpDir(prefix = 'wpt-fetch-') {
 	return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-function stubResponse(response) {
-	const captured = {};
+// Queue-based https.get mock. Each call consumes the next response (the last
+// response repeats once the queue is exhausted). Records the captured
+// `{ url, options }` per call so tests can assert headers / conditional GETs.
+function stubResponses(responses) {
+	const calls = [];
+	let i = 0;
 	https.get.mockImplementation((url, options, callback) => {
-		captured.url = url;
-		captured.options = options;
+		const r = responses[Math.min(i, responses.length - 1)];
+		i++;
+		calls.push({ url, options });
 		const req = new EventEmitter();
 		req.destroy = () => {};
 		const res = new EventEmitter();
-		res.statusCode = response.statusCode;
+		res.statusCode = r.statusCode;
+		res.headers = r.etag ? { etag: r.etag } : {};
 		res.setEncoding = () => {};
 		process.nextTick(() => {
 			callback(res);
-			res.emit('data', response.body);
+			res.emit('data', r.body || '');
 			res.emit('end');
 		});
 		return req;
 	});
-	return { captured };
+	return { calls };
 }
 
-describe('isCacheableRef', () => {
-	test.each([
-		['v1', true],
-		['v1.2', true],
-		['v1.2.3', true],
-		['v1.2.3-rc1', true],
-		['v1.2.3+build', true],
-		['a'.repeat(40), true],
-		['0123456789abcdef0123456789abcdef01234567', true],
-		['main', false],
-		['master', false],
-		['develop', false],
-		['HEAD', false],
-		['feature/x', false],
-		['abc1234', false],
-		['1.2.3', false],
-		['', false],
-	])('isCacheableRef(%j) -> %s', (ref, expected) => {
-		expect(isCacheableRef(ref)).toBe(expected);
+function stubTransportError(message = 'ECONNRESET') {
+	https.get.mockImplementation(() => {
+		const req = new EventEmitter();
+		req.destroy = () => {};
+		process.nextTick(() => req.emit('error', new Error(message)));
+		return req;
 	});
-
-	test('rejects non-strings', () => {
-		expect(isCacheableRef(undefined)).toBe(false);
-		expect(isCacheableRef(null)).toBe(false);
-		expect(isCacheableRef(123)).toBe(false);
-	});
-});
+}
 
 describe('defaultCacheDir', () => {
 	const savedXdg = process.env.XDG_CACHE_HOME;
@@ -149,65 +136,111 @@ describe('fetchRemoteFile', () => {
 		return path.join(cacheDir, hash);
 	}
 
-	test('cacheable ref + cache miss fetches and writes to cache', async () => {
-		stubResponse({ statusCode: 200, body: 'BODY' });
+	test('cache miss fetches, writes body + ETag sidecar', async () => {
+		stubResponses([{ statusCode: 200, body: 'BODY', etag: 'W/"v1"' }]);
 		const body = await fetchRemoteFile(repo, fileSrc, { cacheDir });
 		expect(body).toBe('BODY');
 		expect(https.get).toHaveBeenCalledTimes(1);
 		expect(fs.readFileSync(cachePathFor(expectedUrl), 'utf8')).toBe('BODY');
+		expect(
+			fs.readFileSync(`${cachePathFor(expectedUrl)}.etag`, 'utf8')
+		).toBe('W/"v1"');
 	});
 
-	test('cacheable ref + cache hit reads from disk, no HTTP', async () => {
+	test('cache hit revalidates with If-None-Match; 304 serves cache', async () => {
 		await fsp.mkdir(cacheDir, { recursive: true });
 		await fsp.writeFile(cachePathFor(expectedUrl), 'CACHED', 'utf8');
+		await fsp.writeFile(
+			`${cachePathFor(expectedUrl)}.etag`,
+			'W/"v1"',
+			'utf8'
+		);
+		const { calls } = stubResponses([{ statusCode: 304 }]);
 		const body = await fetchRemoteFile(repo, fileSrc, { cacheDir });
 		expect(body).toBe('CACHED');
-		expect(https.get).not.toHaveBeenCalled();
+		expect(https.get).toHaveBeenCalledTimes(1);
+		expect(calls[0].options.headers['If-None-Match']).toBe('W/"v1"');
 	});
 
-	test('--refresh bypasses cache and re-fetches', async () => {
+	test('200 with a new body updates the cache', async () => {
+		await fsp.mkdir(cacheDir, { recursive: true });
+		await fsp.writeFile(cachePathFor(expectedUrl), 'OLD', 'utf8');
+		await fsp.writeFile(
+			`${cachePathFor(expectedUrl)}.etag`,
+			'W/"v1"',
+			'utf8'
+		);
+		stubResponses([{ statusCode: 200, body: 'NEW', etag: 'W/"v2"' }]);
+		const body = await fetchRemoteFile(repo, fileSrc, { cacheDir });
+		expect(body).toBe('NEW');
+		expect(fs.readFileSync(cachePathFor(expectedUrl), 'utf8')).toBe('NEW');
+		expect(
+			fs.readFileSync(`${cachePathFor(expectedUrl)}.etag`, 'utf8')
+		).toBe('W/"v2"');
+	});
+
+	test('--refresh re-fetches without a conditional header', async () => {
 		await fsp.mkdir(cacheDir, { recursive: true });
 		await fsp.writeFile(cachePathFor(expectedUrl), 'CACHED', 'utf8');
-		stubResponse({ statusCode: 200, body: 'FRESH' });
+		await fsp.writeFile(
+			`${cachePathFor(expectedUrl)}.etag`,
+			'W/"v1"',
+			'utf8'
+		);
+		const { calls } = stubResponses([
+			{ statusCode: 200, body: 'FRESH', etag: 'W/"v2"' },
+		]);
 		const body = await fetchRemoteFile(repo, fileSrc, {
 			cacheDir,
 			refresh: true,
 		});
 		expect(body).toBe('FRESH');
-		expect(https.get).toHaveBeenCalledTimes(1);
+		expect(calls[0].options.headers['If-None-Match']).toBeUndefined();
 		expect(fs.readFileSync(cachePathFor(expectedUrl), 'utf8')).toBe(
 			'FRESH'
 		);
 	});
 
-	test('mutable ref always fetches and never writes to cache', async () => {
-		stubResponse({ statusCode: 200, body: 'BODY' });
-		const mutableRepo = { ...repo, ref: 'main' };
-		await fetchRemoteFile(mutableRepo, fileSrc, { cacheDir });
-		await fetchRemoteFile(mutableRepo, fileSrc, { cacheDir });
-		expect(https.get).toHaveBeenCalledTimes(2);
-		expect(fs.readdirSync(cacheDir)).toEqual([]);
+	test('offline (transport error) with a cached copy serves cache + warns', async () => {
+		await fsp.mkdir(cacheDir, { recursive: true });
+		await fsp.writeFile(cachePathFor(expectedUrl), 'CACHED', 'utf8');
+		stubTransportError();
+		const warnings = [];
+		const body = await fetchRemoteFile(repo, fileSrc, {
+			cacheDir,
+			warnings,
+		});
+		expect(body).toBe('CACHED');
+		expect(warnings.some((w) => /serving cached/.test(w))).toBe(true);
+	});
+
+	test('404 with a cached copy still throws (does not serve stale)', async () => {
+		await fsp.mkdir(cacheDir, { recursive: true });
+		await fsp.writeFile(cachePathFor(expectedUrl), 'CACHED', 'utf8');
+		stubResponses([{ statusCode: 404, body: 'not found' }]);
+		await expect(
+			fetchRemoteFile(repo, fileSrc, { cacheDir })
+		).rejects.toMatchObject({ code: 'EFETCHFAIL', statusCode: 404 });
 	});
 
 	test('sends User-Agent and Authorization when token supplied', async () => {
-		const { captured } = stubResponse({ statusCode: 200, body: 'BODY' });
+		const { calls } = stubResponses([{ statusCode: 200, body: 'BODY' }]);
 		await fetchRemoteFile(repo, fileSrc, { cacheDir, token: 'abc123' });
-		expect(captured.options.headers['User-Agent']).toBe(
+		expect(calls[0].options.headers['User-Agent']).toBe(
 			'rtcamp-wp-tooling'
 		);
-		expect(captured.options.headers.Authorization).toBe('Bearer abc123');
+		expect(calls[0].options.headers.Authorization).toBe('Bearer abc123');
 	});
 
 	test('falls back to WP_TOOLING_GITHUB_TOKEN env var', async () => {
 		const saved = process.env.WP_TOOLING_GITHUB_TOKEN;
 		process.env.WP_TOOLING_GITHUB_TOKEN = 'envtoken';
 		try {
-			const { captured } = stubResponse({
-				statusCode: 200,
-				body: 'BODY',
-			});
+			const { calls } = stubResponses([
+				{ statusCode: 200, body: 'BODY' },
+			]);
 			await fetchRemoteFile(repo, fileSrc, { cacheDir });
-			expect(captured.options.headers.Authorization).toBe(
+			expect(calls[0].options.headers.Authorization).toBe(
 				'Bearer envtoken'
 			);
 		} finally {
@@ -219,8 +252,8 @@ describe('fetchRemoteFile', () => {
 		}
 	});
 
-	test('non-2xx throws EFETCHFAIL with statusCode', async () => {
-		stubResponse({ statusCode: 404, body: 'not found' });
+	test('non-2xx with no cache throws EFETCHFAIL with statusCode', async () => {
+		stubResponses([{ statusCode: 404, body: 'not found' }]);
 		await expect(
 			fetchRemoteFile(repo, fileSrc, { cacheDir })
 		).rejects.toMatchObject({
@@ -231,10 +264,9 @@ describe('fetchRemoteFile', () => {
 	});
 
 	test('403 + rate-limit body sets rateLimited', async () => {
-		stubResponse({
-			statusCode: 403,
-			body: '{"message":"API rate limit exceeded"}',
-		});
+		stubResponses([
+			{ statusCode: 403, body: '{"message":"API rate limit exceeded"}' },
+		]);
 		await expect(
 			fetchRemoteFile(repo, fileSrc, { cacheDir })
 		).rejects.toMatchObject({
@@ -244,13 +276,8 @@ describe('fetchRemoteFile', () => {
 		});
 	});
 
-	test('transport error throws EFETCHFAIL with cause', async () => {
-		https.get.mockImplementation(() => {
-			const req = new EventEmitter();
-			req.destroy = () => {};
-			process.nextTick(() => req.emit('error', new Error('ECONNRESET')));
-			return req;
-		});
+	test('transport error with no cache throws EFETCHFAIL with cause', async () => {
+		stubTransportError('ECONNRESET');
 		await expect(
 			fetchRemoteFile(repo, fileSrc, { cacheDir })
 		).rejects.toMatchObject({
@@ -259,7 +286,7 @@ describe('fetchRemoteFile', () => {
 		});
 	});
 
-	test('timeout throws EFETCHFAIL', async () => {
+	test('timeout with no cache throws EFETCHFAIL', async () => {
 		let destroyed = false;
 		https.get.mockImplementation(() => {
 			const req = new EventEmitter();
@@ -278,7 +305,7 @@ describe('fetchRemoteFile', () => {
 	});
 
 	test('cache write failure records a warning but returns body', async () => {
-		stubResponse({ statusCode: 200, body: 'BODY' });
+		stubResponses([{ statusCode: 200, body: 'BODY' }]);
 		// Point cacheDir at a regular file so mkdir + writeFile fail.
 		const blocker = path.join(makeTmpDir(), 'blocker');
 		fs.writeFileSync(blocker, 'x');
@@ -294,5 +321,46 @@ describe('fetchRemoteFile', () => {
 		} finally {
 			fs.rmSync(path.dirname(blocker), { recursive: true, force: true });
 		}
+	});
+});
+
+describe('readCached', () => {
+	let cacheDir;
+	const repo = {
+		github: 'rtCamp/wp-shared-workflows',
+		ref: 'v1',
+		path: 'scaffolds',
+	};
+
+	beforeEach(() => {
+		cacheDir = makeTmpDir();
+		jest.clearAllMocks();
+	});
+	afterEach(() => {
+		fs.rmSync(cacheDir, { recursive: true, force: true });
+	});
+
+	function cachePathFor(relPath) {
+		const url = _internal.composeUrl(repo, relPath);
+		const hash = crypto.createHash('sha256').update(url).digest('hex');
+		return path.join(cacheDir, hash);
+	}
+
+	test('returns null when nothing is cached, never hits the network', async () => {
+		expect(await readCached(repo, 'index.json', { cacheDir })).toBeNull();
+		expect(https.get).not.toHaveBeenCalled();
+	});
+
+	test('returns the cached body when present', async () => {
+		fs.mkdirSync(cacheDir, { recursive: true });
+		fs.writeFileSync(
+			cachePathFor('index.json'),
+			'{"scaffolds":[]}',
+			'utf8'
+		);
+		expect(await readCached(repo, 'index.json', { cacheDir })).toBe(
+			'{"scaffolds":[]}'
+		);
+		expect(https.get).not.toHaveBeenCalled();
 	});
 });

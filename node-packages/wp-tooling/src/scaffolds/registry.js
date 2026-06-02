@@ -32,10 +32,12 @@ const { render, collectPlaceholders, applyTransform } = require('./render');
 const { ScaffoldError } = require('./errors');
 const { fetchRemoteFile } = require('./fetch');
 const {
-	readInventory,
-	validateInventory,
-	entryToRecord,
-} = require('./inventory');
+	INDEX_FILENAME,
+	readSources,
+	validateSources,
+	validateIndex,
+	indexEntryToRecord,
+} = require('./sources');
 
 class ScaffoldRegistry {
 	/**
@@ -77,10 +79,20 @@ class ScaffoldRegistry {
 	 * manifest's `source` field (`template`/`package`), which is preserved
 	 * verbatim from scaffold.json.
 	 *
+	 * Remote scaffolds are discovered from `sources.json` (a list of repos),
+	 * each of which publishes an `index.json` the registry fetches (cached,
+	 * offline-tolerant) to learn what scaffolds it offers. Their manifests are
+	 * hydrated lazily on execute() (see hydrateRemote).
+	 *
+	 * @param {Object} [opts]
+	 *                        fetchOpts {Object=} - Forwarded to `fetchRemoteFile`
+	 *                        when loading remote indexes (cacheDir, refresh,
+	 *                        token, warnings).
 	 * @return {Promise<this>} Self, after scanning completes.
 	 */
-	async scan() {
+	async scan(opts = {}) {
 		this._entries.clear();
+		const fetchOpts = opts.fetchOpts || {};
 		const sources = [
 			{ dir: this._defaultsDir, tag: 'default' },
 			{ dir: this._projectDir, tag: 'project' },
@@ -96,36 +108,45 @@ class ScaffoldRegistry {
 			}
 		}
 
-		// Remote scaffolds: thin records from inventory.json in the same dirs.
-		// Loaded after the local walk so a remote id can be rejected when it
-		// collides with a local scaffold. A remote scaffold's full manifest is
-		// fetched lazily on execute() (see hydrateRemote); here we only know
-		// where it lives. `origin: 'remote'` distinguishes it from default/project.
+		// Remote scaffolds: each entry in sources.json names a repo whose
+		// index.json enumerates its scaffolds. Loaded after the local walk so a
+		// remote id can be rejected when it collides with a local one. The full
+		// manifest is fetched lazily on execute() (see hydrateRemote); here we
+		// only learn id + where it lives. `origin: 'remote'` distinguishes it.
 		for (const { dir } of sources) {
-			const inv = await readInventory(dir);
-			if (!inv) {
+			const src = await readSources(dir);
+			if (!src) {
 				continue;
 			}
-			const errs = validateInventory(inv.parsed);
+			const errs = validateSources(src.parsed);
 			if (errs.length) {
 				throw new ScaffoldError(
 					'EBADSCAFFOLD',
-					`Invalid inventory ${inv.file}:\n  - ${errs.join('\n  - ')}`,
-					{ file: inv.file, errors: errs }
+					`Invalid sources ${src.file}:\n  - ${errs.join('\n  - ')}`,
+					{ file: src.file, errors: errs }
 				);
 			}
-			for (const entry of inv.parsed.scaffolds) {
-				const record = entryToRecord(entry);
-				const key = makeKey(record);
-				const existing = this._entries.get(key);
-				if (existing && existing.origin !== 'remote') {
-					throw new ScaffoldError(
-						'EBADSCAFFOLD',
-						`inventory id '${entry.id}' collides with a local scaffold`,
-						{ file: inv.file, id: entry.id }
-					);
+			for (const source of src.parsed.sources) {
+				const records = await discoverSource(source, fetchOpts);
+				for (const record of records) {
+					const key = makeKey(record);
+					const existing = this._entries.get(key);
+					if (existing && existing.origin !== 'remote') {
+						throw new ScaffoldError(
+							'EBADSCAFFOLD',
+							`remote id '${makeId(record)}' collides with a local scaffold`,
+							{ id: makeId(record), source }
+						);
+					}
+					if (existing && existing.origin === 'remote') {
+						throw new ScaffoldError(
+							'EBADSCAFFOLD',
+							`remote id '${makeId(record)}' is offered by more than one source`,
+							{ id: makeId(record), source }
+						);
+					}
+					this._entries.set(key, record);
 				}
-				this._entries.set(key, record); // project inventory overrides default
 			}
 		}
 		return this;
@@ -203,7 +224,7 @@ class ScaffoldRegistry {
 	 * @param {Object}                opts
 	 *                                       dryRun    {boolean=} - When true, do not write files (still returns the plan).
 	 *                                       cwd       {string=}  - Target directory. Defaults to process.cwd().
-	 *                                       fetchOpts {Object=}  - Forwarded to `fetchRemoteFile` for remote (inventory) scaffolds (cacheDir, refresh, token).
+	 *                                       fetchOpts {Object=}  - Forwarded to `fetchRemoteFile` for remote (sources) scaffolds (cacheDir, refresh, token).
 	 * @return {Promise<Object>} Result with scaffold/engine/developer/ai/warnings blocks.
 	 * @throws {ScaffoldError} ENOSCAFFOLD, EMISSINGINPUT, EBADSCAFFOLD, EWRITEFAIL, ERENDERFAIL, EFETCHFAIL.
 	 */
@@ -382,7 +403,7 @@ class ScaffoldRegistry {
 			scaffold: {
 				id: makeId(scaffold),
 				slug: scaffold.slug,
-				// `kind: 'template'` covers both local and remote (inventory)
+				// `kind: 'template'` covers both local and remote (sources)
 				// template scaffolds — the AI orchestrator doesn't need to
 				// branch on where the body came from; both render Mustache.
 				kind: scaffold.source === 'package' ? 'package' : 'template',
@@ -412,17 +433,69 @@ class ScaffoldRegistry {
 }
 
 /**
- * Hydrate a thin remote (inventory) record into a full scaffold record by
- * fetching, parsing, and validating its `scaffold.json` from the owning repo.
- * The parsed manifest is memoized on the thin record so a repeat execute in
- * the same process skips the fetch (the on-disk fetch cache covers pinned
- * refs across processes). `--refresh` re-fetches the manifest too.
+ * Discover the scaffolds offered by one source repo by fetching its
+ * `index.json` (cached, ETag-validated) and turning each listed entry into a
+ * thin remote record. The fetch is offline-tolerant: `fetchRemoteFile` serves
+ * a cached index when the network is down, and only throws when there is no
+ * cache at all — in which case we skip the source with a warning rather than
+ * hard-fail discovery (so local `list`/`add` keep working offline).
+ *
+ * @param {Object} source    - One validated `sources.json` entry `{ github, ref, path }`.
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile` (cacheDir, refresh, token, warnings).
+ * @return {Promise<Object[]>} Thin remote records (empty when the source is unreachable + uncached).
+ * @throws {ScaffoldError} EBADSCAFFOLD when a reachable index is invalid JSON or fails its schema.
+ */
+async function discoverSource(source, fetchOpts) {
+	const indexRepo = {
+		github: source.github,
+		ref: source.ref,
+		path: source.path,
+	};
+	const ref = `${source.github}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
+	let text;
+	try {
+		text = await fetchRemoteFile(indexRepo, INDEX_FILENAME, fetchOpts);
+	} catch (err) {
+		if (Array.isArray(fetchOpts.warnings)) {
+			fetchOpts.warnings.push(
+				`could not load scaffold index ${ref}: ${err.message}`
+			);
+		}
+		return [];
+	}
+	let parsed;
+	try {
+		parsed = JSON.parse(text);
+	} catch (err) {
+		throw new ScaffoldError(
+			'EBADSCAFFOLD',
+			`Invalid JSON in remote index ${ref}: ${err.message}`,
+			{ source }
+		);
+	}
+	const errs = validateIndex(parsed);
+	if (errs.length) {
+		throw new ScaffoldError(
+			'EBADSCAFFOLD',
+			`Invalid remote index ${ref}:\n  - ${errs.join('\n  - ')}`,
+			{ source, errors: errs }
+		);
+	}
+	return parsed.scaffolds.map((entry) => indexEntryToRecord(source, entry));
+}
+
+/**
+ * Hydrate a thin remote record into a full scaffold record by fetching,
+ * parsing, and validating its `scaffold.json` from the owning repo. The parsed
+ * manifest is memoized on the thin record so a repeat execute in the same
+ * process skips the fetch (the on-disk fetch cache covers pinned refs across
+ * processes). `--refresh` re-fetches the manifest too.
  *
  * The remote manifest is an ordinary scaffold.json (no special fields). The
- * returned record carries the manifest's fields plus the inventory's identity
+ * returned record carries the manifest's fields plus the index's identity
  * (slug/category) and the remote markers (`origin`, `_repository`).
  *
- * @param {Object} record    - Thin remote record from the inventory.
+ * @param {Object} record    - Thin remote record from a source index.
  * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile`.
  * @return {Promise<Object>} A full scaffold record.
  * @throws {ScaffoldError} EBADSCAFFOLD (bad JSON / schema), EFETCHFAIL (network).

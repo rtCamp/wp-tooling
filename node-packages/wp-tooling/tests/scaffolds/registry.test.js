@@ -564,18 +564,21 @@ describe('execute() never embeds secret values', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Remote scaffolds via the inventory
+// Remote scaffolds via per-repo sources + an upstream index
 // ---------------------------------------------------------------------------
 
-describe('remote scaffolds (inventory)', () => {
+describe('remote scaffolds (sources + index)', () => {
 	const { EventEmitter } = require('events');
 	const https = require('https');
 
 	let httpsSpy;
 
-	// Route an https.get to a canned body by matching a route key as a URL
-	// suffix (e.g. 'scaffold.json', 'a.mustache'). Tracks in-flight count.
-	function setHttpsRoutes(routes, { statusCode = 200, delayMs = 0 } = {}) {
+	// Route https.get to a canned body by matching a route key as a URL suffix
+	// (e.g. 'index.json', 'scaffold.json', 'a.mustache'). Models a CDN with
+	// ETags: a request carrying a matching If-None-Match gets 304 + no body, so
+	// caching is exercised. A route value may be a string (200) or
+	// `{ body, statusCode }` to force an error status.
+	function setHttpsRoutes(routes, { delayMs = 0 } = {}) {
 		const starts = [];
 		let inFlight = 0;
 		let maxInFlight = 0;
@@ -588,18 +591,45 @@ describe('remote scaffolds (inventory)', () => {
 				const req = new EventEmitter();
 				req.destroy = () => {};
 				const res = new EventEmitter();
-				res.statusCode = statusCode;
 				res.setEncoding = () => {};
-				let body = '';
+
+				let spec = null;
 				for (const [key, val] of Object.entries(routes)) {
 					if (url.endsWith(key)) {
-						body = val;
+						spec = val;
 						break;
 					}
 				}
+				const body =
+					typeof spec === 'string' ? spec : (spec && spec.body) || '';
+				const forced =
+					spec && typeof spec === 'object'
+						? spec.statusCode
+						: undefined;
+				const etag = `"etag:${url}"`;
+				const ifNoneMatch =
+					options &&
+					options.headers &&
+					options.headers['If-None-Match'];
+
+				let status;
+				let sendBody;
+				if (forced && forced >= 400) {
+					status = forced;
+					sendBody = body;
+				} else if (ifNoneMatch === etag) {
+					status = 304;
+					sendBody = '';
+				} else {
+					status = forced || 200;
+					sendBody = body;
+				}
+				res.statusCode = status;
+				res.headers = { etag };
+
 				const finish = () => {
 					cb(res);
-					res.emit('data', body);
+					res.emit('data', sendBody);
 					res.emit('end');
 					inFlight--;
 				};
@@ -618,14 +648,14 @@ describe('remote scaffolds (inventory)', () => {
 		};
 	}
 
-	// The registry scans the dir it is given (projectDir) directly, so the
-	// inventory lives at its root — mirroring how the CLI passes
-	// `<cwd>/bin/scaffolds` as projectDir with `inventory.json` at its root.
-	function writeInventory(dir, entries) {
+	// The registry scans the dir it is given (projectDir) directly, so
+	// sources.json lives at its root — mirroring how the CLI passes
+	// `<cwd>/bin/scaffolds` as projectDir.
+	function writeSources(dir, sources) {
 		fssync.mkdirSync(dir, { recursive: true });
 		fssync.writeFileSync(
-			path.join(dir, 'inventory.json'),
-			JSON.stringify({ scaffolds: entries }),
+			path.join(dir, 'sources.json'),
+			JSON.stringify({ sources }),
 			'utf8'
 		);
 	}
@@ -643,17 +673,23 @@ describe('remote scaffolds (inventory)', () => {
 		);
 	}
 
-	const entry = (overrides = {}) => ({
-		id: 'ci/test-remote',
-		name: 'CI Remote',
-		description: 'a remote scaffold',
-		repository: {
-			github: 'rtCamp/wp-shared-workflows',
-			ref: 'v1',
-			path: 'scaffolds/ci/test-remote',
-		},
+	const source = (overrides = {}) => ({
+		github: 'rtCamp/wp-shared-workflows',
+		ref: 'v1',
+		path: 'scaffolds',
 		...overrides,
 	});
+
+	const indexEntry = (overrides = {}) => ({
+		id: 'ci/test-remote',
+		path: 'ci/test-remote',
+		name: 'CI Remote',
+		description: 'a remote scaffold',
+		...overrides,
+	});
+
+	const indexBody = (entries = [indexEntry()]) =>
+		JSON.stringify({ scaffolds: entries });
 
 	const manifest = (overrides = {}) =>
 		JSON.stringify({
@@ -683,19 +719,23 @@ describe('remote scaffolds (inventory)', () => {
 		}
 	});
 
-	test('scan surfaces an inventory entry as a thin remote record', async () => {
-		writeInventory(projectDir, [entry()]);
+	const scanOpts = () => ({ fetchOpts: { cacheDir } });
+
+	test('scan fetches the index and surfaces a thin remote record', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({ 'index.json': indexBody() });
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		const rec = r.get('ci/test-remote');
 		expect(rec).toBeTruthy();
 		expect(rec.origin).toBe('remote');
 		expect(rec.name).toBe('CI Remote');
 		expect(rec.files).toBeUndefined(); // not hydrated yet
 		expect(rec._repository.github).toBe('rtCamp/wp-shared-workflows');
+		expect(rec._repository.path).toBe('scaffolds/ci/test-remote');
 	});
 
-	test('inventory id colliding with a local scaffold throws EBADSCAFFOLD', async () => {
+	test('remote id colliding with a local scaffold throws EBADSCAFFOLD', async () => {
 		writeLocalScaffold(projectDir, {
 			slug: 'test-remote',
 			category: 'ci',
@@ -704,26 +744,73 @@ describe('remote scaffolds (inventory)', () => {
 			source: 'template',
 			files: [{ src: 'x.mustache', dest: 'x.yml' }],
 		});
-		writeInventory(projectDir, [entry()]);
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({ 'index.json': indexBody() });
 		const r = new ScaffoldRegistry({ projectDir });
-		await expect(r.scan()).rejects.toMatchObject({ code: 'EBADSCAFFOLD' });
+		await expect(r.scan(scanOpts())).rejects.toMatchObject({
+			code: 'EBADSCAFFOLD',
+		});
+	});
+
+	test('same id offered by two sources throws EBADSCAFFOLD', async () => {
+		writeSources(projectDir, [
+			source(),
+			source({ github: 'rtCamp/other-repo' }),
+		]);
+		setHttpsRoutes({ 'index.json': indexBody() }); // both indexes list ci/test-remote
+		const r = new ScaffoldRegistry({ projectDir });
+		await expect(r.scan(scanOpts())).rejects.toMatchObject({
+			code: 'EBADSCAFFOLD',
+		});
+	});
+
+	test('unreachable index is skipped with a warning, not a hard failure', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({ 'index.json': { body: 'nope', statusCode: 404 } });
+		const warnings = [];
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan({ fetchOpts: { cacheDir, warnings } });
+		expect(r.get('ci/test-remote')).toBeNull();
+		expect(
+			warnings.some((w) => /could not load scaffold index/.test(w))
+		).toBe(true);
+	});
+
+	test('malformed index throws EBADSCAFFOLD', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({ 'index.json': '{ not json' });
+		const r = new ScaffoldRegistry({ projectDir });
+		await expect(r.scan(scanOpts())).rejects.toMatchObject({
+			code: 'EBADSCAFFOLD',
+		});
+	});
+
+	test('schema-invalid index throws EBADSCAFFOLD', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({ 'index.json': JSON.stringify({ scaffolds: [{}] }) });
+		const r = new ScaffoldRegistry({ projectDir });
+		await expect(r.scan(scanOpts())).rejects.toMatchObject({
+			code: 'EBADSCAFFOLD',
+		});
 	});
 
 	test('execute hydrates the manifest then fetches + writes the template', async () => {
-		writeInventory(projectDir, [entry()]);
+		writeSources(projectDir, [source()]);
 		setHttpsRoutes({
+			'index.json': indexBody(),
 			'scaffold.json': manifest(),
 			'a.mustache': 'content: rendered',
 		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		const result = await r.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, fetchOpts: { cacheDir } }
 		);
 		expect(result.engine.wrote).toEqual(['.github/workflows/a.yml']);
-		expect(httpsSpy).toHaveBeenCalledTimes(2); // manifest + 1 template
+		// index (scan) + manifest + 1 template
+		expect(httpsSpy).toHaveBeenCalledTimes(3);
 		const written = fssync.readFileSync(
 			path.join(targetDir, '.github/workflows/a.yml'),
 			'utf8'
@@ -732,8 +819,9 @@ describe('remote scaffolds (inventory)', () => {
 	});
 
 	test('renders the fetched manifest inputs into the template', async () => {
-		writeInventory(projectDir, [entry()]);
+		writeSources(projectDir, [source()]);
 		setHttpsRoutes({
+			'index.json': indexBody(),
 			'scaffold.json': manifest({
 				inputs: [
 					{ key: 'greeting', description: 'g', default: 'hello' },
@@ -742,7 +830,7 @@ describe('remote scaffolds (inventory)', () => {
 			'a.mustache': 'value: {{greeting}}',
 		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await r.execute(
 			'ci/test-remote',
 			{},
@@ -755,42 +843,50 @@ describe('remote scaffolds (inventory)', () => {
 		expect(written).toBe('value: hello');
 	});
 
-	test('cacheable ref caches manifest + template across fresh registries', async () => {
-		writeInventory(projectDir, [entry()]); // ref v1 -> cacheable
+	test('ETag cache serves the body on 304 across fresh registries', async () => {
+		writeSources(projectDir, [source()]);
 		setHttpsRoutes({
+			'index.json': indexBody(),
 			'scaffold.json': manifest(),
 			'a.mustache': 'body',
 		});
 		const r1 = new ScaffoldRegistry({ projectDir });
-		await r1.scan();
+		await r1.scan(scanOpts());
 		await r1.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, fetchOpts: { cacheDir } }
 		);
-		expect(httpsSpy).toHaveBeenCalledTimes(2);
-		// Fresh registry (no in-process memo) + fresh target: both files served
-		// from the on-disk cache, so no additional network.
+		// Fresh registry + fresh target: every URL is now cached, so the server
+		// answers conditional requests with 304 + an empty body. The correct
+		// file can only be written if the cached bodies are used.
 		const targetTwo = makeTmpDir();
 		const r2 = new ScaffoldRegistry({ projectDir });
-		await r2.scan();
+		await r2.scan(scanOpts());
 		try {
 			await r2.execute(
 				'ci/test-remote',
 				{},
 				{ cwd: targetTwo, fetchOpts: { cacheDir } }
 			);
-			expect(httpsSpy).toHaveBeenCalledTimes(2); // unchanged
+			const written = fssync.readFileSync(
+				path.join(targetTwo, '.github/workflows/a.yml'),
+				'utf8'
+			);
+			expect(written).toBe('body'); // served from cache on 304
 		} finally {
 			fssync.rmSync(targetTwo, { recursive: true, force: true });
 		}
 	});
 
 	test('malformed remote manifest throws EBADSCAFFOLD', async () => {
-		writeInventory(projectDir, [entry()]);
-		setHttpsRoutes({ 'scaffold.json': '{ not json' });
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody(),
+			'scaffold.json': '{ not json',
+		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await expect(
 			r.execute(
 				'ci/test-remote',
@@ -801,10 +897,13 @@ describe('remote scaffolds (inventory)', () => {
 	});
 
 	test('schema-invalid remote manifest throws EBADSCAFFOLD', async () => {
-		writeInventory(projectDir, [entry()]);
-		setHttpsRoutes({ 'scaffold.json': JSON.stringify({ slug: 'x' }) });
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody(),
+			'scaffold.json': JSON.stringify({ slug: 'x' }),
+		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await expect(
 			r.execute(
 				'ci/test-remote',
@@ -815,10 +914,13 @@ describe('remote scaffolds (inventory)', () => {
 	});
 
 	test('manifest 404 throws EFETCHFAIL', async () => {
-		writeInventory(projectDir, [entry()]);
-		setHttpsRoutes({ 'scaffold.json': 'not found' }, { statusCode: 404 });
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody(),
+			'scaffold.json': { body: 'not found', statusCode: 404 },
+		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await expect(
 			r.execute(
 				'ci/test-remote',
@@ -829,20 +931,21 @@ describe('remote scaffolds (inventory)', () => {
 	});
 
 	test('dry-run fetches the manifest but not the template, writes nothing', async () => {
-		writeInventory(projectDir, [entry()]);
+		writeSources(projectDir, [source()]);
 		const routes = setHttpsRoutes({
+			'index.json': indexBody(),
 			'scaffold.json': manifest(),
 			'a.mustache': 'body',
 		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		const result = await r.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, dryRun: true, fetchOpts: { cacheDir } }
 		);
 		expect(routes.templateStarts()).toHaveLength(0); // no template fetch
-		expect(httpsSpy).toHaveBeenCalledTimes(1); // manifest only
+		expect(httpsSpy).toHaveBeenCalledTimes(2); // index + manifest only
 		expect(result.engine.wrote).toEqual(['.github/workflows/a.yml']);
 		expect(
 			fssync.existsSync(path.join(targetDir, '.github/workflows/a.yml'))
@@ -850,9 +953,10 @@ describe('remote scaffolds (inventory)', () => {
 	});
 
 	test('parallel template prefetch: 3 templates fetched concurrently', async () => {
-		writeInventory(projectDir, [entry()]);
+		writeSources(projectDir, [source()]);
 		const routes = setHttpsRoutes(
 			{
+				'index.json': indexBody(),
 				'scaffold.json': manifest({
 					files: [
 						{ src: 'a.mustache', dest: '.github/workflows/a.yml' },
@@ -867,44 +971,38 @@ describe('remote scaffolds (inventory)', () => {
 			{ delayMs: 30 }
 		);
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await r.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, fetchOpts: { cacheDir } }
 		);
 		expect(routes.templateStarts()).toHaveLength(3);
-		// All three template fetches were in flight at once (Promise.all),
-		// rather than serialised one-after-another.
 		expect(routes.maxInFlight()).toBeGreaterThanOrEqual(3);
 	});
 
-	test('re-run on an existing dest performs no fetch (offline-safe)', async () => {
-		writeInventory(projectDir, [
-			entry({
-				repository: {
-					github: 'rtCamp/wp-shared-workflows',
-					ref: 'main', // mutable: would refetch if not skipped
-					path: 'scaffolds/ci/test-remote',
-				},
-			}),
-		]);
-		setHttpsRoutes({ 'scaffold.json': manifest(), 'a.mustache': 'body' });
+	test('re-run on an existing dest performs no further fetch (offline-safe)', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody(),
+			'scaffold.json': manifest(),
+			'a.mustache': 'body',
+		});
 		const r = new ScaffoldRegistry({ projectDir });
-		await r.scan();
+		await r.scan(scanOpts());
 		await r.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, fetchOpts: { cacheDir } }
 		);
-		expect(httpsSpy).toHaveBeenCalledTimes(2); // manifest + template
-		// Same registry + same target: manifest memoized, dest exists.
+		expect(httpsSpy).toHaveBeenCalledTimes(3); // index + manifest + template
+		// Same registry + same target: manifest memoised, dest exists.
 		const result = await r.execute(
 			'ci/test-remote',
 			{},
 			{ cwd: targetDir, fetchOpts: { cacheDir } }
 		);
-		expect(httpsSpy).toHaveBeenCalledTimes(2); // unchanged
+		expect(httpsSpy).toHaveBeenCalledTimes(3); // unchanged
 		expect(result.engine.wrote).toEqual([]);
 		expect(result.engine.skipped).toEqual(['.github/workflows/a.yml']);
 	});

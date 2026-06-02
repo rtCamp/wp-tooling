@@ -33,8 +33,14 @@ const {
 	SECRET_KEY_PATTERN,
 } = require('./schema');
 const { render, collectPlaceholders } = require('./render');
-const { INVENTORY_FILENAME, validateInventory } = require('./inventory');
-const { fetchRemoteFile } = require('./fetch');
+const {
+	SOURCES_FILENAME,
+	INDEX_FILENAME,
+	validateSources,
+	validateIndex,
+	indexEntryToRecord,
+} = require('./sources');
+const { fetchRemoteFile, readCached } = require('./fetch');
 
 const SLUG_RE = new RegExp(SLUG_PATTERN);
 const CATEGORY_RE = new RegExp(CATEGORY_PATTERN);
@@ -502,13 +508,13 @@ function printHelp() {
 			'',
 			'Validates scaffold manifests. With no id, checks the whole bundled catalogue.',
 			'With one or more ids (e.g. wp/cli, lint/phpcs/vip), only those are checked.',
-			'Remote (inventory) scaffolds are recognised; by default only their inventory',
-			'shape is checked offline. Pass --remote to also fetch and schema-validate the',
-			'manifest at each pinned ref.',
+			'Remote scaffolds (from sources.json) are recognised; by default only the',
+			'sources.json shape is checked offline (plus remote ids from any cached index).',
+			'Pass --remote to fetch each repo index + scaffold manifest and schema-validate.',
 			'',
 			'Flags:',
 			'  --cwd <path>      Also include project-local scaffolds at <path>/bin/scaffolds.',
-			'  --remote          Fetch + schema-validate each remote scaffold manifest (network).',
+			'  --remote          Fetch + schema-validate each remote index + manifest (network).',
 			'  --refresh         With --remote, bypass the cache and re-fetch.',
 			'  --cache-dir <p>   With --remote, override the remote-fetch cache directory.',
 			'  --json            Machine-readable output.',
@@ -663,30 +669,31 @@ function collectFiles(opts) {
 }
 
 /**
- * Validate the inventory file(s) and the remote scaffolds they declare.
+ * Validate the `sources.json` file(s) and the remote scaffolds they reach.
  *
- * Emits two kinds of rows (shaped like `validateOne` output):
- *   - one file-level row per inventory file (`id: 'inventory'`) carrying its
- *     shape result (malformed JSON, bad entries, duplicate ids, and any remote
- *     id that collides with a local scaffold), and
- *   - one row per remote scaffold (`id: <entry.id>`, `remote: true`) so that
- *     `validate <remote-id>` resolves instead of erroring.
+ * Emits rows shaped like `validateOne` output:
+ *   - one file-level row per `sources.json` (`id: 'sources'`) carrying its
+ *     shape result (malformed JSON, bad/duplicate source entries);
+ *   - one row per remote scaffold (`id: <category/slug>`, `remote: true`) so
+ *     that `validate <remote-id>` resolves instead of erroring; and
+ *   - an index-level error row when a reachable index is unfetchable/invalid.
  *
- * Default is fully offline: a remote row is valid on inventory shape alone.
- * With `opts.remote`, each remote manifest is fetched at its pinned ref and
- * schema-validated (reusing the same `validate()` the registry runs on `add`);
- * a network/HTTP failure becomes an `EFETCHFAIL`-tagged error on its row. Per-id
- * rows are only produced when the inventory shape is sound — a malformed
- * inventory yields just its file-level row, and we never fetch from a broken pin.
+ * Default is offline: the `sources.json` shape is checked, and remote ids are
+ * enumerated only from a **cached** index (none → no per-id rows). With
+ * `opts.remote`, each repo's `index.json` and every scaffold's `scaffold.json`
+ * is fetched at the pinned ref and schema-validated (reusing the same
+ * `validate()` the registry runs on `add`); network/HTTP failures become
+ * `EFETCHFAIL`-tagged errors. Per-id rows are only produced when the
+ * `sources.json` shape is sound.
  *
- * Absent inventory files contribute nothing — the dormant default leaves
+ * Absent `sources.json` files contribute nothing — the dormant default leaves
  * `validate` behaving exactly as before.
  *
  * @param {Object}      opts     - Parsed CLI options (`cwd`, `remote`, `refresh`, `cacheDir`, `ids`).
  * @param {Set<string>} localIds - Ids of the discovered local scaffolds.
  * @return {Promise<Array<{file: string, id: string, valid: boolean, errors: string[], remote?: boolean}>>} Result rows.
  */
-async function collectInventoryResults(opts, localIds) {
+async function collectSourcesResults(opts, localIds) {
 	const dirs = [defaultsDir()];
 	if (opts.cwd) {
 		dirs.push(projectDir(opts.cwd));
@@ -702,11 +709,11 @@ async function collectInventoryResults(opts, localIds) {
 
 	const results = [];
 	for (const dir of dirs) {
-		const file = path.join(dir, INVENTORY_FILENAME);
+		const file = path.join(dir, SOURCES_FILENAME);
 		if (!fs.existsSync(file)) {
 			continue;
 		}
-		const fileRow = { file, id: 'inventory', valid: true, errors: [] };
+		const fileRow = { file, id: 'sources', valid: true, errors: [] };
 		let parsed;
 		try {
 			parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -716,51 +723,115 @@ async function collectInventoryResults(opts, localIds) {
 			results.push(fileRow);
 			continue;
 		}
-		const shapeErrs = validateInventory(parsed);
-		const entries = Array.isArray(parsed && parsed.scaffolds)
-			? parsed.scaffolds
-			: [];
-		for (const entry of entries) {
-			if (
-				entry &&
-				typeof entry.id === 'string' &&
-				localIds.has(entry.id)
-			) {
-				shapeErrs.push(
-					`scaffolds: id '${entry.id}' collides with a local scaffold`
-				);
-			}
-		}
+		const shapeErrs = validateSources(parsed);
 		if (shapeErrs.length) {
 			fileRow.valid = false;
 			fileRow.errors.push(...shapeErrs);
 		}
 		results.push(fileRow);
 
-		// Per-remote-id rows require a sound inventory: a malformed manifest
-		// can't yield trustworthy per-entry rows, and we must never fetch from
-		// a broken pin.
+		// Per-remote-id rows require a sound sources file: we never fetch from a
+		// malformed source list.
 		if (!fileRow.valid) {
 			continue;
 		}
-		for (const entry of entries) {
-			if (wanted && !wanted.has(entry.id)) {
-				continue;
+		for (const source of parsed.sources) {
+			const records = await resolveSourceRecords(
+				source,
+				opts,
+				fetchOpts,
+				results,
+				file
+			);
+			for (const record of records) {
+				const id = makeId(record);
+				if (wanted && !wanted.has(id)) {
+					continue;
+				}
+				const row = {
+					file,
+					id,
+					valid: true,
+					errors: [],
+					remote: true,
+				};
+				if (localIds.has(id)) {
+					row.valid = false;
+					row.errors.push(
+						`id '${id}' collides with a local scaffold`
+					);
+				}
+				if (opts.remote && row.valid) {
+					await validateRemoteManifest(record, fetchOpts, row);
+				}
+				results.push(row);
 			}
-			const row = {
-				file,
-				id: entry.id,
-				valid: true,
-				errors: [],
-				remote: true,
-			};
-			if (opts.remote) {
-				await validateRemoteManifest(entry, fetchOpts, row);
-			}
-			results.push(row);
 		}
 	}
 	return results;
+}
+
+/**
+ * Resolve the thin remote records a source offers: under `opts.remote` fetch +
+ * validate its `index.json`; otherwise read a cached index only (offline). An
+ * unfetchable/invalid reachable index pushes an error row into `results` and
+ * yields no records.
+ *
+ * @param {Object} source    - A validated `sources.json` entry `{ github, ref, path }`.
+ * @param {Object} opts      - Parsed CLI options.
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile`.
+ * @param {Array}  results   - Result rows (mutated to append index-level errors).
+ * @param {string} file      - The `sources.json` path (for row attribution).
+ * @return {Promise<Object[]>} Thin remote records (empty on uncached-offline or index error).
+ */
+async function resolveSourceRecords(source, opts, fetchOpts, results, file) {
+	const indexRepo = {
+		github: source.github,
+		ref: source.ref,
+		path: source.path,
+	};
+	const ref = `${source.github}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
+	const indexErr = (errors) =>
+		results.push({
+			file,
+			id: `${source.github} (index)`,
+			valid: false,
+			errors,
+			remote: true,
+		});
+
+	let text;
+	if (opts.remote) {
+		try {
+			text = await fetchRemoteFile(indexRepo, INDEX_FILENAME, fetchOpts);
+		} catch (err) {
+			indexErr([`${err.code || 'EFETCHFAIL'}: ${err.message}`]);
+			return [];
+		}
+	} else {
+		text = await readCached(indexRepo, INDEX_FILENAME, {
+			cacheDir: opts.cacheDir || undefined,
+		});
+		if (text === null) {
+			return [];
+		}
+	}
+
+	let indexParsed;
+	try {
+		indexParsed = JSON.parse(text);
+	} catch (err) {
+		indexErr([`invalid index JSON (${ref}): ${err.message}`]);
+		return [];
+	}
+	const errs = validateIndex(indexParsed);
+	if (errs.length) {
+		indexErr(errs.map((e) => `index (${ref}): ${e}`));
+		return [];
+	}
+	return indexParsed.scaffolds.map((entry) =>
+		indexEntryToRecord(source, entry)
+	);
 }
 
 /**
@@ -768,13 +839,13 @@ async function collectInventoryResults(opts, localIds) {
  * it, mutating `row` in place. A fetch failure (`EFETCHFAIL`) or invalid manifest
  * (bad JSON / schema errors) marks the row invalid with attributed messages.
  *
- * @param {Object} entry     - A validated inventory entry (`id`, `repository`).
+ * @param {Object} record    - A thin remote record (`_repository`).
  * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile` (`refresh`, `cacheDir`).
  * @param {Object} row       - The result row to annotate.
  * @return {Promise<void>} Resolves once `row` reflects the manifest's validity.
  */
-async function validateRemoteManifest(entry, fetchOpts, row) {
-	const repo = entry.repository;
+async function validateRemoteManifest(record, fetchOpts, row) {
+	const repo = record._repository;
 	const ref = `${repo.github}@${repo.ref}/${repo.path}/scaffold.json`;
 	let text;
 	try {
@@ -846,7 +917,7 @@ async function runCli(argv) {
 	const files = collectFiles(opts);
 	const allResults = files.map(validateOne);
 	const localIds = new Set(allResults.map((r) => r.id).filter(Boolean));
-	allResults.push(...(await collectInventoryResults(opts, localIds)));
+	allResults.push(...(await collectSourcesResults(opts, localIds)));
 	const results = filterByIds(allResults, opts.ids);
 	if (opts.ids.length && results.length === 0) {
 		const available = allResults.map((r) => r.id).filter(Boolean);
