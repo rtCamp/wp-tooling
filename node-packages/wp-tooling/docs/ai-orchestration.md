@@ -55,8 +55,8 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - The engine is idempotent under `scaffold.dryRun: true`: identical inputs produce identical output across runs.
 - The engine never reads or writes any path outside `--cwd`.
 - The engine never invokes `gh`, `git`, `composer`, `npm`, or any other external CLI on behalf of the caller.
-- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Remote (inventory) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
-- `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds are listed from the inventory without fetching, so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`.
+- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
+- `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds come from a repo's cached index (`sources.json` → each repo's `index.json`), so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`. `list` is online-preferred with a cache fallback: it reads the index (cached, ETag-validated), and a `warnings` array reports any source that was unreachable and uncached. The top-level `{ scaffolds, warnings }` shape carries those notes.
 - The engine core has zero dependency on the TTY UI kit. AI orchestration mode never loads any terminal-UI primitive. Skills can rely on the engine being usable from any context, including non-TTY containers, CI runners, and headless test harnesses.
 
 ## 4. Skill responsibilities
@@ -159,7 +159,7 @@ A Mustache template referenced a placeholder not in the resolved inputs. Engine 
 
 ### `EFETCHFAIL`
 
-A fetch for a remote (inventory) scaffold failed — either its `scaffold.json` manifest or one of its templates: non-2xx HTTP response, timeout, or transport error. The caller's machine has no internet, the inventory's repo/ref/path does not exist, or `raw.githubusercontent.com` rate-limited the request. (`EBADSCAFFOLD` is thrown instead when the fetched manifest is reachable but invalid JSON / fails schema validation.)
+A fetch for a remote (sources) scaffold failed — the repo `index.json`, a scaffold's `scaffold.json` manifest, or one of its templates: non-2xx HTTP response, timeout, or transport error. The caller's machine has no internet, the source's repo/ref/path does not exist, or `raw.githubusercontent.com` rate-limited the request. (`EBADSCAFFOLD` is thrown instead when a fetched index/manifest is reachable but invalid JSON / fails schema validation. A *discovery* index fetch that fails with no cache is non-fatal — the source is skipped with a warning — so `EFETCHFAIL` surfaces from `add` of a specific remote scaffold, or from `validate --remote`.)
 
 ```json
 {
@@ -172,7 +172,7 @@ A fetch for a remote (inventory) scaffold failed — either its `scaffold.json` 
 
 When the response looks like a GitHub rate-limit (HTTP 403 with `"rate limit"` in the body), the payload additionally carries `"rateLimited": true` — set `WP_TOOLING_GITHUB_TOKEN` to raise the unauthenticated quota.
 
-**Skill response:** surface to the developer. If `rateLimited` is true, recommend setting `WP_TOOLING_GITHUB_TOKEN` (or waiting). For 404 / wrong-ref errors, recommend re-checking the inventory entry's `repository.{github,ref,path}`. Do not retry automatically.
+**Skill response:** surface to the developer. If `rateLimited` is true, recommend setting `WP_TOOLING_GITHUB_TOKEN` (or waiting). For 404 / wrong-ref errors, recommend re-checking the `sources.json` entry's `{github,ref,path}` and the owning repo's `index.json`. Do not retry automatically.
 
 ## 6. Project introspection
 

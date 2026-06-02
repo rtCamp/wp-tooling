@@ -199,23 +199,41 @@ Use nesting when a scaffold has multiple variants of the same concept (PHPCS sta
 
 ---
 
-## Remote scaffolds via the inventory
+## Remote scaffolds via per-repo sources + an upstream index
 
-Most scaffolds live entirely inside `wp-tooling` (a `scaffold.json` + templates under `scaffolds/`). A scaffold can instead live **in another repo** — useful when that repo owns the thing being generated, e.g. the `ci/*` callers into `rtCamp/wp-shared-workflows`. In that case the *whole* scaffold (its `scaffold.json` and templates) lives in the owning repo, and `wp-tooling` keeps only a one-line pointer in an **inventory**.
+Most scaffolds live entirely inside `wp-tooling` (a `scaffold.json` + templates under `scaffolds/`). A scaffold can instead live **in another repo** — useful when that repo owns the thing being generated, e.g. the `ci/*` callers into `rtCamp/wp-shared-workflows`. In that case the *whole* scaffold (its `scaffold.json` and templates) lives in the owning repo. `wp-tooling` lists only the **repos** (sources); each owning repo publishes its own **index** of the scaffolds it offers.
 
-A remote scaffold's `scaffold.json` is an **ordinary manifest** — there is no special `source` value or `repository` field inside it. Remoteness is expressed entirely by the inventory entry. The same files can move between local and remote with zero manifest edits.
+The upshot: adding, changing, or registering a remote scaffold is **a single PR in the owning repo** — `wp-tooling` only changes when you onboard a *new repo*. A remote scaffold's `scaffold.json` is an **ordinary manifest** — there is no special `source` value or `repository` field inside it. Remoteness is expressed entirely by the source + index. The same files can move between local and remote with zero manifest edits.
 
 ### Authoring a remote scaffold
 
-**1. In the owning repo** (e.g. `rtCamp/wp-shared-workflows`), add a normal scaffold directory:
+**1. In the owning repo** (e.g. `rtCamp/wp-shared-workflows`), add a normal scaffold directory plus a root index that lists it:
 
 ```
-scaffolds/ci/test-php/
-  scaffold.json            # ordinary manifest: source "template", inputs, files, ...
-  ci-test-php.yml.mustache
+scaffolds/
+  index.json               # lists the scaffolds this repo offers
+  ci/test-php/
+    scaffold.json          # ordinary manifest: source "template", inputs, files, ...
+    ci-test-php.yml.mustache
 ```
 
-Because the templates sit next to the manifest, this is a fully self-contained local scaffold *from that repo's point of view*. Validate it there in CI without making the repo a Node project:
+`scaffolds/index.json`:
+
+```json
+{
+  "scaffolds": [
+    {
+      "id": "ci/test-php",
+      "path": "ci/test-php",
+      "name": "CI: PHPUnit",
+      "description": "GitHub Actions workflow calling rtCamp/wp-shared-workflows ci-test-php.yml.",
+      "checksum": "sha256:…"
+    }
+  ]
+}
+```
+
+`name`/`description` live here so wp-tooling's `list` has something to show without fetching every manifest; `path` is the scaffold's directory relative to the source `path`; `checksum` is optional. Because the templates sit next to the manifest, this is a fully self-contained local scaffold *from that repo's point of view*. Validate it there in CI without making the repo a Node project:
 
 ```yaml
 - run: npx --yes @rtcamp/wp-tooling validate ./scaffolds/ci/test-php
@@ -223,42 +241,37 @@ Because the templates sit next to the manifest, this is a fully self-contained l
 
 (`npx` fetches wp-tooling ephemerally — no `package.json`, no committed `node_modules`.) Then tag the repo (e.g. `v1`).
 
-**2. In `wp-tooling`**, add one entry to `scaffolds/inventory.json`:
+**2. In `wp-tooling`**, add the *repo* to `scaffolds/sources.json` (only needed the first time a repo is onboarded):
 
 ```json
 {
-  "scaffolds": [
+  "sources": [
     {
-      "id": "ci/test-php",
-      "name": "CI: PHPUnit",
-      "description": "GitHub Actions workflow calling rtCamp/wp-shared-workflows ci-test-php.yml.",
-      "repository": {
-        "github": "rtCamp/wp-shared-workflows",
-        "ref": "v1",
-        "path": "scaffolds/ci/test-php"
-      }
+      "github": "rtCamp/wp-shared-workflows",
+      "ref": "v1",
+      "path": "scaffolds"
     }
   ]
 }
 ```
 
-On `add ci/test-php`, the engine fetches `<github>/<ref>/<path>/scaffold.json`, validates it, then fetches each `files[].src` from the same directory and renders exactly as a local scaffold.
+On scan, the engine fetches `<github>/<ref>/<path>/index.json` to discover the repo's scaffolds. On `add ci/test-php`, it fetches that scaffold's `scaffold.json`, validates it, then fetches each `files[].src` from the same directory and renders exactly as a local scaffold. A scaffold id must be unique across local scaffolds and every source (a collision is a hard `EBADSCAFFOLD` at scan).
 
 ### Two different refs
 
 Don't confuse them:
 
-- **`repository.ref` (inventory)** — the version of the owning repo wp-tooling *fetches the scaffold from*. A literal pin (use a tag). Bumping it is a wp-tooling change.
+- **`source.ref` (sources.json)** — the version of the owning repo wp-tooling *fetches scaffolds from*. A literal pin the team controls (use a tag or SHA). Bumping it is a wp-tooling change.
 - **A `wsw_ref` *input*** declared by the scaffold — renders into the generated workflow's `uses: ...@<ref>` line, i.e. which workflow version the consumer's CI *calls at runtime*. A normal input with its own default.
 
 They are usually the same value but are independent knobs.
 
 ### Caching, auth, offline behaviour
 
-- **Caching.** Manifests + templates fetched at an immutable ref — semver-style tags (`v1`, `v1.2.3`, `v1.2.3-rc1`) or 40-char SHAs — are cached under `${XDG_CACHE_HOME:-$HOME/.cache}/wp-tooling/remote/`. Mutable refs (`main`, branches, short SHAs) always re-fetch. `npx wp-tooling add ... --refresh` forces a re-fetch; `npx wp-tooling cache clear` empties the cache.
+- **Caching.** The index, manifests, and templates are cached under `${XDG_CACHE_HOME:-$HOME/.cache}/wp-tooling/remote/` and validated with HTTP conditional requests (ETag / `If-None-Match`): a `304 Not Modified` serves the cached copy, so content is re-downloaded only when it actually changes at the pinned ref. A SHA pin never changes; a movable tag (`v1`) refreshes when it moves. `npx wp-tooling add ... --refresh` forces a re-fetch; `npx wp-tooling cache clear` empties the cache.
 - **Auth.** Public repos need no setup. For private repos or to dodge the unauthenticated `raw.githubusercontent.com` rate limit, export `WP_TOOLING_GITHUB_TOKEN`; it is sent as `Authorization: Bearer ...`.
-- **`list`** stays offline — it shows remote scaffolds from the inventory (`origin: "remote"`, `counts: null`) without fetching. Only `add` touches the network. A `--dry-run` on a remote scaffold fetches just the (small, cached) manifest to produce the plan and never fetches template bodies.
-- **`validate`** is offline by default: it checks the inventory's shape, recognises remote ids (so `validate ci/test-php` resolves), and flags any id that collides with a local scaffold — without fetching. Pass **`--remote`** to also fetch each remote manifest at its pinned ref and schema-validate it (honours `--refresh` / `--cache-dir`); a network/HTTP failure reports as an `EFETCHFAIL` row, a bad manifest as schema errors. `--remote` checks the manifest only — template correctness is verified in the owning repo (step 1) and at `add` time.
+- **`list`** reads the repo index (cached). It is **online-preferred with a cache fallback**: it shows remote scaffolds (`origin: "remote"`, `counts: null`) from the last-seen index, and when a source is unreachable and uncached it is skipped with a warning rather than failing the whole list. A `--dry-run` on a remote scaffold fetches just the (small, cached) manifest to produce the plan and never fetches template bodies.
+- **`validate`** is offline by default: it checks `sources.json`'s shape and recognises remote ids from any **cached** index (so `validate ci/test-php` resolves after a prior run). Pass **`--remote`** to fetch each repo's index + each manifest at its pinned ref and schema-validate them (honours `--refresh` / `--cache-dir`); a network/HTTP failure reports as an `EFETCHFAIL` row, a bad index/manifest as schema errors, and a remote id colliding with a local scaffold is flagged. `--remote` checks manifests only — template correctness is verified in the owning repo (step 1) and at `add` time.
 
 ### When to use it
 
@@ -289,7 +302,7 @@ Look at these existing scaffolds when authoring a new one:
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
 | Block with `block.json` + framework class | `wp/block-dynamic` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
-| Scaffold hosted in another repo (inventory) | `scaffolds/inventory.json` + `tests/fixtures/scaffolds-inventory/inventory.json` |
+| Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 
 Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.
 

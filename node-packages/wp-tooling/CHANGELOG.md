@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Remote scaffolds — a scaffold's `scaffold.json` + templates can live in another repo. `scaffolds/sources.json` lists the source repos (pinned `{ github, ref, path }`); each repo publishes a `scaffolds/index.json` enumerating the scaffolds it offers, which the registry fetches to discover them (one PR in the owning repo adds/changes a scaffold; wp-tooling only changes to onboard a new repo). Manifests + templates are fetched on `add`, cached under `${XDG_CACHE_HOME:-$HOME/.cache}/wp-tooling/remote/` and validated with ETag conditional requests (`304 Not Modified` serves the cache; movable tags refresh when they move). New error code `EFETCHFAIL` (network/HTTP) distinct from `EBADSCAFFOLD` (bad index/manifest). `list` is online-preferred with a cache fallback and reports unreachable sources as warnings; `validate --remote` fetches + schema-validates each index + manifest; `wp-tooling cache clear` empties the cache. Dormant by default — no `sources.json` ships.
 - TTY UI kit (`src/ui/`) with nine public exports: `Wizard`, `text`, `confirm`, `password`, `checkbox`, `radio`, `checkboxTree`, `spinner`, and `CancelledError`.
 - `Wizard` class -- runs steps in order, sharing a mutable context object; supports `skip(ctx)` predicate. Validates that `steps` is an array. Omits ANSI formatting in non-TTY mode.
 - `spinner` -- async progress feedback with ASCII animation in TTY and plain text fallback. Guards against multiple intervals when `start()` called twice.

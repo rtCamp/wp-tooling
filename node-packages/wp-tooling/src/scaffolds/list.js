@@ -28,6 +28,8 @@ function parseArgs(argv) {
 		cwd: process.cwd(),
 		category: null,
 		origin: null,
+		refresh: false,
+		cacheDir: null,
 		help: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
@@ -48,6 +50,12 @@ function parseArgs(argv) {
 			opts.origin = argv[++i];
 		} else if (a.startsWith('--origin=')) {
 			opts.origin = a.slice('--origin='.length);
+		} else if (a === '--refresh') {
+			opts.refresh = true;
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = argv[++i];
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else {
 			throw new Error(`Unexpected argument: ${a}`);
 		}
@@ -62,9 +70,11 @@ function printHelp() {
 			'',
 			'Flags:',
 			'  --category <name>    Show only scaffolds in this category (e.g., wp, ci, block, utility).',
-			'  --origin <default|project|remote>  Show only default-catalogue, project-local, or remote (inventory) scaffolds.',
+			'  --origin <default|project|remote>  Show only default-catalogue, project-local, or remote (sources) scaffolds.',
 			'  --json               Emit machine-readable JSON instead of the human table.',
 			'  --cwd <path>         Project directory whose bin/scaffolds is merged in (default: cwd).',
+			'  --refresh            Bypass the remote-index cache and re-fetch.',
+			'  --cache-dir <path>   Override the remote-fetch cache directory.',
 			'  --help, -h           Show this help text.',
 			'',
 			'Examples:',
@@ -85,12 +95,12 @@ function projectDir(cwd) {
 	return path.join(cwd, 'bin', 'scaffolds');
 }
 
-async function buildRegistry(cwd) {
+async function buildRegistry(cwd, fetchOpts) {
 	const registry = new ScaffoldRegistry({
 		defaultsDir: defaultsDir(),
 		projectDir: projectDir(cwd),
 	});
-	await registry.scan();
+	await registry.scan({ fetchOpts });
 	return registry;
 }
 
@@ -110,9 +120,9 @@ function applyFilters(scaffolds, opts) {
 }
 
 function summarise(scaffold) {
-	// Remote (inventory) scaffolds are listed from their inventory entry
-	// without fetching the manifest, so their detailed counts are unknown
-	// until `add`. They render Mustache like any template scaffold.
+	// Remote (sources) scaffolds are listed from the repo index without
+	// fetching each manifest, so their detailed counts are unknown until
+	// `add`. They render Mustache like any template scaffold.
 	if (scaffold.origin === 'remote') {
 		return {
 			id: makeId(scaffold),
@@ -235,16 +245,27 @@ async function runCli(argv) {
 		return 1;
 	}
 	try {
-		const registry = await buildRegistry(opts.cwd);
+		const warnings = [];
+		const fetchOpts = { warnings };
+		if (opts.refresh) {
+			fetchOpts.refresh = true;
+		}
+		if (opts.cacheDir) {
+			fetchOpts.cacheDir = opts.cacheDir;
+		}
+		const registry = await buildRegistry(opts.cwd, fetchOpts);
 		const all = registry.all();
 		const filtered = applyFilters(all, opts);
 		const summaries = filtered.map(summarise);
 		if (opts.json) {
 			process.stdout.write(
-				JSON.stringify({ scaffolds: summaries }) + '\n'
+				JSON.stringify({ scaffolds: summaries, warnings }) + '\n'
 			);
 		} else {
 			printHumanTable(summaries);
+			for (const w of warnings) {
+				process.stderr.write(`warning: ${w}\n`);
+			}
 		}
 		return 0;
 	} catch (err) {

@@ -1,6 +1,6 @@
 /**
  * `wp-tooling cache <subaction>` — manage the on-disk cache used by remote
- * (inventory) scaffolds for their fetched manifests and templates.
+ * (sources) scaffolds for their fetched indexes, manifests and templates.
  *
  * Current subactions: `clear` (recursively removes the cache directory).
  * The `cache` namespace is reserved for future helpers (e.g. `warm`,
@@ -46,7 +46,7 @@ function printHelp() {
 			'Usage: wp-tooling cache <subaction> [flags]',
 			'',
 			'Subactions:',
-			'  clear              Remove every cached remote template body.',
+			'  clear              Remove the cached remote indexes, manifests, and templates.',
 			'',
 			'Flags:',
 			'  --cache-dir <path> Override the default cache directory.',
@@ -82,7 +82,7 @@ async function runCli(argv) {
 	const dir = opts.cacheDir || defaultCacheDir();
 	if (opts.action === 'clear') {
 		await clear(dir);
-		process.stdout.write(`Cleared template cache at ${dir}\n`);
+		process.stdout.write(`Cleared remote scaffold cache at ${dir}\n`);
 		return 0;
 	}
 	process.stderr.write(`Error: unknown subaction "${opts.action}"\n`);

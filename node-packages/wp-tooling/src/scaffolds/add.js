@@ -96,7 +96,7 @@ function printHelp() {
 			'  --dry-run            Print the plan without writing files.',
 			'  --json               Emit a single JSON line on stdout. Implies --non-interactive.',
 			'  --cwd <path>         Target directory. Defaults to the current working directory.',
-			'  --refresh            Force re-fetch of remote (inventory) scaffold manifests + templates.',
+			'  --refresh            Force re-fetch of remote scaffold indexes, manifests + templates.',
 			'  --cache-dir <path>   Override the default cache directory for remote templates.',
 			'  --help, -h           Show this help text.',
 			'',
@@ -118,12 +118,12 @@ function projectDir(cwd) {
 	return path.join(cwd, 'bin', 'scaffolds');
 }
 
-async function buildRegistry(cwd) {
+async function buildRegistry(cwd, fetchOpts) {
 	const registry = new ScaffoldRegistry({
 		defaultsDir: defaultsDir(),
 		projectDir: projectDir(cwd),
 	});
-	await registry.scan();
+	await registry.scan({ fetchOpts });
 	return registry;
 }
 
@@ -289,7 +289,10 @@ async function runInteractive(opts) {
 		{
 			name: 'discover',
 			async run(ctx) {
-				ctx.registry = await buildRegistry(ctx.opts.cwd);
+				ctx.registry = await buildRegistry(
+					ctx.opts.cwd,
+					fetchOptsFrom(ctx.opts)
+				);
 				ctx.scaffold = ctx.registry.get(ctx.opts.id);
 				if (!ctx.scaffold) {
 					throw new ScaffoldError(
@@ -388,7 +391,7 @@ async function runInteractive(opts) {
 }
 
 async function runNonInteractive(opts) {
-	const registry = await buildRegistry(opts.cwd);
+	const registry = await buildRegistry(opts.cwd, fetchOptsFrom(opts));
 	const result = await registry.execute(opts.id, opts.inputs, {
 		dryRun: opts.dryRun,
 		cwd: opts.cwd,

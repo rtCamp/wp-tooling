@@ -1,21 +1,26 @@
 /**
- * Remote-file fetcher for scaffolds listed in the inventory
- * (`src/scaffolds/inventory.js`). Fetches both a remote scaffold's
- * `scaffold.json` manifest and its template bodies.
+ * Remote-file fetcher for scaffolds discovered via `sources.json`
+ * (`src/scaffolds/sources.js`). Fetches a repo's `index.json`, a remote
+ * scaffold's `scaffold.json` manifest, and its template bodies.
  *
- * Composes a `raw.githubusercontent.com` URL from `{ github, ref, path }`
- * plus a relative file path, fetches it over HTTPS, and caches the body on
- * disk for refs that look immutable (tag-style or full SHA). The cache
- * layout is flat — one file per URL, named by SHA-256 of that URL — so
- * `cache clear` is a single recursive remove.
+ * Composes a `raw.githubusercontent.com` URL from `{ github, ref, path }` plus
+ * a relative file path, fetches it over HTTPS, and caches the body on disk.
+ * The cache is **always** written and validated by ETag: on a later read we
+ * issue a conditional request (`If-None-Match`) and serve the cached body on
+ * `304 Not Modified`, only re-downloading when the content at that ref has
+ * actually changed. A pinned SHA never changes; a movable tag (e.g. `v1`)
+ * refreshes when it moves. The cache layout is flat — one file per URL, named
+ * by SHA-256 of that URL, with a sibling `.etag` file — so `cache clear` is a
+ * single recursive remove.
  *
  * Zero runtime npm dependencies; Node built-ins only. Shape mirrors
  * `src/version-monitor/http.js` (User-Agent header, 10s timeout, status-code
  * surfacing) so tests can mock `node:https` the same way.
  *
- * On non-2xx / timeout / network failure, throws `ScaffoldError` with
- * `code: 'EFETCHFAIL'`, attaching `url`, `statusCode`, and `rateLimited`
- * (a heuristic flag set on HTTP 403 responses that look rate-limited).
+ * On non-2xx (other than 304) / timeout / network failure with no usable
+ * cache, throws `ScaffoldError` with `code: 'EFETCHFAIL'`, attaching `url`,
+ * `statusCode`, and `rateLimited` (a heuristic flag set on HTTP 403 responses
+ * that look rate-limited).
  */
 
 'use strict';
@@ -33,32 +38,9 @@ const DEFAULT_TIMEOUT_MS = 10000;
 const RAW_GITHUB_BASE = 'https://raw.githubusercontent.com';
 
 /**
- * A cacheable ref is one that should not change once published:
- *   - Semver-style tags: `v1`, `v1.2`, `v1.2.3`, `v1.2.3-rc1`, `v1.2.3+build`.
- *   - Full 40-character commit SHAs.
- * Everything else (`main`, `develop`, `HEAD`, short SHAs, custom branches,
- * unprefixed numbers) is treated as mutable and bypasses the cache.
- *
- * @param {string} ref Git ref string (tag, branch, SHA).
- * @return {boolean} True when the body fetched at this ref may be cached.
- */
-function isCacheableRef(ref) {
-	if (typeof ref !== 'string' || ref.length === 0) {
-		return false;
-	}
-	if (/^v\d+(\.\d+)*([-+]\S+)?$/.test(ref)) {
-		return true;
-	}
-	if (/^[0-9a-f]{40}$/.test(ref)) {
-		return true;
-	}
-	return false;
-}
-
-/**
- * Cache directory: respects `$XDG_CACHE_HOME` (Linux convention) and
- * falls back to `~/.cache/`. The `wp-tooling/remote/` sub-path is dedicated
- * to this feature so `cache clear` only touches our own files.
+ * Cache directory: respects `$XDG_CACHE_HOME` (Linux convention) and falls
+ * back to `~/.cache/`. The `wp-tooling/remote/` sub-path is dedicated to this
+ * feature so `cache clear` only touches our own files.
  *
  * @return {string} Absolute path to the cache dir (may not exist yet).
  */
@@ -71,8 +53,8 @@ function defaultCacheDir() {
 }
 
 /**
- * Build the absolute raw-content URL for a remote scaffold file.
- * Collapses leading/trailing slashes on each component so authors can write
+ * Build the absolute raw-content URL for a remote scaffold file. Collapses
+ * leading/trailing slashes on each component so authors can write
  * `path: "scaffolds/ci/test-php"` or `path: "scaffolds/ci/test-php/"`
  * interchangeably.
  *
@@ -102,17 +84,19 @@ function hashUrl(url) {
 }
 
 /**
- * One-shot HTTPS GET returning the raw body as a UTF-8 string.
- * Surfaces non-2xx as a ScaffoldError with `code: 'EFETCHFAIL'`,
- * `statusCode`, and `rateLimited` heuristic.
+ * One-shot HTTPS GET. Resolves `{ status, body, etag }` for any 2xx **and**
+ * for `304 Not Modified` (so a conditional request can be answered from
+ * cache). Rejects with `EFETCHFAIL` on other non-2xx, timeout, or network
+ * error.
  *
  * @param {string} url
  * @param {Object} [options]
  * @param {string} [options.token]   Bearer token (e.g. `WP_TOOLING_GITHUB_TOKEN`).
+ * @param {string} [options.etag]    Prior ETag — sent as `If-None-Match`.
  * @param {number} [options.timeout] Per-request timeout in ms (default 10000).
- * @return {Promise<string>} Body text.
+ * @return {Promise<{status: number, body: string, etag: (string|null)}>} The response status, body, and ETag.
  */
-function getText(url, options = {}) {
+function httpGet(url, options = {}) {
 	return new Promise((resolve, reject) => {
 		const headers = {
 			'User-Agent': USER_AGENT,
@@ -121,15 +105,24 @@ function getText(url, options = {}) {
 		if (options.token) {
 			headers.Authorization = `Bearer ${options.token}`;
 		}
+		if (options.etag) {
+			headers['If-None-Match'] = options.etag;
+		}
 		const timeout = options.timeout || DEFAULT_TIMEOUT_MS;
 		const request = https.get(url, { headers, timeout }, (res) => {
 			const status = res.statusCode || 0;
+			const etag =
+				(res.headers && (res.headers.etag || res.headers.ETag)) || null;
 			let body = '';
 			res.setEncoding('utf8');
 			res.on('data', (chunk) => {
 				body += chunk;
 			});
 			res.on('end', () => {
+				if (status === 304) {
+					resolve({ status, body: '', etag });
+					return;
+				}
 				if (status === 403 && /rate limit/i.test(body)) {
 					reject(
 						new ScaffoldError(
@@ -150,7 +143,7 @@ function getText(url, options = {}) {
 					);
 					return;
 				}
-				resolve(body);
+				resolve({ status, body, etag });
 			});
 		});
 		request.on('timeout', () => {
@@ -175,78 +168,160 @@ function getText(url, options = {}) {
 	});
 }
 
-/**
- * Fetch one file from a remote scaffold repo — either the scaffold's
- * `scaffold.json` manifest or one of its template bodies. Reads from cache
- * when the ref is immutable and a cached copy exists; otherwise hits the
- * network and (for immutable refs) writes the body to cache.
- *
- * @param {Object}   repository      `{ github, ref, path }`.
- * @param {string}   relPath         File relative to `repository.path` (e.g. `scaffold.json` or a `files[].src`).
- * @param {Object}   [opts]          Fetch options.
- * @param {string}   [opts.cacheDir] Override the default cache dir (test seam).
- * @param {boolean}  [opts.refresh]  Force a re-fetch even when cached.
- * @param {string}   [opts.token]    Bearer token; defaults to env `WP_TOOLING_GITHUB_TOKEN`.
- * @param {string[]} [opts.warnings] When supplied, soft errors (e.g. cache write failures) are pushed here instead of throwing.
- * @return {Promise<string>} The file contents, UTF-8.
- * @throws {ScaffoldError} `EFETCHFAIL` on HTTP / network failure.
- */
-async function fetchRemoteFile(repository, relPath, opts = {}) {
-	const url = composeUrl(repository, relPath);
-	const cacheable = isCacheableRef(repository.ref);
-	const cacheDir = opts.cacheDir || defaultCacheDir();
-	const cachePath = path.join(cacheDir, hashUrl(url));
-
-	if (cacheable && !opts.refresh) {
-		try {
-			return await fs.readFile(cachePath, 'utf8');
-		} catch (err) {
-			// Cache miss is the common case; only surface unexpected errors.
-			if (err && err.code !== 'ENOENT') {
-				const note = `cache read failed for ${cachePath}: ${err.message}`;
-				if (Array.isArray(opts.warnings)) {
-					opts.warnings.push(note);
-				}
-			}
-		}
-	}
-
-	const token =
+function resolveToken(opts) {
+	return (
 		opts.token ||
 		(typeof process.env.WP_TOOLING_GITHUB_TOKEN === 'string' &&
 		process.env.WP_TOOLING_GITHUB_TOKEN.length > 0
 			? process.env.WP_TOOLING_GITHUB_TOKEN
-			: undefined);
+			: undefined)
+	);
+}
 
-	const body = await getText(url, { token });
+async function readCacheEntry(cachePath) {
+	let body;
+	try {
+		body = await fs.readFile(cachePath, 'utf8');
+	} catch (err) {
+		if (err && err.code === 'ENOENT') {
+			return null;
+		}
+		throw err;
+	}
+	let etag = null;
+	try {
+		etag = await fs.readFile(`${cachePath}.etag`, 'utf8');
+	} catch {
+		etag = null;
+	}
+	return { body, etag };
+}
 
-	if (cacheable) {
-		try {
-			await fs.mkdir(cacheDir, { recursive: true });
-			// Write to a unique temp file then rename: rename is atomic on the
-			// same filesystem, so a concurrent `add` fetching the same URL can
-			// never observe a half-written cache entry.
-			const tmpPath = `${cachePath}.tmp-${process.pid}-${crypto
-				.randomBytes(6)
-				.toString('hex')}`;
-			await fs.writeFile(tmpPath, body, 'utf8');
-			await fs.rename(tmpPath, cachePath);
-		} catch (err) {
-			const note = `cache write failed for ${cachePath}: ${err.message}`;
-			if (Array.isArray(opts.warnings)) {
-				opts.warnings.push(note);
-			}
-			// Cache failures must never block the fetch result.
+async function writeCacheEntry(cacheDir, cachePath, body, etag, opts) {
+	try {
+		await fs.mkdir(cacheDir, { recursive: true });
+		// Write to a unique temp file then rename: rename is atomic on the same
+		// filesystem, so a concurrent `add` fetching the same URL can never
+		// observe a half-written cache entry.
+		const tmpPath = `${cachePath}.tmp-${process.pid}-${crypto
+			.randomBytes(6)
+			.toString('hex')}`;
+		await fs.writeFile(tmpPath, body, 'utf8');
+		await fs.rename(tmpPath, cachePath);
+		if (etag) {
+			await fs.writeFile(`${cachePath}.etag`, etag, 'utf8');
+		}
+	} catch (err) {
+		const note = `cache write failed for ${cachePath}: ${err.message}`;
+		if (Array.isArray(opts.warnings)) {
+			opts.warnings.push(note);
+		}
+		// Cache failures must never block the fetch result.
+	}
+}
+
+/**
+ * Read a remote file from cache only, without hitting the network. Used for
+ * offline id recognition (e.g. `validate` resolving a remote id from the
+ * last-seen index).
+ *
+ * @param {Object} repository      `{ github, ref, path }`.
+ * @param {string} relPath         File relative to `repository.path`.
+ * @param {Object} [opts]
+ * @param {string} [opts.cacheDir] Override the default cache dir.
+ * @return {Promise<string|null>} Cached body, or `null` when not cached.
+ */
+async function readCached(repository, relPath, opts = {}) {
+	const url = composeUrl(repository, relPath);
+	const cacheDir = opts.cacheDir || defaultCacheDir();
+	const cachePath = path.join(cacheDir, hashUrl(url));
+	const entry = await readCacheEntry(cachePath).catch(() => null);
+	return entry ? entry.body : null;
+}
+
+/**
+ * Fetch one file from a remote scaffold repo — the repo `index.json`, a
+ * scaffold's `scaffold.json`, or one of its template bodies. Validates the
+ * cache with an `If-None-Match` conditional request: a `304` serves the cached
+ * body, a `200` updates it. When the network is unreachable but a cached copy
+ * exists, the cached copy is served with a warning (offline tolerance);
+ * otherwise the error propagates.
+ *
+ * @param {Object}   repository      `{ github, ref, path }`.
+ * @param {string}   relPath         File relative to `repository.path`.
+ * @param {Object}   [opts]          Fetch options.
+ * @param {string}   [opts.cacheDir] Override the default cache dir (test seam).
+ * @param {boolean}  [opts.refresh]  Force a re-fetch even when cached/unchanged.
+ * @param {string}   [opts.token]    Bearer token; defaults to env `WP_TOOLING_GITHUB_TOKEN`.
+ * @param {string[]} [opts.warnings] When supplied, soft errors (cache write / offline fallback) are pushed here.
+ * @return {Promise<string>} The file contents, UTF-8.
+ * @throws {ScaffoldError} `EFETCHFAIL` on HTTP / network failure with no usable cache.
+ */
+async function fetchRemoteFile(repository, relPath, opts = {}) {
+	const url = composeUrl(repository, relPath);
+	const cacheDir = opts.cacheDir || defaultCacheDir();
+	const cachePath = path.join(cacheDir, hashUrl(url));
+	const token = resolveToken(opts);
+
+	let cached = null;
+	try {
+		cached = await readCacheEntry(cachePath);
+	} catch (err) {
+		if (Array.isArray(opts.warnings)) {
+			opts.warnings.push(
+				`cache read failed for ${cachePath}: ${err.message}`
+			);
 		}
 	}
 
-	return body;
+	const conditionalEtag =
+		cached && !opts.refresh ? cached.etag || undefined : undefined;
+
+	let res;
+	try {
+		res = await httpGet(url, { token, etag: conditionalEtag });
+	} catch (err) {
+		// Offline tolerance: fall back to a cached copy only on a transport
+		// error or timeout (no `statusCode`) — i.e. genuinely unreachable. An
+		// HTTP status error (404 removed/wrong-path, 403 rate-limit, 5xx) is a
+		// real signal and must surface, not silently serve stale content.
+		if (cached && err.statusCode === undefined) {
+			if (Array.isArray(opts.warnings)) {
+				opts.warnings.push(
+					`serving cached ${url} (offline: ${err.message})`
+				);
+			}
+			return cached.body;
+		}
+		throw err;
+	}
+
+	if (res.status === 304 && cached) {
+		return cached.body;
+	}
+
+	// A 304 with no cache to satisfy it is a server quirk — re-fetch
+	// unconditionally so we always return a real body.
+	if (res.status === 304 && !cached) {
+		const fresh = await httpGet(url, { token });
+		await writeCacheEntry(
+			cacheDir,
+			cachePath,
+			fresh.body,
+			fresh.etag,
+			opts
+		);
+		return fresh.body;
+	}
+
+	await writeCacheEntry(cacheDir, cachePath, res.body, res.etag, opts);
+	return res.body;
 }
 
 module.exports = {
 	fetchRemoteFile,
+	readCached,
 	defaultCacheDir,
-	isCacheableRef,
 	// Exported for tests; do not rely on these from production callers.
-	_internal: { composeUrl, hashUrl, getText, USER_AGENT, RAW_GITHUB_BASE },
+	_internal: { composeUrl, hashUrl, httpGet, USER_AGENT, RAW_GITHUB_BASE },
 };

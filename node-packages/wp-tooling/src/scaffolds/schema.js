@@ -21,10 +21,10 @@ const REQUIRED_FIELDS = ['slug', 'name', 'description', 'source', 'files'];
  * boot wiring for a class shipped in vendor and writes zero files.
  *
  * A scaffold can also be served from a remote repo, but that is NOT a
- * `source` value — remoteness is expressed by an inventory entry
- * (`src/scaffolds/inventory.js`) that points at an ordinary `template`
- * scaffold living in another repo. The manifest shape is identical either
- * way; only its discovery + template loading differ.
+ * `source` value — remoteness is expressed by a `sources.json` entry +
+ * the owning repo's index (`src/scaffolds/sources.js`) pointing at an
+ * ordinary `template` scaffold living in another repo. The manifest shape
+ * is identical either way; only its discovery + template loading differ.
  */
 const ALLOWED_SOURCES = ['template', 'package'];
 
@@ -72,7 +72,7 @@ const SLUG_PATTERN = '^[a-z0-9-]+$';
 const CATEGORY_PATTERN = '^[a-z][a-z0-9/-]*$';
 const INPUT_KEY_PATTERN = '^[a-z][a-z0-9_]*$';
 const SECRET_KEY_PATTERN = '^[A-Z][A-Z0-9_]*$';
-/** `owner/repo` on github.com — used by the inventory validator. */
+/** `owner/repo` on github.com — used by the sources/index validator. */
 const GITHUB_REPO_PATTERN = '^[\\w.-]+/[\\w.-]+$';
 
 /** Reusable Draft-07 entry shapes. */
