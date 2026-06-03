@@ -12,4 +12,9 @@ parameters:
     # WordPress doc-blocks are unreliable; don't treat their types as certain.
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true
+    # Flag wrong-case calls to functions/methods (PHP is case-insensitive here,
+    # so these slip through at runtime) and @var tags whose declared type is
+    # provably wrong. Orthogonal to treatPhpDocTypesAsCertain.
+    checkFunctionNameCase: true
+    reportWrongPhpDocTypeInVarTag: true
     ignoreErrors: []

@@ -63,11 +63,21 @@ final class ConfigTest extends TestCase
 
     private function makeConsumerProject(): string
     {
-        $project = (string) tempnam(sys_get_temp_dir(), 'wp-phpstan-consumer-');
-        unlink($project);
-        mkdir($project . '/vendor/rtcamp/wp-phpstan', 0o777, true);
+        $project = tempnam(sys_get_temp_dir(), 'wp-phpstan-consumer-');
+        self::assertNotFalse($project, 'Could not create a temp file for the consumer project.');
 
-        copy($this->baseline(), $project . '/vendor/rtcamp/wp-phpstan/phpstan.neon.dist');
+        // Turn the temp file into a project directory. Assert each step so a
+        // setup failure reports clearly instead of as a stray warning (the
+        // suite runs with failOnWarning=true).
+        self::assertTrue(unlink($project), "Could not remove temp file: {$project}");
+        self::assertTrue(
+            mkdir($project . '/vendor/rtcamp/wp-phpstan', 0o777, true),
+            "Could not create the temp consumer project dir: {$project}"
+        );
+        self::assertTrue(
+            copy($this->baseline(), $project . '/vendor/rtcamp/wp-phpstan/phpstan.neon.dist'),
+            'Could not copy phpstan.neon.dist into the temp consumer project.'
+        );
 
         foreach (self::LINKED_DEPS as $dep) {
             $linked = @symlink($this->realPath(self::PACKAGE_ROOT . '/vendor/' . $dep), $project . '/vendor/' . $dep);
