@@ -124,9 +124,32 @@ Templates render code (PHP, JS, YAML, JSON). HTML escaping is explicitly disable
 The `inputs[]` array is the authoritative declaration. For each input the engine resolves a value in this order:
 
 1. Explicit `--key=value` passed to `add`.
-2. Discovery (currently supports `input:<other-key>` for derivation; e.g. `class` derived from `name` via the `pascal-case` transform).
+2. `discover_from` (see below).
 3. `default`.
 4. Error `EMISSINGINPUT` if the field is `required: true`.
+
+An explicit value always wins over discovery, so AI/CLI callers are never overridden.
+
+### `discover_from` sources
+
+`discover_from` reads a value from elsewhere. Every source is **fallback-safe**: when the file
+or key is absent the input falls through to its `default` (so a project without the file behaves
+exactly as if `discover_from` were not set).
+
+- `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
+- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** (first map key, trailing `\` stripped) — but only for non-path inputs; inputs whose key looks like a path (`base_path`, `*_path`, `*_dir`) keep their own `default`, since the PSR-4 root directory is rarely a scaffold's target sub-path.
+- `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
+
+Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
+
+```json
+{
+    "key": "namespace",
+    "description": "PSR-4 namespace for the class.",
+    "discover_from": "composer.json:autoload.psr-4",
+    "default": "Inc\\Cli"
+}
+```
 
 When `inputs[]` is omitted, the engine falls back to scanning template placeholders (with `collectPlaceholders`) and requires every placeholder to be supplied. The explicit `inputs[]` block is always preferable: it lets you document the input, set defaults, declare transforms, and gate `required`.
 
@@ -138,6 +161,7 @@ Available via `transform`:
 - `kebab-case`: `QmExport` → `qm-export`
 - `snake-case`: `qm-export` → `qm_export`
 - `upper-snake-case`: `wporg-username` → `WPORG_USERNAME`
+- `json-escape`: `Acme\Blog` → `Acme\\Blog` (embed a PHP namespace in a JSON snippet)
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
 
@@ -177,6 +201,49 @@ Use sections inside `snippet_template` to vary the snippet by flag (e.g. the sin
 - `tests[]`: test stubs written alongside production output. Each entry has `src`, `dest`, `framework` (`phpunit`, `jest`, `playwright`, `pa11y`, `actionlint`, `yaml-parse`), and optional `command`.
 - `secrets[]`: declarations only — never values. Each entry has `key` (UPPER_SNAKE_CASE), `scope` (`github-actions`, `env`, `dotenv`), `description`, and optional `required`.
 - `scripts.npm` / `scripts.composer`: maps of `{ name: command }` the developer should add to their `package.json` / `composer.json`. The engine surfaces these in the report; nothing is auto-merged.
+
+---
+
+## Features (`feature{}`) — toggleable scaffolds
+
+An optional `feature` block turns a scaffold into something `wp-tooling features` can switch on and
+off (e.g. Tailwind). It is additive: scaffolds without it behave exactly as before, and the
+`add` (AI) path ignores it entirely.
+
+```json
+"feature": {
+    "config_key": "tailwind",
+    "owned_files": [ "postcss.config.js" ],
+    "confirm_remove": [ "src/css/frontend/tailwind.css" ],
+    "gitignore": [ "_tailwind-theme.css" ]
+}
+```
+
+- `config_key` (required): the key under `features{}` in `.wp-tooling.json` that records on/off.
+- `owned_files`: files this feature creates that are safe to delete on disable (rendered like `dest` paths).
+- `confirm_remove`: developer-editable files deleted only after explicit confirmation.
+- `gitignore`: lines added on enable, removed on disable. Omit lines the project's base `.gitignore` already ships (otherwise disable would strip a pre-existing rule).
+
+The CLI:
+
+```bash
+wp-tooling features                       # interactive, one prompt per feature (defaulted to current state)
+wp-tooling features --enable tailwind     # non-interactive
+wp-tooling features --disable tailwind --force   # remove developer-editable files without asking
+wp-tooling features --json                # machine-readable status
+```
+
+Programmatically the registry exposes `enable(id, inputs, opts)`, `disable(id, opts)` (opts may
+include an async `confirmRemove(path)` callback), and `status(cwd)`. The engine **reports** the
+feature's `npm_dev_dependencies` but never installs them — the feature-manager driver does.
+`--no-install` (`install: false`) skips the install and only reports the deps; add
+`--record-deps` (`record: true`) to also write the missing entries into `package.json` so the
+next plain `npm install` brings them in (for init scripts that themselves run inside
+`npm install`).
+
+On enable, the rendered `owned_files` / `confirm_remove` / `gitignore` paths are persisted under
+`featureFiles{}` in `.wp-tooling.json`; disable removes exactly those paths (falling back to
+re-rendering the manifest templates when nothing was persisted).
 
 ---
 
@@ -233,7 +300,7 @@ scaffolds/
 }
 ```
 
-`name`/`description` live here so wp-tooling's `list` has something to show without fetching every manifest; `path` is the scaffold's directory relative to the source `path`; `checksum` is optional. Because the templates sit next to the manifest, this is a fully self-contained local scaffold *from that repo's point of view*. Validate it there in CI without making the repo a Node project:
+`name`/`description` live here so wp-tooling's `list` has something to show without fetching every manifest; `path` is the scaffold's directory relative to the source `path`; `checksum` is optional — when present it is the hex SHA-256 of the scaffold's `scaffold.json` body (with or without a `sha256:` prefix), and the engine verifies the fetched manifest against it on `add`, failing with `EBADSCAFFOLD` on mismatch. Because the templates sit next to the manifest, this is a fully self-contained local scaffold *from that repo's point of view*. Validate it there in CI without making the repo a Node project:
 
 ```yaml
 - run: npx --yes @rtcamp/wp-tooling validate ./scaffolds/ci/test-php

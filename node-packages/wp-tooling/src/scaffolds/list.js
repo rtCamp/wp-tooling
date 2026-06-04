@@ -19,8 +19,11 @@
 
 'use strict';
 
-const path = require('path');
-const { ScaffoldRegistry } = require('./registry');
+const {
+	buildRegistry,
+	fetchOptsFrom,
+	requireFlagValue,
+} = require('./cli-support');
 
 function parseArgs(argv) {
 	const opts = {
@@ -34,26 +37,29 @@ function parseArgs(argv) {
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag; rejects a missing or flag-shaped
+		// value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--json') {
 			opts.json = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
 		} else if (a === '--category') {
-			opts.category = argv[++i];
+			opts.category = value();
 		} else if (a.startsWith('--category=')) {
 			opts.category = a.slice('--category='.length);
 		} else if (a === '--origin') {
-			opts.origin = argv[++i];
+			opts.origin = value();
 		} else if (a.startsWith('--origin=')) {
 			opts.origin = a.slice('--origin='.length);
 		} else if (a === '--refresh') {
 			opts.refresh = true;
 		} else if (a === '--cache-dir') {
-			opts.cacheDir = argv[++i];
+			opts.cacheDir = value();
 		} else if (a.startsWith('--cache-dir=')) {
 			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else {
@@ -85,23 +91,6 @@ function printHelp() {
 			'',
 		].join('\n')
 	);
-}
-
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
-}
-
-async function buildRegistry(cwd, fetchOpts) {
-	const registry = new ScaffoldRegistry({
-		defaultsDir: defaultsDir(),
-		projectDir: projectDir(cwd),
-	});
-	await registry.scan({ fetchOpts });
-	return registry;
 }
 
 function makeId(s) {
@@ -230,7 +219,14 @@ function formatCounts(counts) {
 }
 
 async function runCli(argv) {
-	const opts = parseArgs(argv);
+	let opts;
+	try {
+		opts = parseArgs(argv);
+	} catch (err) {
+		process.stderr.write(`Error: ${err.message}\n`);
+		printHelp();
+		return 1;
+	}
 	if (opts.help) {
 		printHelp();
 		return 0;
@@ -246,13 +242,7 @@ async function runCli(argv) {
 	}
 	try {
 		const warnings = [];
-		const fetchOpts = { warnings };
-		if (opts.refresh) {
-			fetchOpts.refresh = true;
-		}
-		if (opts.cacheDir) {
-			fetchOpts.cacheDir = opts.cacheDir;
-		}
+		const fetchOpts = { ...fetchOptsFrom(opts), warnings };
 		const registry = await buildRegistry(opts.cwd, fetchOpts);
 		const all = registry.all();
 		const filtered = applyFilters(all, opts);

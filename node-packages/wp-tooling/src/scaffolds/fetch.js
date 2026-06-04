@@ -74,13 +74,24 @@ function composeUrl(repository, relPath) {
 }
 
 /**
- * SHA-256 hex of a string. Used as the cache filename.
+ * SHA-256 hex digest of a string. Shared primitive used both for cache
+ * filenames (hashUrl) and remote-manifest integrity checks (registry.js).
+ *
+ * @param {string} s Input string.
+ * @return {string} 64-character lowercase hex digest.
+ */
+function sha256Hex(s) {
+	return crypto.createHash('sha256').update(s).digest('hex');
+}
+
+/**
+ * SHA-256 hex of a URL. Used as the cache filename.
  *
  * @param {string} url Absolute URL whose body is being cached.
  * @return {string} 64-character lowercase hex digest.
  */
 function hashUrl(url) {
-	return crypto.createHash('sha256').update(url).digest('hex');
+	return sha256Hex(url);
 }
 
 /**
@@ -322,6 +333,7 @@ module.exports = {
 	fetchRemoteFile,
 	readCached,
 	defaultCacheDir,
+	sha256Hex,
 	// Exported for tests; do not rely on these from production callers.
 	_internal: { composeUrl, hashUrl, httpGet, USER_AGENT, RAW_GITHUB_BASE },
 };

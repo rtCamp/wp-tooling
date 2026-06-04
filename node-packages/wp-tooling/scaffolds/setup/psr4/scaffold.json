@@ -15,14 +15,20 @@
 			"key": "base_path",
 			"description": "Directory containing the PHP source relative to the project root, without trailing slash (e.g. includes or src).",
 			"default": "includes"
+		},
+		{
+			"key": "namespace_json",
+			"description": "JSON-encoded form of `namespace` (backslashes doubled). Derived automatically; do not supply.",
+			"discover_from": "input:namespace",
+			"transform": "json-escape"
 		}
 	],
 	"wiring": [
 		{
 			"target_file": "composer.json",
 			"anchor": "\"autoload\"",
-			"snippet_template": "\"autoload\": {\n    \"psr-4\": {\n        \"{{namespace}}\\\\\": \"{{base_path}}/\"\n    }\n}",
-			"description": "Merge PSR-4 autoload into composer.json. The namespace key must have JSON-encoded backslashes and a trailing backslash (e.g. PHP namespace Acme\\Blog becomes JSON key \"Acme\\\\Blog\\\\\"). Create the autoload block if absent. Run composer dump-autoload --optimize after applying."
+			"snippet_template": "\"autoload\": {\n    \"psr-4\": {\n        \"{{namespace_json}}\\\\\": \"{{base_path}}/\"\n    }\n}",
+			"description": "Merge PSR-4 autoload into composer.json. The namespace key is already JSON-encoded with its trailing backslash (e.g. PHP namespace Acme\\Blog renders as JSON key \"Acme\\\\Blog\\\\\") — paste it verbatim. Create the autoload block if absent. Run composer dump-autoload --optimize after applying."
 		}
 	]
 }

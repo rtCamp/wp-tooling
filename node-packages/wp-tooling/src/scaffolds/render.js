@@ -139,6 +139,9 @@ const TRANSFORMS = {
 	'kebab-case': (s) => splitWords(s).join('-').toLowerCase(),
 	'snake-case': (s) => splitWords(s).join('_').toLowerCase(),
 	'upper-snake-case': (s) => splitWords(s).join('_').toUpperCase(),
+	// JSON-encode backslashes so a PHP namespace can be embedded inside a
+	// JSON snippet (e.g. a composer.json PSR-4 key): Acme\Blog -> Acme\\Blog.
+	'json-escape': (s) => String(s).replace(/\\/g, '\\\\'),
 };
 
 function splitWords(s) {

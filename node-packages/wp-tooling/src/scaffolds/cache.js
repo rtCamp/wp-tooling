@@ -16,6 +16,7 @@
 const fs = require('fs/promises');
 
 const { defaultCacheDir } = require('./fetch');
+const { requireFlagValue } = require('./cli-support');
 
 function parseArgs(argv) {
 	const opts = {
@@ -28,7 +29,7 @@ function parseArgs(argv) {
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--cache-dir') {
-			opts.cacheDir = argv[++i];
+			opts.cacheDir = requireFlagValue(argv[++i], a);
 		} else if (a.startsWith('--cache-dir=')) {
 			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (!opts.action) {

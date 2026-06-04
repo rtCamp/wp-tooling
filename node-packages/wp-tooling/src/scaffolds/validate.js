@@ -41,6 +41,7 @@ const {
 	indexEntryToRecord,
 } = require('./sources');
 const { fetchRemoteFile, readCached } = require('./fetch');
+const { defaultsDir, projectDir, requireFlagValue } = require('./cli-support');
 
 const SLUG_RE = new RegExp(SLUG_PATTERN);
 const CATEGORY_RE = new RegExp(CATEGORY_PATTERN);
@@ -61,6 +62,7 @@ const TOP_LEVEL_KEYS = new Set([
 	'tests',
 	'secrets',
 	'scripts',
+	'feature',
 	...DEPENDENCY_MAPS,
 ]);
 
@@ -147,6 +149,9 @@ function validate(scaffold) {
 	}
 	if (scaffold.scripts !== undefined) {
 		errors.push(...validateScripts(scaffold.scripts));
+	}
+	if (scaffold.feature !== undefined) {
+		errors.push(...validateFeature(scaffold.feature));
 	}
 
 	for (const mapKey of DEPENDENCY_MAPS) {
@@ -452,6 +457,48 @@ function validateScripts(scripts) {
 	return errors;
 }
 
+const FEATURE_LIST_KEYS = ['owned_files', 'confirm_remove', 'gitignore'];
+const FEATURE_KEYS = new Set(['config_key', ...FEATURE_LIST_KEYS]);
+
+function validateFeature(feature) {
+	if (
+		feature === null ||
+		typeof feature !== 'object' ||
+		Array.isArray(feature)
+	) {
+		return ['feature: must be an object'];
+	}
+	const errors = [];
+	if (
+		typeof feature.config_key !== 'string' ||
+		feature.config_key.length === 0
+	) {
+		errors.push('feature.config_key: must be a non-empty string');
+	}
+	for (const arrKey of FEATURE_LIST_KEYS) {
+		if (feature[arrKey] === undefined) {
+			continue;
+		}
+		if (!Array.isArray(feature[arrKey])) {
+			errors.push(`feature.${arrKey}: must be an array`);
+			continue;
+		}
+		feature[arrKey].forEach((v, i) => {
+			if (typeof v !== 'string' || v.length === 0) {
+				errors.push(
+					`feature.${arrKey}[${i}]: must be a non-empty string`
+				);
+			}
+		});
+	}
+	for (const k of Object.keys(feature)) {
+		if (!FEATURE_KEYS.has(k)) {
+			errors.push(`feature: unknown field '${k}'`);
+		}
+	}
+	return errors;
+}
+
 // ---------------------------------------------------------------------------
 // CLI surface (`wp-tooling validate [scaffold-id...] [flags]`)
 //
@@ -476,12 +523,15 @@ function parseArgs(argv) {
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag; rejects a missing or flag-shaped
+		// value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--json') {
 			opts.json = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
 		} else if (a === '--remote') {
@@ -489,7 +539,7 @@ function parseArgs(argv) {
 		} else if (a === '--refresh') {
 			opts.refresh = true;
 		} else if (a === '--cache-dir') {
-			opts.cacheDir = argv[++i];
+			opts.cacheDir = value();
 		} else if (a.startsWith('--cache-dir=')) {
 			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
@@ -524,14 +574,6 @@ function printHelp() {
 			'',
 		].join('\n')
 	);
-}
-
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
 }
 
 function findScaffoldJsons(root) {
