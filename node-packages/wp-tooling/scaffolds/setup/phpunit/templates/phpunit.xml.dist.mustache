@@ -5,9 +5,16 @@
 	bootstrap="tests/bootstrap.php"
 	colors="true"
 >
+	<!--
+		Unit covers every per-kind test directory the wp/* scaffolds write
+		(tests/Cli/, tests/PostTypes/, ...); Integration is opt-in under its
+		own directory. Keep these in sync with the scaffold engine's
+		`tests_path` defaults.
+	-->
 	<testsuites>
 		<testsuite name="Unit">
-			<directory>tests/Unit</directory>
+			<directory>tests</directory>
+			<exclude>tests/Integration</exclude>
 		</testsuite>
 		<testsuite name="Integration">
 			<directory>tests/Integration</directory>

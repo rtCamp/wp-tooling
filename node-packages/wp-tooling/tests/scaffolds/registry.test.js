@@ -930,6 +930,74 @@ describe('remote scaffolds (sources + index)', () => {
 		).rejects.toMatchObject({ code: 'EFETCHFAIL', statusCode: 404 });
 	});
 
+	test('index checksum is verified against the fetched manifest', async () => {
+		const crypto = require('crypto');
+		const body = manifest();
+		const goodSum = crypto.createHash('sha256').update(body).digest('hex');
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody([
+				indexEntry({ checksum: `sha256:${goodSum}` }),
+			]),
+			'scaffold.json': body,
+			'a.mustache': 'content: rendered',
+		});
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan(scanOpts());
+		const result = await r.execute(
+			'ci/test-remote',
+			{},
+			{ cwd: targetDir, fetchOpts: { cacheDir } }
+		);
+		expect(result.engine.wrote).toEqual(['.github/workflows/a.yml']);
+	});
+
+	test('checksum mismatch throws EBADSCAFFOLD before any write', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody([
+				indexEntry({ checksum: 'sha256:' + 'a'.repeat(64) }),
+			]),
+			'scaffold.json': manifest(),
+			'a.mustache': 'content: rendered',
+		});
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan(scanOpts());
+		await expect(
+			r.execute(
+				'ci/test-remote',
+				{},
+				{ cwd: targetDir, fetchOpts: { cacheDir } }
+			)
+		).rejects.toMatchObject({ code: 'EBADSCAFFOLD' });
+		expect(
+			fssync.existsSync(path.join(targetDir, '.github/workflows/a.yml'))
+		).toBe(false);
+	});
+
+	test('remote manifest dest escaping --cwd throws EWRITEFAIL', async () => {
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody(),
+			'scaffold.json': manifest({
+				files: [{ src: 'a.mustache', dest: '../evil.yml' }],
+			}),
+			'a.mustache': 'pwned',
+		});
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan(scanOpts());
+		await expect(
+			r.execute(
+				'ci/test-remote',
+				{},
+				{ cwd: targetDir, fetchOpts: { cacheDir } }
+			)
+		).rejects.toMatchObject({ code: 'EWRITEFAIL', errno: 'EOUTSIDE' });
+		expect(
+			fssync.existsSync(path.join(path.dirname(targetDir), 'evil.yml'))
+		).toBe(false);
+	});
+
 	test('dry-run fetches the manifest but not the template, writes nothing', async () => {
 		writeSources(projectDir, [source()]);
 		const routes = setHttpsRoutes({

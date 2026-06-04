@@ -17,8 +17,12 @@
 
 'use strict';
 
-const path = require('path');
-const { ScaffoldRegistry, ScaffoldError } = require('./registry');
+const { ScaffoldError } = require('./registry');
+const {
+	buildRegistry,
+	fetchOptsFrom,
+	requireFlagValue,
+} = require('./cli-support');
 
 function parseArgs(argv) {
 	const opts = {
@@ -34,6 +38,9 @@ function parseArgs(argv) {
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag (`--name foo`); rejects a missing or
+		// flag-shaped value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--non-interactive') {
@@ -46,18 +53,18 @@ function parseArgs(argv) {
 		} else if (a === '--refresh') {
 			opts.refresh = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
 		} else if (a === '--cache-dir') {
-			opts.cacheDir = argv[++i];
+			opts.cacheDir = value();
 		} else if (a.startsWith('--cache-dir=')) {
 			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
 			const eq = a.indexOf('=');
 			if (eq === -1) {
 				const k = a.slice(2);
-				opts.inputs[snakify(k)] = argv[++i];
+				opts.inputs[snakify(k)] = value();
 			} else {
 				const k = a.slice(2, eq);
 				opts.inputs[snakify(k)] = a.slice(eq + 1);
@@ -69,17 +76,6 @@ function parseArgs(argv) {
 		}
 	}
 	return opts;
-}
-
-function fetchOptsFrom(opts) {
-	const fetchOpts = {};
-	if (opts.refresh) {
-		fetchOpts.refresh = true;
-	}
-	if (opts.cacheDir) {
-		fetchOpts.cacheDir = opts.cacheDir;
-	}
-	return fetchOpts;
 }
 
 function snakify(key) {
@@ -109,24 +105,6 @@ function printHelp() {
 	);
 }
 
-// wp-tooling's bundled scaffolds. From src/scaffolds/ that's two levels up.
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
-}
-
-async function buildRegistry(cwd, fetchOpts) {
-	const registry = new ScaffoldRegistry({
-		defaultsDir: defaultsDir(),
-		projectDir: projectDir(cwd),
-	});
-	await registry.scan({ fetchOpts });
-	return registry;
-}
-
 function formatErrorPayload(err) {
 	if (err instanceof ScaffoldError) {
 		const payload = { code: err.code, message: err.message };
@@ -145,6 +123,11 @@ function formatErrorPayload(err) {
 			'rateLimited',
 			'timeout',
 			'cause',
+			'file',
+			'errors',
+			'id',
+			'source',
+			'repository',
 		]) {
 			if (err[k] !== undefined) {
 				payload[k] = err[k];
@@ -406,7 +389,14 @@ async function runNonInteractive(opts) {
 }
 
 async function runCli(argv) {
-	const opts = parseArgs(argv);
+	let opts;
+	try {
+		opts = parseArgs(argv);
+	} catch (err) {
+		process.stderr.write(`Error: ${err.message}\n`);
+		printHelp();
+		return 1;
+	}
 	if (opts.help) {
 		printHelp();
 		return 0;

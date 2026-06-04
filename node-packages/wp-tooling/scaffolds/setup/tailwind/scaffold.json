@@ -1,0 +1,36 @@
+{
+	"slug": "tailwind",
+	"category": "setup",
+	"name": "Tailwind CSS",
+	"description": "Tailwind v4 build integration. Adds postcss.config.js and turns on the GenerateTailwindThemePlugin (which keeps Tailwind tokens in sync with theme.json and scaffolds the Tailwind CSS entry on first build). Pair it with a webpack gate that loads @rtcamp/tailwind-config when features.tailwind is set.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "css_dir",
+			"description": "Directory holding the Tailwind CSS entry files (tailwind.css and the generated _tailwind-theme.css).",
+			"default": "src/css/frontend",
+			"discover_from": "config:cssDir"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/postcss.config.js",
+			"dest": "postcss.config.js",
+			"raw": true
+		}
+	],
+	"feature": {
+		"config_key": "tailwind",
+		"owned_files": [
+			"postcss.config.js",
+			"{{css_dir}}/_tailwind-theme.css"
+		],
+		"confirm_remove": [ "{{css_dir}}/tailwind.css" ],
+		"gitignore": [ "{{css_dir}}/_tailwind-theme.css" ]
+	},
+	"npm_dev_dependencies": {
+		"@rtcamp/tailwind-config": "^0.1.0",
+		"tailwindcss": "^4.3.0",
+		"@tailwindcss/postcss": "^4.3.0"
+	}
+}

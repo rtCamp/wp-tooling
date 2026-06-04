@@ -254,22 +254,28 @@ describe('readLine -- non-TTY mode', () => {
 		expect(stdoutWriteSpy).toHaveBeenCalledWith('second: ');
 	});
 
-	it('should resolve queued waiters with an empty string when stdin closes', async () => {
+	it('should reject queued waiters as cancelled when stdin closes', async () => {
+		// EOF must NOT resolve to '' — a required-field prompt would loop
+		// forever re-asking and receiving the same empty answer.
 		const terminal = loadTerminal();
 		const pending = terminal.readLine('prompt: ');
 		const [rl] = readline.__getCreated();
 		rl.emit('close');
-		await expect(pending).resolves.toBe('');
+		await expect(pending).rejects.toMatchObject({
+			name: 'CancelledError',
+		});
 	});
 
-	it('should resolve immediately with an empty string after stdin has closed', async () => {
+	it('should reject immediately as cancelled after stdin has closed', async () => {
 		const terminal = loadTerminal();
 		const priming = terminal.readLine('a: ');
 		const [rl] = readline.__getCreated();
 		rl.emit('close');
-		await priming;
+		await priming.catch(() => {});
 
-		await expect(terminal.readLine('b: ')).resolves.toBe('');
+		await expect(terminal.readLine('b: ')).rejects.toMatchObject({
+			name: 'CancelledError',
+		});
 	});
 
 	it('should buffer lines that arrive before a reader is waiting', async () => {
