@@ -71,7 +71,6 @@
 	</rule>
 
 	<rule ref="Squiz.Commenting.FunctionComment">
-		<exclude name="Squiz.Commenting.FunctionComment.ParamCommentFullStop" />
 		<exclude name="Squiz.Commenting.FunctionComment.EmptyThrows" />
 		<properties>
 			<property name="skipIfInheritdoc" value="true" />
@@ -91,7 +90,6 @@
 	<rule ref="SlevomatCodingStandard.Classes.ClassConstantVisibility" />
 	<rule ref="SlevomatCodingStandard.Classes.ClassMemberSpacing" />
 	<rule ref="SlevomatCodingStandard.Classes.ConstantSpacing" />
-	<rule ref="SlevomatCodingStandard.Classes.DisallowLateStaticBindingForConstants" />
 	<rule ref="SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition" />
 	<rule ref="SlevomatCodingStandard.Classes.DisallowMultiPropertyDefinition" />
 	<rule ref="SlevomatCodingStandard.Classes.DisallowStringExpressionPropertyFetch" />
@@ -105,7 +103,7 @@
 	<rule ref="SlevomatCodingStandard.Classes.MethodSpacing" />
 	<rule ref="SlevomatCodingStandard.Classes.ModernClassNameReference">
 		<properties>
-			<!-- Doesn't use PHPCompatibility. -->
+			<!-- $obj::class is PHP 8.0+; Slevomat ignores testVersion, so keep this off. -->
 			<property name="enableOnObjects" value="false" />
 		</properties>
 	</rule>
@@ -116,7 +114,8 @@
 	<rule ref="SlevomatCodingStandard.Classes.TraitUseDeclaration" />
 	<rule ref="SlevomatCodingStandard.Classes.TraitUseSpacing">
 		<properties>
-			<property name="linesCountBeforeFirstUseWhenFirstInClass" value="0" />
+			<!-- Must stay 1 to agree with EmptyLinesAroundClassBraces when a class opens with a trait use. -->
+			<property name="linesCountBeforeFirstUseWhenFirstInClass" value="1" />
 		</properties>
 	</rule>
 	<rule ref="SlevomatCodingStandard.Classes.UselessLateStaticBinding" />
@@ -130,25 +129,12 @@
 	<rule ref="SlevomatCodingStandard.Exceptions.ReferenceThrowableOnly" />
 
 	<rule ref="SlevomatCodingStandard.Functions.ArrowFunctionDeclaration" />
-	<rule ref="SlevomatCodingStandard.Functions.DisallowEmptyFunction" />
 	<rule ref="SlevomatCodingStandard.Functions.StaticClosure" />
 	<rule ref="SlevomatCodingStandard.Functions.UnusedInheritedVariablePassedToClosure" />
 
 	<rule ref="SlevomatCodingStandard.Namespaces.AlphabeticallySortedUses">
 		<properties>
 			<property name="caseSensitive" value="true" />
-		</properties>
-	</rule>
-	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameInAnnotation">
-		<properties>
-			<property name="ignoredAnnotationNames" type="array">
-				<element value="@phpstan-import-type" />
-				<element value="@phpstan-param" />
-				<element value="@phpstan-return" />
-				<element value="@phpstan-template" />
-				<element value="@phpstan-type" />
-				<element value="@phpstan-var" />
-			</property>
 		</properties>
 	</rule>
 	<rule ref="SlevomatCodingStandard.Namespaces.NamespaceSpacing" />
@@ -179,11 +165,8 @@
 	     Slevomat — strict functional sniffs
 	     ========================================================== -->
 
-	<rule ref="SlevomatCodingStandard.Classes.DisallowConstructorPropertyPromotion" />
 	<rule ref="SlevomatCodingStandard.ControlStructures.RequireNullCoalesceOperator" />
 	<rule ref="SlevomatCodingStandard.Exceptions.DeadCatch" />
-	<rule ref="SlevomatCodingStandard.Exceptions.DisallowNonCapturingCatch" />
-	<rule ref="SlevomatCodingStandard.Functions.UnusedParameter" />
 	<rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue" />
 	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions" />
 	<rule ref="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />

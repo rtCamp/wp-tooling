@@ -88,7 +88,10 @@ final class RulesetTest extends TestCase
 		[, $output] = self::runPhpcs(['-i']);
 
 		$this->assertStringContainsString('rtCampWP-Basic', $output);
-		$this->assertStringContainsString('rtCampWP', $output);
+		// Word-boundary match — a plain substring check would be satisfied by
+		// the "rtCampWP" inside "rtCampWP-Basic" even if the full standard
+		// failed to register.
+		$this->assertMatchesRegularExpression('/\brtCampWP\b(?!-)/', $output);
 	}
 
 	public function test_clean_fixture_passes_basic(): void
