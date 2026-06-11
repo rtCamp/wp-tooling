@@ -37,17 +37,24 @@ parameters:
     # Project-specific overrides and suppressions go here.
 ```
 
-That single include is all you need — the baseline already pulls in
-`szepeviktor/phpstan-wordpress`'s extension (the WordPress stubs and return-type
-extensions), so you do not reference it yourself. Run the analysis with:
+That single include is all you need. Run the analysis with:
 
 ```bash
 vendor/bin/phpstan analyse
 ```
 
-> **Do not** also enable `phpstan/extension-installer` for `szepeviktor/phpstan-wordpress`.
-> This baseline already includes that extension; auto-loading it a second time
-> makes PHPStan fail on duplicate service definitions.
+> **The WordPress extension must load exactly once.** This baseline already
+> includes `szepeviktor/phpstan-wordpress`, and loading it twice fails PHPStan.
+> So: don't include its `extension.neon` in your own neon, and if you use
+> `phpstan/extension-installer`, make it skip the package in `composer.json`:
+>
+> ```json
+> "extra": {
+>     "phpstan/extension-installer": {
+>         "ignore": ["szepeviktor/phpstan-wordpress"]
+>     }
+> }
+> ```
 
 ## Overriding
 

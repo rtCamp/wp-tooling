@@ -1,9 +1,8 @@
 # rtCamp shared PHPStan baseline for WordPress projects.
 #
-# Relative path on purpose: it resolves to the sibling vendor/szepeviktor install
-# (this file lives at vendor/rtcamp/wp-phpstan/), so a consumer includes only this
-# one file. Don't also enable phpstan/extension-installer for szepeviktor, or the
-# extension loads twice and PHPStan fails on the duplicate services.
+# The relative include resolves to the sibling vendor/szepeviktor install, so a
+# consumer includes only this one file. The extension must load exactly once —
+# no manual extension.neon include and no extension-installer auto-load (see README).
 includes:
     - ../../szepeviktor/phpstan-wordpress/extension.neon
 
@@ -12,9 +11,16 @@ parameters:
     # WordPress doc-blocks are unreliable; don't treat their types as certain.
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true
-    # Flag wrong-case calls to functions/methods (PHP is case-insensitive here,
-    # so these slip through at runtime) and @var tags whose declared type is
-    # provably wrong. Orthogonal to treatPhpDocTypesAsCertain.
+    # Wrong-case function/method calls and provably wrong @var tags.
     checkFunctionNameCase: true
     reportWrongPhpDocTypeInVarTag: true
-    ignoreErrors: []
+    # Low-noise correctness checks — stricter than bare level 5, not a level bump.
+    inferPrivatePropertyTypeFromConstructor: true
+    checkInternalClassCaseSensitivity: true
+    checkExplicitMixedMissingReturn: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    reportAlwaysTrueInLastCondition: true
+    reportStaticMethodSignatures: true
+    # Variables assigned inside a loop don't exist after it.
+    polluteScopeWithAlwaysIterableForeach: false
+    polluteScopeWithLoopInitialAssignments: false
