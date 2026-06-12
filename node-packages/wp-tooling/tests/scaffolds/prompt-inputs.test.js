@@ -9,7 +9,7 @@
 
 'use strict';
 
-jest.mock('@rtcamp/wp-tooling/ui', () => {
+jest.mock('../../src/ui', () => {
 	const calls = { text: [], confirm: [] };
 	return {
 		__esModule: false,
@@ -26,7 +26,7 @@ jest.mock('@rtcamp/wp-tooling/ui', () => {
 	};
 });
 
-const ui = require('@rtcamp/wp-tooling/ui');
+const ui = require('../../src/ui');
 const {
 	promptMissingInputs,
 	confirmRun,

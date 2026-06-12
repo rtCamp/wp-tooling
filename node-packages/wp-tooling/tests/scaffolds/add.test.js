@@ -181,7 +181,7 @@ describe('engine core is not coupled to TTY UI', () => {
 			require.cache[require.resolve('../../src/scaffolds/registry')]
 		).toBeDefined();
 		// The UI module would be in require.cache if it had been loaded by registry.
-		const uiPath = require.resolve('@rtcamp/wp-tooling/ui');
+		const uiPath = require.resolve('../../src/ui');
 		const beforeKeys = Object.keys(require.cache).length;
 		// Construct a registry from a real scaffold to exercise the engine path.
 		const tmp = makeTmpDir();

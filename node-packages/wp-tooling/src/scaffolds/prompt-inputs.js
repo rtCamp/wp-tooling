@@ -13,7 +13,7 @@
 
 'use strict';
 
-const { text, confirm, CancelledError } = require('@rtcamp/wp-tooling/ui');
+const { text, confirm, CancelledError } = require('../ui');
 
 /**
  * Prompt the developer for each missing input, returning a merged map.
