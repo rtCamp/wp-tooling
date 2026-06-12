@@ -61,25 +61,10 @@ Confirm findings with the developer in one short message. Proceed on confirmatio
 
 ### 3. Canonical layout
 
-Files group by **kind**, never by feature. `<Root>` = project's autoload root (e.g. `Inc`, `Acme\Blog`). Honour these unless the project shows >=3 consistent samples justifying a deviation.
+Resolve the target source dir, namespace, test dir, test namespace, and module for the chosen kind before any scaffold call — including the modules-host-one-kind rule and the per-feature-folder anti-pattern check.
 
-| Scaffold | Source dir | Source ns | Test dir | Test ns | Module |
-|---|---|---|---|---|---|
-| `wp/cpt` | `includes/PostTypes/` | `<Root>\PostTypes` | `tests/PostTypes/` | `<Root>\Tests\PostTypes` | `<Root>\Modules\PostTypes` |
-| `wp/taxonomy` | `includes/Taxonomies/` | `<Root>\Taxonomies` | `tests/Taxonomies/` | `<Root>\Tests\Taxonomies` | `<Root>\Modules\Taxonomies` |
-| `wp/block-dynamic` | `includes/Blocks/` + `src/blocks/<slug>/` + `build/blocks/<slug>/` | `<Root>\Blocks` | `tests/Blocks/` | `<Root>\Tests\Blocks` | `<Root>\Modules\Blocks` |
-| `wp/rest` | `includes/Rest/` | `<Root>\Rest` | `tests/Rest/` | `<Root>\Tests\Rest` | `<Root>\Modules\Rest` |
-| `wp/shortcode` | `includes/Shortcodes/` | `<Root>\Shortcodes` | `tests/Shortcodes/` | `<Root>\Tests\Shortcodes` | `<Root>\Modules\Shortcodes` |
-| `wp/admin-page` | `includes/Admin/` | `<Root>\Admin` | `tests/Admin/` | `<Root>\Tests\Admin` | `<Root>\Modules\Admin` |
-| `wp/settings-page` | `includes/Settings/` | `<Root>\Settings` | `tests/Settings/` | `<Root>\Tests\Settings` | `<Root>\Modules\Settings` |
-| `wp/user-role` | `includes/Roles/` | `<Root>\Roles` | `tests/Roles/` | `<Root>\Tests\Roles` | `<Root>\Modules\Roles` |
-| `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\Cli` |
-| `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
-| `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
-
-**Modules host one kind each. No `Modules/<Feature>/...`.** A multi-kind feature (e.g. Testimonials = CPT + taxonomy + block + REST) spans the per-kind directories and wires into each kind's module.
-
-If the project already has a per-feature module folder, flag as anti-pattern. Offer migration before adding new artifacts. Do not scaffold into it.
+Read:
+- `references/canonical-layout.md`
 
 ### 4. Derive test cases from the developer brief - BEFORE any scaffold call
 
@@ -88,13 +73,10 @@ Write a test-case checklist covering:
 - **Happy path** - central behaviour the developer stated.
 - **Edge cases** - empty/missing/boundary inputs, large input.
 - **Error paths** - invalid input, missing auth, wrong capability.
-- **Integration** - kind-specific:
-  - `wp/cpt`: `post_type_exists()`, supports, REST exposure, attached taxonomies.
-  - `wp/taxonomy`: `taxonomy_exists()`, attached object types, term assignment.
-  - `wp/rest`: route appears in `rest_get_server()->get_routes()`, permission check, request/response schema, dedupe behaviour.
-  - `wp/block-dynamic`: block name, `register_hooks` action, `render()` markup with `WP_Query` fixture, empty state, count cap, attribute filters.
-  - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
-  - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
+- **Integration** - kind-specific assertions per kind.
+
+For the kind-specific integration assertions, read:
+- `references/test-checklist.md`
 
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 
@@ -132,12 +114,10 @@ Result shape: `{ scaffold, engine, developer, ai, warnings }`.
 
 #### 6a. Adaptive wiring
 
-For each `{ targetFile, anchor, snippet, description }`:
+Follow the four-step procedure (snippet, location, consent, idempotency) for every `ai.wiring` entry.
 
-1. **Snippet** - use canonical if it matches the sampled project pattern; else translate using the sampled shape with the new class substituted. Show both. If patterns conflict or no samples exist, ask.
-2. **Location** - anchor present → after it; else after the last sampled occurrence of the pattern; else best-effort in bootstrap method (say so); else skip and print as manual instruction.
-3. **Consent** - show targetFile + line range + description + rendered snippet. Ask `[apply / different location / edit snippet / skip]`. Never apply without consent.
-4. **Idempotent** - search first, do not re-insert.
+Read and apply:
+- `references/adaptive-wiring.md`
 
 ### 7. TDD loop (mandatory for every scaffolded artifact)
 
@@ -145,24 +125,8 @@ Tests come before implementation. No exceptions. If the developer says "skip tes
 
 For block scaffolds, surface a developer action before testing: "run `npm run build` so the editor can read the compiled block." Do not run it yourself.
 
-| Step | Action |
-|---|---|
-| A | Expand the engine's stub into the full suite from §4's checklist. Strip every `markTestIncomplete`. |
-| B | Run: `composer test` / `composer test:unit` (PHP), `npm run test:js` / `npx jest` (JS). Expect red. If the runner errors before running, invoke the relevant `setup/*` scaffold and retry. |
-| C | Implement just enough production code to flip **one** failing test green. |
-| D | Re-run. Confirm that one test passes. |
-| E | Loop B-D one test at a time. |
-| F | Once green, refactor; re-run. |
-| G | Final gates - all must pass: full PHPUnit suite, full Jest suite if JS touched, `composer lint:php`, `npm run lint:js`. |
-
-Frameworks per kind:
-
-| Kind | Framework |
-|---|---|
-| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable` | PHPUnit |
-| `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
-| `block/interactive` | Jest + Playwright |
-| `ci/*` | actionlint + yaml-parse |
+For the A-G step table and the test framework per kind — expand the stub, run red, then implement one test at a time to green — read and apply:
+- `references/tdd-loop.md`
 
 ### 8. Escalate when stuck - do not guess
 
@@ -206,15 +170,8 @@ Escalation report format: **what you tried, what you observed, what's blocking, 
 
 ## Engine errors
 
-| Code | Response |
-|---|---|
-| `ENOSCAFFOLD` | Surface `available` list, suggest closest, ask. |
-| `EMISSINGINPUT` | Read `missingDetails`, run §2 discovery, retry with resolved values. |
-| `EBADSCAFFOLD` | Invalid manifest. Surface verbatim, do not retry. For an `origin: "remote"` scaffold this means the fetched manifest at its pinned ref is broken — surface it; do not try to repair another repo's scaffold. |
-| `EWRITEFAIL` | Surface path + errno. Do not retry. |
-| `ERENDERFAIL` | Scaffold author bug. Surface. |
-| `EFETCHFAIL` | Network/HTTP failure fetching an `origin: "remote"` scaffold's manifest or a template. Surface `url` + `statusCode`. If the payload sets `rateLimited`, tell the developer to set `WP_TOOLING_GITHUB_TOKEN` and stop. A timeout is transient — one retry is reasonable; a 404 means the source pin (`sources.json` repo/ref/path) or the owning repo's index is wrong — surface, do not retry. Never hand-write the artifact to work around a failed fetch (the engine owns it). |
-| Unknown | Surface, exit non-zero, do not crash. |
+On any non-zero exit from the engine, read:
+- `references/engine-errors.md` — the response to each error code (`ENOSCAFFOLD`, `EMISSINGINPUT`, `EBADSCAFFOLD`, `EWRITEFAIL`, `ERENDERFAIL`, `EFETCHFAIL`).
 
 ## CI/CD variant
 

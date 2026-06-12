@@ -52,45 +52,8 @@ Before I start, I need a few details:
 
 After the request is clear, read the project directory to avoid duplicating work.
 
-**Project type (verify against developer's description):**
-
-```bash
-grep -rl "Plugin Name:\|Theme Name:" . --include="*.php" --exclude-dir=vendor --exclude-dir=node_modules -l | head -1
-```
-
-**VIP indicators:**
-
-```bash
-grep -rl "WordPress-VIP-Minimum\|automattic/vip-coding-standards\|VIP_GO_ENV" . \
-    --include="*.{php,xml,json,yml}" --exclude-dir=vendor --exclude-dir=node_modules | head -3
-```
-
-**Languages present:**
-
-```bash
-find . -name "*.php" -not -path "*/vendor/*" | head -1
-find . \( -name "*.js" -o -name "*.jsx" \) -not -path "*/node_modules/*" -not -path "*/build/*" | head -1
-find . \( -name "*.scss" -o -name "*.css" \) -not -path "*/node_modules/*" | head -1
-```
-
-**PSR-4 autoload:**
-
-```bash
-grep -A 8 '"autoload"' composer.json 2>/dev/null
-```
-
-**Existing tooling configs (skip if present):**
-
-```bash
-ls .editorconfig phpcs.xml.dist phpstan.neon.dist eslint.config.js .stylelintrc.js \
-   phpunit.xml.dist jest.config.js .pa11yci.json 2>/dev/null
-```
-
-**Existing namespace (if PSR-4 missing):**
-
-```bash
-grep -r "^namespace " . --include="*.php" --exclude-dir=vendor | head -3
-```
+Read and run:
+- `references/detection-commands.md` — detection commands for project type, VIP indicators, languages present, PSR-4 autoload, existing tooling configs, existing namespace.
 
 If detection contradicts what the developer said, flag it and ask. Never silently override the developer's stated intent with what you find on disk.
 
@@ -100,32 +63,15 @@ Construct the plan in two phases: **project setup** and **feature scaffolds**.
 
 #### Phase A: Project setup
 
-| Condition | Scaffold | Skip if |
-|---|---|---|
-| Always | `setup/editorconfig` | `.editorconfig` exists |
-| PHP present, no PSR-4 in `composer.json` | `setup/psr4` | `autoload.psr-4` already set |
-| VIP project | `lint/phpcs/vip` | `phpcs.xml.dist` exists |
-| Non-VIP project | `lint/phpcs/full` | `phpcs.xml.dist` exists |
-| Developer explicitly chose core-only PHPCS | `lint/phpcs/core` | `phpcs.xml.dist` exists |
-| PHP present | `lint/phpstan` | `phpstan.neon.dist` exists |
-| JS present | `lint/eslint` | `eslint.config.js` exists |
-| CSS or SCSS present | `lint/stylelint` | `.stylelintrc.js` exists |
-| Developer wants PHP tests | `setup/phpunit` | `phpunit.xml.dist` exists |
-| Developer wants JS tests | `setup/jest` | `jest.config.js` exists |
-| Developer wants a11y tests | `setup/pa11y` | `.pa11yci.json` exists |
+Read:
+- `references/phase-a-setup.md` — the condition → scaffold → skip-if selection table, the PHPCS standard reference, and the test scaffolds reference.
 
 #### Phase B: Feature scaffolds
 
-Map each feature the developer mentioned to one or more scaffold IDs from the catalogue:
+Map each feature the developer mentioned to one or more scaffold IDs from the catalogue.
 
-| Developer said | Scaffold ID |
-|---|---|
-| CLI command | `wp/cli` |
-| REST endpoint / API | `wp/rest` (if available) |
-| Cron job / background job | `wp/cron` (if available) |
-| Gutenberg block | `wp/block-dynamic` |
-| Cache / transients | `utility/cache` |
-| CI pipeline | `ci/cd-wporg` (or other CI scaffold) |
+Read:
+- `references/phase-b-features.md` — the feature → scaffold ID mapping.
 
 Run `npx wp-tooling list --json` to see exactly what is available. If a feature the developer wants has no matching scaffold, note it explicitly as a manual task in the final report.
 
@@ -164,52 +110,31 @@ Do not start running scaffolds until the developer confirms. If they adjust, upd
 
 Run each setup scaffold in order. Use `--non-interactive --json --cwd .`.
 
-For `setup/editorconfig`:
-
-```bash
-npx wp-tooling add setup/editorconfig --non-interactive --json --cwd .
-```
-
-For `setup/psr4` (use detected or developer-supplied namespace and base path):
-
-```bash
-npx wp-tooling add setup/psr4 \
-    --non-interactive --json --cwd . \
-    --namespace='Acme\ImageOptimizer' --base-path='includes'
-```
-
-For lint and test setup scaffolds:
-
-```bash
-npx wp-tooling add lint/phpcs/vip --non-interactive --json --cwd .
-npx wp-tooling add lint/phpstan    --non-interactive --json --cwd .
-npx wp-tooling add lint/eslint     --non-interactive --json --cwd .
-npx wp-tooling add setup/phpunit   --non-interactive --json --cwd . --source-dir=includes
-npx wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base-url=http://localhost:8888
-```
+Read:
+- `references/phase-a-setup.md` — the exact command per scaffold.
 
 Process each result before running the next:
 
 - Report files written and skipped.
-- Apply `setup/psr4` wiring to `composer.json` with explicit consent (see §Wiring below).
+- Apply `setup/psr4` wiring to `composer.json` with explicit consent. Read and apply: `references/psr4-wiring.md` (also covers the create-if-missing `composer.json` flow and feature-scaffold wiring).
 - Accumulate `developer.install.*` and `developer.scripts.*` across all scaffolds.
 
 ### 5. Execute Phase B
 
-For each feature scaffold, follow the full workflow from `skills/scaffold.md` — introspect conventions, apply naming, invoke the engine, adaptive wiring, **expand test stubs into a real suite, then drive implementation from those tests** (red → green → refactor).
+For each feature scaffold, follow the full workflow from the companion `scaffold` skill — installed as a sibling of this skill. Before the first feature scaffold, read:
 
-Do not batch feature scaffolds. Run one at a time, apply its wiring, complete the TDD loop (see `skills/scaffold.md` §5b), then move to the next.
+- `../scaffold/SKILL.md`
+- `../scaffold/references/tdd-loop.md`
+- `../scaffold/references/test-checklist.md`
 
-For `wp/cli`, pass the same project conventions detected in Stage 1 (namespace, base path, class suffix) — defaults assume the rtCamp skeleton (`Inc\Cli`, `includes/Cli`) and will be wrong for any other project:
+— introspect conventions, apply naming, invoke the engine, adaptive wiring, **expand test stubs into a real suite, then drive implementation from those tests** (red → green → refactor).
 
-```bash
-npx wp-tooling add wp/cli \
-    --non-interactive --json --cwd . \
-    --namespace='Acme\ImageOptimizer\Cli' --base-path='includes/Cli' \
-    --name=optimize-images --class=OptimizeImagesCommand
-```
+Do not batch feature scaffolds. Run one at a time, apply its wiring, complete the TDD loop (`../scaffold/references/tdd-loop.md`), then move to the next.
 
-The engine emits `ai.wiring` (where to register the command) and a thin test stub at `tests/Cli/OptimizeImagesCommandTest.php`. Show the wiring snippet, get consent, apply. Then turn the stub into a real test suite (happy path, dry-run flag, edge cases, error handling) and implement `__invoke()` test-by-test until the suite is green. Never leave `markTestIncomplete` in the final state.
+Read:
+- `references/phase-b-features.md` — the per-feature command shape (conventions to pass, `wp/cli` example).
+
+The engine emits `ai.wiring` (where to register the command) and a thin test stub at `tests/<Kind>/<Class>Test.php`. Show the wiring snippet, get consent, apply. Then turn the stub into a real test suite (happy path, dry-run flag, edge cases, error handling) and implement test-by-test until the suite is green. Never leave `markTestIncomplete` in the final state.
 
 **Phase B feature scaffolds require the matching test framework from Phase A.** If Phase A skipped `setup/phpunit` because the developer did not ask for tests, surface this before running Phase B feature scaffolds:
 
@@ -226,119 +151,10 @@ Which?
 
 Default to (1). Only proceed without tests if the developer explicitly chooses (2).
 
-### Wiring: composer.json PSR-4
-
-When `setup/psr4` wiring is received:
-
-1. Show the current `"autoload"` block in `composer.json` (or note it is absent).
-2. Show the intended entry: namespace `Acme\ImageOptimizer` maps to `includes/`.
-3. Ask: `Apply PSR-4 autoload to composer.json? [apply / skip]`
-4. If apply: paste the engine's `ai.wiring[0].snippet` verbatim. The engine already emits the PSR-4 key JSON-encoded with its trailing backslash (e.g. `"Acme\\ImageOptimizer\\"`) — **do not escape it again**, or you will double the backslashes and break autoload.
-5. Remind: run `composer dump-autoload --optimize` after applying.
-
-If `composer.json` does not exist, offer to create a minimal one:
-
-```
-composer.json not found. I can create a minimal one:
-
-  {
-    "name": "vendor/image-optimizer",
-    "type": "wordpress-plugin",
-    "require": { "php": ">=8.3" },
-    "autoload": {
-      "psr-4": { "Acme\\ImageOptimizer\\": "includes/" }
-    }
-  }
-
-Create it? [yes / skip PSR-4 / give me the values to use]
-```
-
-### Wiring: feature scaffolds
-
-Same as `skills/scaffold.md` §5 — `ai.wiring`. Show diff, get consent, apply.
-
 ### 6. Consolidated final report
 
-```
-Setup complete.
-
-Files written (Phase A):
-  .editorconfig
-  phpcs.xml.dist       (WordPress VIP Minimum + Docs)
-  phpstan.neon.dist    (extends rtCamp wp-phpstan baseline)
-  eslint.config.js
-  phpunit.xml.dist
-  tests/bootstrap.php
-  composer.json        (PSR-4 autoload added, Acme\ImageOptimizer → includes/)
-
-Files written (Phase B):
-  includes/Cli/OptimizeImagesCommand.php
-  tests/Cli/OptimizeImagesCommandTest.php
-
-Wiring applied:
-  includes/Plugin.php:43 — $this->boot('optimize-images', \Acme\ImageOptimizer\Cli\OptimizeImagesCommand::class);
-
-Tests:
-  tests/Cli/OptimizeImagesCommandTest.php — stub passing.
-
-Developer actions (run these yourself):
-
-  composer dump-autoload --optimize
-
-  composer require --dev \
-    automattic/vip-coding-standards:^3.0 \
-    wp-coding-standards/wpcs:^3.0 \
-    squizlabs/php_codesniffer:^3.7 \
-    phpunit/phpunit:^12.0 \
-    yoast/phpunit-polyfills:^4.0 \
-    brain/monkey:^2.6
-
-  npm install --save-dev \
-    eslint@^10.0.0 \
-    @wordpress/eslint-plugin@^25.1.0 \
-    @rtcamp/eslint-config@^0.1.0
-
-Scripts to add to composer.json:
-
-  "scripts": {
-    "lint:php": "phpcs --standard=phpcs.xml.dist",
-    "lint:php:fix": "phpcbf --standard=phpcs.xml.dist",
-    "phpstan": "phpstan analyse",
-    "test": "phpunit",
-    "test:unit": "phpunit --testsuite Unit",
-    "test:integration": "phpunit --testsuite Integration"
-  }
-
-Scripts to add to package.json:
-
-  "scripts": {
-    "lint:js": "eslint 'src/**/*.js' 'assets/**/*.js'",
-    "lint:js:fix": "eslint 'src/**/*.js' 'assets/**/*.js' --fix"
-  }
-
-Skipped: none.
-Outstanding manual tasks: none.
-```
-
-Deduplicate packages. Sort alphabetically within each block. Pinned packages use exact versions; everything else uses range specifiers.
-
-## PHPCS standard reference
-
-| Scaffold ID | When to use | Ruleset |
-|---|---|---|
-| `lint/phpcs/full` | Most rtCamp projects (recommended default) | `vendor/rtcamp/wp-framework/phpcs.xml.dist`, WordPress-Core + Extra + Docs + VIP-Go |
-| `lint/phpcs/vip` | WordPress VIP platform projects | `WordPress-VIP-Minimum` + `WordPress-Docs` |
-| `lint/phpcs/core` | Projects explicitly opting out of VIP-Go rules | `WordPress` — Core + Extra + Docs only |
-
-Developers can add `<rule>` entries to `phpcs.xml.dist` to override or extend the selected standard.
-
-## Test scaffolds reference
-
-| Scaffold ID | What it installs | When to apply |
-|---|---|---|
-| `setup/phpunit` | `phpunit.xml.dist`, `tests/bootstrap.php`, PHPUnit + polyfills + Brain Monkey | PHP plugin or theme with tests |
-| `setup/jest` | `jest.config.js`, `@wordpress/jest-preset-default` | JS blocks or scripts with unit tests |
-| `setup/pa11y` | `.pa11yci.json`, `pa11y-ci` | Any project needing WCAG2AA accessibility coverage |
+Read:
+- `references/report-template.md` — the full report template and its formatting rules (dedupe packages, sort alphabetically, pinned vs range versions).
 
 ## Rules: never assume, always ask
 
