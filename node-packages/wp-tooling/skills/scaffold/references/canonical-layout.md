@@ -1,5 +1,7 @@
 # Canonical Layout
 
+Use this file when you're resolving where a scaffolded artifact and its tests live (§3 of the workflow).
+
 Files group by **kind**, never by feature. `<Root>` = project's autoload root (e.g. `Inc`, `Acme\Blog`). Honour these unless the project shows ≥3 consistent samples justifying a deviation.
 
 | Scaffold | Source dir | Source ns | Test dir | Test ns | Module |

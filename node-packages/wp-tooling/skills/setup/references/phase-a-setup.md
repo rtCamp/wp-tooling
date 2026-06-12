@@ -1,5 +1,7 @@
 # Phase A — Project Setup Scaffolds
 
+Use this file when you're building the Phase A plan (§2 of the workflow) or executing it (§4).
+
 ## Selection table
 
 | Condition | Scaffold | Skip if |
@@ -24,7 +26,9 @@
 | `lint/phpcs/vip` | WordPress VIP platform projects | `WordPress-VIP-Minimum` + `WordPress-Docs` |
 | `lint/phpcs/core` | Projects explicitly opting out of VIP-Go rules | `WordPress` — Core + Extra + Docs only |
 
-## Test scaffold reference
+Developers can add `<rule>` entries to `phpcs.xml.dist` to override or extend the selected standard.
+
+## Test scaffolds reference
 
 | Scaffold ID | What it installs | When to apply |
 |---|---|---|
@@ -34,25 +38,26 @@
 
 ## Execution commands
 
-Run each in order with `--non-interactive --json --cwd .`. Process each result before running the next.
+For `setup/editorconfig`:
 
 ```bash
-# EditorConfig
 npx wp-tooling add setup/editorconfig --non-interactive --json --cwd .
+```
 
-# PSR-4 (use detected or developer-confirmed namespace and base path)
+For `setup/psr4` (use detected or developer-supplied namespace and base path):
+
+```bash
 npx wp-tooling add setup/psr4 \
     --non-interactive --json --cwd . \
-    --namespace='Acme\Plugin' --base-path='includes'
+    --namespace='Acme\ImageOptimizer' --base-path='includes'
+```
 
-# Lint configs
-npx wp-tooling add lint/phpcs/full --non-interactive --json --cwd .
+For lint and test setup scaffolds:
+
+```bash
+npx wp-tooling add lint/phpcs/vip --non-interactive --json --cwd .
 npx wp-tooling add lint/phpstan    --non-interactive --json --cwd .
 npx wp-tooling add lint/eslint     --non-interactive --json --cwd .
-npx wp-tooling add lint/stylelint  --non-interactive --json --cwd .
-
-# Test frameworks
-npx wp-tooling add setup/phpunit --non-interactive --json --cwd . --source-dir=includes
-npx wp-tooling add setup/jest    --non-interactive --json --cwd .
-npx wp-tooling add setup/pa11y   --non-interactive --json --cwd . --base-url=http://localhost:8888
+npx wp-tooling add setup/phpunit   --non-interactive --json --cwd . --source-dir=includes
+npx wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base-url=http://localhost:8888
 ```

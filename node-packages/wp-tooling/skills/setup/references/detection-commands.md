@@ -1,6 +1,6 @@
 # Detection Commands
 
-Run these to detect what already exists before building the scaffold plan (§1).
+Use this file when you're detecting what already exists in the project before building the scaffold plan (§1 of the workflow).
 
 **Project type:**
 ```bash

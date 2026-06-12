@@ -1,5 +1,7 @@
 # Consolidated Final Report Template
 
+Use this file when you're writing the consolidated final report after all phases complete (§6 of the workflow).
+
 ```
 Setup complete.
 
@@ -10,17 +12,17 @@ Files written (Phase A):
   eslint.config.js
   phpunit.xml.dist
   tests/bootstrap.php
-  composer.json        (PSR-4 autoload added, Acme\Plugin → includes/)
+  composer.json        (PSR-4 autoload added, Acme\ImageOptimizer → includes/)
 
 Files written (Phase B):
   includes/Cli/OptimizeImagesCommand.php
   tests/Cli/OptimizeImagesCommandTest.php
 
 Wiring applied:
-  includes/Plugin.php:43 — $this->boot('optimize-images', \Acme\Plugin\Cli\OptimizeImagesCommand::class);
+  includes/Plugin.php:43 — $this->boot('optimize-images', \Acme\ImageOptimizer\Cli\OptimizeImagesCommand::class);
 
 Tests:
-  tests/Cli/OptimizeImagesCommandTest.php — N tests passing.
+  tests/Cli/OptimizeImagesCommandTest.php — stub passing.
 
 Developer actions (run these yourself):
 
@@ -61,7 +63,4 @@ Skipped: none.
 Outstanding manual tasks: none.
 ```
 
-**Formatting rules:**
-- Deduplicate packages — no repeated entries across Phase A and Phase B.
-- Sort alphabetically within each block.
-- Pinned packages use exact versions; everything else uses range specifiers.
+Deduplicate packages. Sort alphabetically within each block. Pinned packages use exact versions; everything else uses range specifiers.
