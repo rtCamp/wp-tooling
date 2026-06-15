@@ -1,0 +1,6 @@
+# Keep test/dev artefacts out of the split mirror tarball.
+# splitsh-lite carries this file to the mirror repo as-is.
+/tests              export-ignore
+/.github            export-ignore
+phpunit.xml.dist    export-ignore
+.gitattributes      export-ignore

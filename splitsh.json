@@ -1,0 +1,14 @@
+{
+    "$comment": "Source of truth for Composer subtree splits.",
+    "$comment_subtrees": "Key = mirror repo name under 'organization'. Value = path inside the monorepo.",
+    "organization": "rtCamp",
+    "subtrees": {
+        "wp-phpcs": "composer-packages/phpcs",
+        "wp-phpstan": "composer-packages/phpstan"
+    },
+    "defaults": {
+        "branch": "main",
+        "user_name": "github-actions[bot]",
+        "user_email": "github-actions[bot]@users.noreply.github.com"
+    }
+}

@@ -1,0 +1,24 @@
+{
+	"slug": "eslint",
+	"category": "lint",
+	"name": "ESLint setup",
+	"description": "Installs ESLint with rtCamp's shared config (extends `@rtcamp/eslint-config`) and adds lint:js scripts.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/eslint.config.js.mustache",
+			"dest": "eslint.config.js"
+		}
+	],
+	"npm_dev_dependencies": {
+		"eslint": "^10.0.0",
+		"@wordpress/eslint-plugin": "^25.1.0",
+		"@rtcamp/eslint-config": "^0.1.0"
+	},
+	"scripts": {
+		"npm": {
+			"lint:js": "eslint 'src/**/*.js' 'assets/**/*.js'",
+			"lint:js:fix": "eslint 'src/**/*.js' 'assets/**/*.js' --fix"
+		}
+	}
+}
