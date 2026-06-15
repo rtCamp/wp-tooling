@@ -321,7 +321,7 @@ async function applyChange(registry, change, opts, io = {}) {
 
 async function runInteractive(opts) {
 	// Lazy require so non-interactive callers never load TTY UI.
-	const { confirm, spinner } = require('@rtcamp/wp-tooling/ui');
+	const { confirm, spinner } = require('../ui');
 
 	const cwd = path.resolve(opts.cwd);
 	const registry = await buildRegistry(cwd, fetchOptsFrom(opts));
