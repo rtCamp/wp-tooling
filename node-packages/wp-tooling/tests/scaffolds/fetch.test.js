@@ -56,6 +56,23 @@ function stubTransportError(message = 'ECONNRESET') {
 	});
 }
 
+// Connection drops mid-body: headers arrive, then the response stream errors.
+function stubResponseError(message = 'ECONNRESET') {
+	https.get.mockImplementation((url, options, callback) => {
+		const req = new EventEmitter();
+		req.destroy = () => {};
+		const res = new EventEmitter();
+		res.statusCode = 200;
+		res.headers = {};
+		res.setEncoding = () => {};
+		process.nextTick(() => {
+			callback(res);
+			res.emit('error', new Error(message));
+		});
+		return req;
+	});
+}
+
 describe('defaultCacheDir', () => {
 	const savedXdg = process.env.XDG_CACHE_HOME;
 	afterEach(() => {
@@ -278,6 +295,16 @@ describe('fetchRemoteFile', () => {
 
 	test('transport error with no cache throws EFETCHFAIL with cause', async () => {
 		stubTransportError('ECONNRESET');
+		await expect(
+			fetchRemoteFile(repo, fileSrc, { cacheDir })
+		).rejects.toMatchObject({
+			code: 'EFETCHFAIL',
+			cause: 'ECONNRESET',
+		});
+	});
+
+	test('response-stream error (reset mid-body) rejects EFETCHFAIL', async () => {
+		stubResponseError('ECONNRESET');
 		await expect(
 			fetchRemoteFile(repo, fileSrc, { cacheDir })
 		).rejects.toMatchObject({

@@ -776,22 +776,33 @@ describe('remote scaffolds (sources + index)', () => {
 		).toBe(true);
 	});
 
-	test('malformed index throws EBADSCAFFOLD', async () => {
+	test('malformed index is skipped with a warning; local scaffolds survive', async () => {
+		writeLocalScaffold(projectDir, {
+			slug: 'local-thing',
+			category: 'ci',
+			name: 'Local',
+			description: 'local',
+			source: 'template',
+			files: [{ src: 'x.mustache', dest: 'x.yml' }],
+		});
 		writeSources(projectDir, [source()]);
 		setHttpsRoutes({ 'index.json': '{ not json' });
+		const warnings = [];
 		const r = new ScaffoldRegistry({ projectDir });
-		await expect(r.scan(scanOpts())).rejects.toMatchObject({
-			code: 'EBADSCAFFOLD',
-		});
+		await r.scan({ fetchOpts: { cacheDir, warnings } });
+		expect(r.get('ci/test-remote')).toBeNull();
+		expect(r.get('ci/local-thing')).toBeTruthy();
+		expect(warnings.some((w) => /skipping source/.test(w))).toBe(true);
 	});
 
-	test('schema-invalid index throws EBADSCAFFOLD', async () => {
+	test('schema-invalid index is skipped with a warning, not a hard failure', async () => {
 		writeSources(projectDir, [source()]);
 		setHttpsRoutes({ 'index.json': JSON.stringify({ scaffolds: [{}] }) });
+		const warnings = [];
 		const r = new ScaffoldRegistry({ projectDir });
-		await expect(r.scan(scanOpts())).rejects.toMatchObject({
-			code: 'EBADSCAFFOLD',
-		});
+		await r.scan({ fetchOpts: { cacheDir, warnings } });
+		expect(r.get('ci/test-remote')).toBeNull();
+		expect(warnings.some((w) => /skipping source/.test(w))).toBe(true);
 	});
 
 	test('execute hydrates the manifest then fetches + writes the template', async () => {
@@ -973,6 +984,32 @@ describe('remote scaffolds (sources + index)', () => {
 		expect(
 			fssync.existsSync(path.join(targetDir, '.github/workflows/a.yml'))
 		).toBe(false);
+	});
+
+	test('checksum matches case-insensitively (uppercase hex + SHA256: prefix)', async () => {
+		const crypto = require('crypto');
+		const body = manifest();
+		const upper = crypto
+			.createHash('sha256')
+			.update(body)
+			.digest('hex')
+			.toUpperCase();
+		writeSources(projectDir, [source()]);
+		setHttpsRoutes({
+			'index.json': indexBody([
+				indexEntry({ checksum: `SHA256:${upper}` }),
+			]),
+			'scaffold.json': body,
+			'a.mustache': 'content: rendered',
+		});
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan(scanOpts());
+		const result = await r.execute(
+			'ci/test-remote',
+			{},
+			{ cwd: targetDir, fetchOpts: { cacheDir } }
+		);
+		expect(result.engine.wrote).toEqual(['.github/workflows/a.yml']);
 	});
 
 	test('remote manifest dest escaping --cwd throws EWRITEFAIL', async () => {

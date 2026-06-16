@@ -123,11 +123,19 @@ function validateSources(sources) {
 		const entry = sources.sources[i];
 		const at = `sources[${i}]`;
 		errors.push(...validateSource(entry, at));
-		if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-			const dupKey = `${entry.repository}@${entry.path}`;
+		// Key on repository+ref+path: same repo+path, different ref = distinct
+		// pins. Skip malformed entries (validateSource already flags them).
+		if (
+			entry &&
+			typeof entry === 'object' &&
+			typeof entry.repository === 'string' &&
+			typeof entry.ref === 'string' &&
+			typeof entry.path === 'string'
+		) {
+			const dupKey = `${entry.repository}@${entry.ref}@${entry.path}`;
 			if (seen.has(dupKey)) {
 				errors.push(
-					`${at}: duplicate source '${entry.repository}' path '${entry.path}'`
+					`${at}: duplicate source '${entry.repository}' ref '${entry.ref}' path '${entry.path}'`
 				);
 			}
 			seen.add(dupKey);

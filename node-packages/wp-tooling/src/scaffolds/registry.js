@@ -37,7 +37,7 @@ const {
 	getFeatureFiles,
 	clearFeatureFiles,
 } = require('./config');
-const { fetchRemoteFile, sha256Hex } = require('./fetch');
+const { fetchRemoteFile, verifyChecksum } = require('./fetch');
 const {
 	INDEX_FILENAME,
 	readSources,
@@ -144,7 +144,21 @@ class ScaffoldRegistry {
 		}
 
 		const perSourceRecords = await Promise.all(
-			allSources.map((source) => discoverSource(source, fetchOpts))
+			allSources.map(async (source) => {
+				try {
+					return await discoverSource(source, fetchOpts);
+				} catch (err) {
+					// A bad index must not take down local scaffolds or healthy
+					// sources; skip it with a warning, as an unreachable index
+					// already is in discoverSource.
+					if (Array.isArray(fetchOpts.warnings)) {
+						fetchOpts.warnings.push(
+							`skipping source ${source.repository}@${source.ref}: ${err.message}`
+						);
+					}
+					return [];
+				}
+			})
 		);
 
 		for (let s = 0; s < allSources.length; s++) {
@@ -742,9 +756,11 @@ async function hydrateRemote(record, fetchOpts) {
 		// tampered/poisoned response. Format: hex SHA-256 of the manifest
 		// body, with an optional `sha256:` prefix.
 		if (record._checksum) {
-			const expected = record._checksum.replace(/^sha256:/, '');
-			const actual = sha256Hex(text);
-			if (actual !== expected) {
+			const { ok, expected, actual } = verifyChecksum(
+				record._checksum,
+				text
+			);
+			if (!ok) {
 				throw new ScaffoldError(
 					'EBADSCAFFOLD',
 					`Checksum mismatch for remote scaffold ${makeId(record)} (${ref}): index declares sha256:${expected}, fetched manifest is sha256:${actual}`,

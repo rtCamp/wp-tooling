@@ -137,6 +137,13 @@ describe('validateSources', () => {
 		});
 		expect(errors.some((x) => /duplicate source/.test(x))).toBe(true);
 	});
+
+	test('same repo + path but different ref is not a duplicate', () => {
+		const errors = validateSources({
+			sources: [validSource(), { ...validSource(), ref: 'v2' }],
+		});
+		expect(errors.some((x) => /duplicate source/.test(x))).toBe(false);
+	});
 });
 
 describe('validateIndex', () => {

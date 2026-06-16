@@ -734,6 +734,39 @@ describe('validate --remote (sources + index)', () => {
 		expect(stdout).toMatch(/ok\s+ci\/remote-thing \(remote\)/);
 	});
 
+	it('--remote fails a manifest whose checksum mismatches the index', async () => {
+		setHttpsRoutes({
+			'index.json': indexBody([
+				{
+					id: 'ci/remote-thing',
+					path: 'ci/remote-thing',
+					name: 'Remote Thing',
+					description: 'a remote scaffold',
+					checksum: 'sha256:' + 'a'.repeat(64),
+				},
+			]),
+			'scaffold.json': manifest(),
+		});
+		writeProjectSources(cwd, [remoteSource()]);
+		const { code, stdout } = await withStdoutCapture(() =>
+			runCli([
+				'ci/remote-thing',
+				'--remote',
+				'--json',
+				'--cwd',
+				cwd,
+				'--cache-dir',
+				cacheDir,
+			])
+		);
+		expect(code).toBe(1);
+		const row = JSON.parse(stdout.trim()).results.find(
+			(r) => r.id === 'ci/remote-thing' && r.remote
+		);
+		expect(row.valid).toBe(false);
+		expect(row.errors.join('\n')).toMatch(/checksum mismatch/i);
+	});
+
 	it('--remote surfaces EFETCHFAIL when the manifest 404s', async () => {
 		setHttpsRoutes({
 			'index.json': indexBody(),

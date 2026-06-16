@@ -95,6 +95,24 @@ function hashUrl(url) {
 }
 
 /**
+ * Verify a fetched body against an index-declared checksum (`sha256:<hex>` or
+ * `<hex>`, case-insensitive). Shared by the registry and `validate --remote` so
+ * their integrity checks cannot drift.
+ *
+ * @param {string} declared Index-declared checksum.
+ * @param {string} body     The fetched body to hash.
+ * @return {{ok: boolean, expected: string, actual: string}} Normalised hex pair and whether they match.
+ */
+function verifyChecksum(declared, body) {
+	const expected = String(declared)
+		.trim()
+		.replace(/^sha256:/i, '')
+		.toLowerCase();
+	const actual = sha256Hex(body);
+	return { ok: actual === expected, expected, actual };
+}
+
+/**
  * One-shot HTTPS GET. Resolves `{ status, body, etag }` for any 2xx **and**
  * for `304 Not Modified` (so a conditional request can be answered from
  * cache). Rejects with `EFETCHFAIL` on other non-2xx, timeout, or network
@@ -126,6 +144,17 @@ function httpGet(url, options = {}) {
 				(res.headers && (res.headers.etag || res.headers.ETag)) || null;
 			let body = '';
 			res.setEncoding('utf8');
+			res.on('error', (err) => {
+				// A reset mid-body fires on the response, not the request;
+				// without this the promise never settles.
+				reject(
+					new ScaffoldError(
+						'EFETCHFAIL',
+						`response from ${url} failed: ${err.message}`,
+						{ url, cause: err.message }
+					)
+				);
+			});
 			res.on('data', (chunk) => {
 				body += chunk;
 			});
@@ -334,6 +363,7 @@ module.exports = {
 	readCached,
 	defaultCacheDir,
 	sha256Hex,
+	verifyChecksum,
 	// Exported for tests; do not rely on these from production callers.
 	_internal: { composeUrl, hashUrl, httpGet, USER_AGENT, RAW_GITHUB_BASE },
 };

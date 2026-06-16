@@ -40,7 +40,7 @@ const {
 	validateIndex,
 	indexEntryToRecord,
 } = require('./sources');
-const { fetchRemoteFile, readCached } = require('./fetch');
+const { fetchRemoteFile, readCached, verifyChecksum } = require('./fetch');
 const { defaultsDir, projectDir, requireFlagValue } = require('./cli-support');
 
 const SLUG_RE = new RegExp(SLUG_PATTERN);
@@ -896,6 +896,18 @@ async function validateRemoteManifest(record, fetchOpts, row) {
 		row.valid = false;
 		row.errors.push(`${err.code || 'EFETCHFAIL'}: ${err.message}`);
 		return;
+	}
+	// Same integrity gate add() applies in hydrateRemote — else validate would
+	// pass a manifest add will reject.
+	if (record._checksum) {
+		const { ok, expected, actual } = verifyChecksum(record._checksum, text);
+		if (!ok) {
+			row.valid = false;
+			row.errors.push(
+				`remote manifest checksum mismatch (${ref}): index declares sha256:${expected}, fetched manifest is sha256:${actual}`
+			);
+			return;
+		}
 	}
 	let manifest;
 	try {
