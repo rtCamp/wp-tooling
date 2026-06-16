@@ -1,0 +1,26 @@
+# rtCamp shared PHPStan baseline for WordPress projects.
+#
+# The relative include resolves to the sibling vendor/szepeviktor install, so a
+# consumer includes only this one file. The extension must load exactly once —
+# no manual extension.neon include and no extension-installer auto-load (see README).
+includes:
+    - ../../szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    # WordPress doc-blocks are unreliable; don't treat their types as certain.
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true
+    # Wrong-case function/method calls and provably wrong @var tags.
+    checkFunctionNameCase: true
+    reportWrongPhpDocTypeInVarTag: true
+    # Low-noise correctness checks — stricter than bare level 5, not a level bump.
+    inferPrivatePropertyTypeFromConstructor: true
+    checkInternalClassCaseSensitivity: true
+    checkExplicitMixedMissingReturn: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    reportAlwaysTrueInLastCondition: true
+    reportStaticMethodSignatures: true
+    # Variables assigned inside a loop don't exist after it.
+    polluteScopeWithAlwaysIterableForeach: false
+    polluteScopeWithLoopInitialAssignments: false

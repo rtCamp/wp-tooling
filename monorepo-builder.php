@@ -44,6 +44,7 @@ return static function (MBConfig $mbConfig): void {
         'require-dev' => [
             'phpunit/phpunit' => '^12.0',
             'phpstan/phpstan' => '^2.0',
+            'szepeviktor/phpstan-wordpress' => '^2.0',
             'squizlabs/php_codesniffer' => '^3.10',
         ],
     ]);
