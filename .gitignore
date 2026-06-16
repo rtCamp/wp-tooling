@@ -19,6 +19,10 @@ skills/*-workspace/
 # Composer
 vendor/
 
+# PHP tooling caches
+.phpunit.cache/
+.phpcs.cache
+
 # Monorepo: nested workspace/build artefacts (npm hoists to root, but be defensive)
 node_modules/
 coverage/

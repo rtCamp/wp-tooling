@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<ruleset
+	name="rtCampWP-Basic"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
+>
+	<description>rtCamp WordPress standards — Basic. WPCS + VIP-Go + Docs + PHP cross-version compatibility, at parity with the rtCamp plugin and theme skeletons. No strict-typing requirements — adopt this first, then move to rtCampWP.</description>
+
+	<!--
+		This ruleset carries rules only. Project-specific configuration —
+		`text_domain`, global prefixes, `WordPress.Files.FileName` (`is_theme`
+		vs PSR-4), `testVersion`, `minimum_wp_version`, the files to scan and
+		the paths to exclude — belongs in the consuming project's own
+		phpcs.xml.dist. See phpcs.xml.dist.example.
+	-->
+
+	<!--
+		WordPress VIP Go — hosting-grade performance/security checks. This is a
+		superset of WordPressVIPMinimum, so it covers everything the skeletons'
+		`WordPress-VIP-Go` and the toolkit's `WordPressVIPMinimum` enforced.
+	-->
+	<rule ref="WordPress-VIP-Go">
+		<!-- Deprecated JS sniffs; @todo remove the exclude once on PHPCS 4.0. -->
+		<exclude name="WordPressVIPMinimum.JS" />
+	</rule>
+
+	<!--
+		The main WordPress Coding Standards. WordPress-Extra includes
+		WordPress-Core, so referencing Extra covers both.
+	-->
+	<rule ref="WordPress-Extra">
+		<!-- Modern PHP idioms rtCamp deliberately allows (plugin skeleton, toolkit
+		     and coding-standards-d all permit these; the theme bans them only by
+		     using vanilla `WordPress` without customising). -->
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax" />
+		<exclude name="Universal.Operators.DisallowShortTernary" />
+	</rule>
+
+	<!-- Inline documentation sniffs. -->
+	<rule ref="WordPress-Docs">
+		<!-- A short docblock description is not mandatory. `Generic.Commenting.DocComment`
+		     ships with WordPress-Docs, so the exclude must live here to take effect. -->
+		<exclude name="Generic.Commenting.DocComment.MissingShort" />
+	</rule>
+
+	<!--
+		PHP cross-version compatibility. The consuming project sets `testVersion`
+		to declare the PHP range it supports.
+	-->
+	<rule ref="PHPCompatibilityWP" />
+
+	<!-- Limit consecutive blank lines between functions to 1, as both skeletons do. -->
+	<rule ref="Squiz.WhiteSpace.FunctionSpacing">
+		<properties>
+			<property name="spacing" value="1" />
+			<property name="spacingBeforeFirst" value="1" />
+			<property name="spacingAfterLast" value="0" />
+		</properties>
+	</rule>
+
+</ruleset>

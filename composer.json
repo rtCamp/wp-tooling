@@ -4,10 +4,20 @@
     "license": "GPL-2.0-or-later",
     "type": "project",
     "require": {
-        "php": ">=8.1"
+        "automattic/vipwpcs": "^3.0",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "php": ">=8.4.1",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "slevomat/coding-standard": "^8.12",
+        "wp-coding-standards/wpcs": "^3.2"
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
     "require-dev": {
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.0",
