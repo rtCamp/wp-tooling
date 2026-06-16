@@ -674,7 +674,7 @@ describe('remote scaffolds (sources + index)', () => {
 	}
 
 	const source = (overrides = {}) => ({
-		github: 'rtCamp/wp-shared-workflows',
+		repository: 'rtCamp/wp-shared-workflows',
 		ref: 'v1',
 		path: 'scaffolds',
 		...overrides,
@@ -731,7 +731,7 @@ describe('remote scaffolds (sources + index)', () => {
 		expect(rec.origin).toBe('remote');
 		expect(rec.name).toBe('CI Remote');
 		expect(rec.files).toBeUndefined(); // not hydrated yet
-		expect(rec._repository.github).toBe('rtCamp/wp-shared-workflows');
+		expect(rec._repository.repository).toBe('rtCamp/wp-shared-workflows');
 		expect(rec._repository.path).toBe('scaffolds/ci/test-remote');
 	});
 
@@ -755,7 +755,7 @@ describe('remote scaffolds (sources + index)', () => {
 	test('same id offered by two sources throws EBADSCAFFOLD', async () => {
 		writeSources(projectDir, [
 			source(),
-			source({ github: 'rtCamp/other-repo' }),
+			source({ repository: 'rtCamp/other-repo' }),
 		]);
 		setHttpsRoutes({ 'index.json': indexBody() }); // both indexes list ci/test-remote
 		const r = new ScaffoldRegistry({ projectDir });

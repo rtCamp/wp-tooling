@@ -1,7 +1,7 @@
 {
   "sources": [
     {
-      "github": "rtCamp/wp-shared-workflows",
+      "repository": "rtCamp/wp-shared-workflows",
       "ref": "v1",
       "path": "scaffolds"
     }

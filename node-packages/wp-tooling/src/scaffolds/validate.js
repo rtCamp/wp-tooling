@@ -819,7 +819,7 @@ async function collectSourcesResults(opts, localIds) {
  * unfetchable/invalid reachable index pushes an error row into `results` and
  * yields no records.
  *
- * @param {Object} source    - A validated `sources.json` entry `{ github, ref, path }`.
+ * @param {Object} source    - A validated `sources.json` entry `{ repository, ref, path }`.
  * @param {Object} opts      - Parsed CLI options.
  * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile`.
  * @param {Array}  results   - Result rows (mutated to append index-level errors).
@@ -828,15 +828,15 @@ async function collectSourcesResults(opts, localIds) {
  */
 async function resolveSourceRecords(source, opts, fetchOpts, results, file) {
 	const indexRepo = {
-		github: source.github,
+		repository: source.repository,
 		ref: source.ref,
 		path: source.path,
 	};
-	const ref = `${source.github}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
+	const ref = `${source.repository}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
 	const indexErr = (errors) =>
 		results.push({
 			file,
-			id: `${source.github} (index)`,
+			id: `${source.repository} (index)`,
 			valid: false,
 			errors,
 			remote: true,
@@ -888,7 +888,7 @@ async function resolveSourceRecords(source, opts, fetchOpts, results, file) {
  */
 async function validateRemoteManifest(record, fetchOpts, row) {
 	const repo = record._repository;
-	const ref = `${repo.github}@${repo.ref}/${repo.path}/scaffold.json`;
+	const ref = `${repo.repository}@${repo.ref}/${repo.path}/scaffold.json`;
 	let text;
 	try {
 		text = await fetchRemoteFile(repo, 'scaffold.json', fetchOpts);

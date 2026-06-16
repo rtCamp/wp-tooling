@@ -366,7 +366,7 @@ describe('validate rejects the removed repository field', () => {
 		const errors = validate({
 			...baseValid(),
 			repository: {
-				github: 'rtCamp/wp-shared-workflows',
+				repository: 'rtCamp/wp-shared-workflows',
 				ref: 'v1',
 				path: 'scaffolds/ci/test-php',
 			},
@@ -543,7 +543,7 @@ describe('validate runCli', () => {
 	}
 
 	const remoteSource = (overrides = {}) => ({
-		github: 'rtCamp/wp-shared-workflows',
+		repository: 'rtCamp/wp-shared-workflows',
 		ref: 'v1',
 		path: 'scaffolds',
 		...overrides,
@@ -559,9 +559,9 @@ describe('validate runCli', () => {
 		expect(stdout).toMatch(/ok\s+sources/);
 	});
 
-	it('fails when a source has a bad github slug', async () => {
+	it('fails when a source has a bad repository slug', async () => {
 		const cwd = makeTmpDir();
-		writeProjectSources(cwd, [remoteSource({ github: 'no-slash' })]);
+		writeProjectSources(cwd, [remoteSource({ repository: 'no-slash' })]);
 		const { code, stdout } = await withStdoutCapture(() =>
 			runCli(['--cwd', cwd])
 		);
@@ -625,7 +625,7 @@ describe('validate --remote (sources + index)', () => {
 	}
 
 	const remoteSource = (overrides = {}) => ({
-		github: 'rtCamp/wp-shared-workflows',
+		repository: 'rtCamp/wp-shared-workflows',
 		ref: 'v1',
 		path: 'scaffolds',
 		...overrides,

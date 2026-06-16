@@ -85,7 +85,7 @@ describe('composeUrl', () => {
 	test('builds a raw-content URL', () => {
 		const url = composeUrl(
 			{
-				github: 'rtCamp/wp-shared-workflows',
+				repository: 'rtCamp/wp-shared-workflows',
 				ref: 'v1',
 				path: 'scaffolds/ci/test-php',
 			},
@@ -99,7 +99,7 @@ describe('composeUrl', () => {
 	test('normalises leading and trailing slashes on each segment', () => {
 		const url = composeUrl(
 			{
-				github: '/rtCamp/wp-shared-workflows/',
+				repository: '/rtCamp/wp-shared-workflows/',
 				ref: '/v1/',
 				path: '/scaffolds/ci/test-php/',
 			},
@@ -114,7 +114,7 @@ describe('composeUrl', () => {
 describe('fetchRemoteFile', () => {
 	let cacheDir;
 	const repo = {
-		github: 'rtCamp/wp-shared-workflows',
+		repository: 'rtCamp/wp-shared-workflows',
 		ref: 'v1',
 		path: 'scaffolds/ci/test-php',
 	};
@@ -327,7 +327,7 @@ describe('fetchRemoteFile', () => {
 describe('readCached', () => {
 	let cacheDir;
 	const repo = {
-		github: 'rtCamp/wp-shared-workflows',
+		repository: 'rtCamp/wp-shared-workflows',
 		ref: 'v1',
 		path: 'scaffolds',
 	};

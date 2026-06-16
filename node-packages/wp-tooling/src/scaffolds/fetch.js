@@ -3,7 +3,7 @@
  * (`src/scaffolds/sources.js`). Fetches a repo's `index.json`, a remote
  * scaffold's `scaffold.json` manifest, and its template bodies.
  *
- * Composes a `raw.githubusercontent.com` URL from `{ github, ref, path }` plus
+ * Composes a `raw.githubusercontent.com` URL from `{ repository, ref, path }` plus
  * a relative file path, fetches it over HTTPS, and caches the body on disk.
  * The cache is **always** written and validated by ETag: on a later read we
  * issue a conditional request (`If-None-Match`) and serve the cached body on
@@ -58,16 +58,16 @@ function defaultCacheDir() {
  * `path: "scaffolds/ci/test-php"` or `path: "scaffolds/ci/test-php/"`
  * interchangeably.
  *
- * @param {Object} repository `{ github, ref, path }`.
- * @param {string} relPath    File relative to `repository.path`.
+ * @param {Object} source  `{ repository, ref, path }`.
+ * @param {string} relPath File relative to `source.path`.
  * @return {string} Absolute URL.
  */
-function composeUrl(repository, relPath) {
+function composeUrl(source, relPath) {
 	const strip = (s) => String(s).replace(/^\/+|\/+$/g, '');
 	const parts = [
-		strip(repository.github),
-		strip(repository.ref),
-		strip(repository.path),
+		strip(source.repository),
+		strip(source.ref),
+		strip(source.path),
 		strip(relPath),
 	].filter((s) => s.length > 0);
 	return `${RAW_GITHUB_BASE}/${parts.join('/')}`;
@@ -236,14 +236,14 @@ async function writeCacheEntry(cacheDir, cachePath, body, etag, opts) {
  * offline id recognition (e.g. `validate` resolving a remote id from the
  * last-seen index).
  *
- * @param {Object} repository      `{ github, ref, path }`.
- * @param {string} relPath         File relative to `repository.path`.
+ * @param {Object} source          `{ repository, ref, path }`.
+ * @param {string} relPath         File relative to `source.path`.
  * @param {Object} [opts]
  * @param {string} [opts.cacheDir] Override the default cache dir.
  * @return {Promise<string|null>} Cached body, or `null` when not cached.
  */
-async function readCached(repository, relPath, opts = {}) {
-	const url = composeUrl(repository, relPath);
+async function readCached(source, relPath, opts = {}) {
+	const url = composeUrl(source, relPath);
 	const cacheDir = opts.cacheDir || defaultCacheDir();
 	const cachePath = path.join(cacheDir, hashUrl(url));
 	const entry = await readCacheEntry(cachePath).catch(() => null);
@@ -258,8 +258,8 @@ async function readCached(repository, relPath, opts = {}) {
  * exists, the cached copy is served with a warning (offline tolerance);
  * otherwise the error propagates.
  *
- * @param {Object}   repository      `{ github, ref, path }`.
- * @param {string}   relPath         File relative to `repository.path`.
+ * @param {Object}   source          `{ repository, ref, path }`.
+ * @param {string}   relPath         File relative to `source.path`.
  * @param {Object}   [opts]          Fetch options.
  * @param {string}   [opts.cacheDir] Override the default cache dir (test seam).
  * @param {boolean}  [opts.refresh]  Force a re-fetch even when cached/unchanged.
@@ -268,8 +268,8 @@ async function readCached(repository, relPath, opts = {}) {
  * @return {Promise<string>} The file contents, UTF-8.
  * @throws {ScaffoldError} `EFETCHFAIL` on HTTP / network failure with no usable cache.
  */
-async function fetchRemoteFile(repository, relPath, opts = {}) {
-	const url = composeUrl(repository, relPath);
+async function fetchRemoteFile(source, relPath, opts = {}) {
+	const url = composeUrl(source, relPath);
 	const cacheDir = opts.cacheDir || defaultCacheDir();
 	const cachePath = path.join(cacheDir, hashUrl(url));
 	const token = resolveToken(opts);

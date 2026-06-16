@@ -14,7 +14,7 @@
  *     `hydrateRemote`).
  *
  * `sources.json` shape (wp-tooling side):
- *   { "sources": [ { "github", "ref", "path" }, ... ] }
+ *   { "sources": [ { "repository", "ref", "path" }, ... ] }
  *
  * `index.json` shape (owning-repo side, fetched):
  *   { "scaffolds": [ { "id", "path", "name", "description", "checksum"? }, ... ] }
@@ -122,12 +122,12 @@ function validateSources(sources) {
 	for (let i = 0; i < sources.sources.length; i++) {
 		const entry = sources.sources[i];
 		const at = `sources[${i}]`;
-		errors.push(...validateRepository(entry, at));
+		errors.push(...validateSource(entry, at));
 		if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-			const dupKey = `${entry.github}@${entry.path}`;
+			const dupKey = `${entry.repository}@${entry.path}`;
 			if (seen.has(dupKey)) {
 				errors.push(
-					`${at}: duplicate source '${entry.github}' path '${entry.path}'`
+					`${at}: duplicate source '${entry.repository}' path '${entry.path}'`
 				);
 			}
 			seen.add(dupKey);
@@ -137,43 +137,42 @@ function validateSources(sources) {
 }
 
 /**
- * Validate one source entry's `{ github, ref, path }` shape.
+ * Validate one source entry's `{ repository, ref, path }` shape.
  *
- * @param {unknown} repository - The candidate source entry.
- * @param {string}  at         - Field-path prefix for messages.
+ * @param {unknown} source - The candidate source entry.
+ * @param {string}  at     - Field-path prefix for messages.
  * @return {string[]} Error messages.
  */
-function validateRepository(repository, at) {
+function validateSource(source, at) {
 	if (
-		repository === null ||
-		typeof repository !== 'object' ||
-		Array.isArray(repository)
+		source === null ||
+		typeof source !== 'object' ||
+		Array.isArray(source)
 	) {
 		return [`${at}: must be an object`];
 	}
 	const errs = [];
-	for (const required of ['github', 'ref', 'path']) {
-		if (!(required in repository)) {
+	for (const required of ['repository', 'ref', 'path']) {
+		if (!(required in source)) {
 			errs.push(`${at}.${required}: required`);
 		}
 	}
-	for (const k of Object.keys(repository)) {
-		if (!['github', 'ref', 'path'].includes(k)) {
+	for (const k of Object.keys(source)) {
+		if (!['repository', 'ref', 'path'].includes(k)) {
 			errs.push(`${at}: unknown field '${k}'`);
 		}
 	}
 	if (
-		repository.github !== undefined &&
-		(typeof repository.github !== 'string' ||
-			!GITHUB_REPO_RE.test(repository.github))
+		source.repository !== undefined &&
+		(typeof source.repository !== 'string' ||
+			!GITHUB_REPO_RE.test(source.repository))
 	) {
-		errs.push(`${at}.github: must match 'owner/repo'`);
+		errs.push(`${at}.repository: must match 'owner/repo'`);
 	}
 	for (const field of ['ref', 'path']) {
 		if (
-			repository[field] !== undefined &&
-			(typeof repository[field] !== 'string' ||
-				repository[field].length === 0)
+			source[field] !== undefined &&
+			(typeof source[field] !== 'string' || source[field].length === 0)
 		) {
 			errs.push(`${at}.${field}: must be a non-empty string`);
 		}
@@ -266,7 +265,7 @@ function validateIndex(index) {
  * own directory; the full manifest (inputs/files/wiring/...) is fetched lazily
  * by the registry on `add`.
  *
- * @param {Object} source - The source repo this index came from `{ github, ref, path }`.
+ * @param {Object} source - The source repo this index came from `{ repository, ref, path }`.
  * @param {Object} entry  - One validated index entry.
  * @return {Object} Thin remote scaffold record.
  */
@@ -283,7 +282,7 @@ function indexEntryToRecord(source, entry) {
 		description: entry.description,
 		origin: 'remote',
 		_repository: {
-			github: source.github,
+			repository: source.repository,
 			ref: source.ref,
 			path: scaffoldPath,
 		},

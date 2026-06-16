@@ -17,7 +17,7 @@ Two further engine capabilities were built on the same branch because they unblo
 
 ## Decisions made
 
-- [2026-06-04] Remote scaffolds use **per-repo sources + an upstream index** (`scaffolds/sources.json` lists pinned `{ github, ref, path }`; each repo publishes `scaffolds/index.json`) rather than a single central inventory file — keeps ownership with the source repo. `source: "repository"` was dropped during this evolution; do not reintroduce.
+- [2026-06-04] Remote scaffolds use **per-repo sources + an upstream index** (`scaffolds/sources.json` lists pinned `{ repository, ref, path }`; each repo publishes `scaffolds/index.json`) rather than a single central inventory file — keeps ownership with the source repo. `source: "repository"` was dropped during this evolution; do not reintroduce.
 - [2026-06-04] `discover_from` precedence is `supplied → discovered → default` and is **fail-safe** — `loadDiscovery` reads `composer.json`/`package.json`/`.wp-tooling.json` tolerantly (never throws); anything unresolved returns `undefined` so the caller falls back to `default`.
 - [2026-06-04] `isPathInput()` heuristic: inputs whose key looks path-shaped (`*_path`, `*_dir`, `base_path`) keep their `default` and are **not** overwritten by a PSR-4 namespace discovery, since the PSR-4 root dir is rarely a scaffold's target sub-path.
 - [2026-06-04] Added an input `transform` step; `json-escape` doubles backslashes so the PSR-4 composer autoload key renders as valid JSON (`namespace_json` derived input on `setup/psr4`).

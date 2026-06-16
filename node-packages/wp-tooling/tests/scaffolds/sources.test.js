@@ -20,7 +20,7 @@ function makeTmpDir() {
 }
 
 const validSource = () => ({
-	github: 'rtCamp/wp-shared-workflows',
+	repository: 'rtCamp/wp-shared-workflows',
 	ref: 'v1',
 	path: 'scaffolds',
 });
@@ -61,7 +61,9 @@ describe('readSources', () => {
 		expect(src).not.toBeNull();
 		expect(src.file).toBe(path.join(FIXTURE_DIR, SOURCES_FILENAME));
 		expect(Array.isArray(src.parsed.sources)).toBe(true);
-		expect(src.parsed.sources[0].github).toBe('rtCamp/wp-shared-workflows');
+		expect(src.parsed.sources[0].repository).toBe(
+			'rtCamp/wp-shared-workflows'
+		);
 	});
 
 	test('throws EBADSCAFFOLD on invalid JSON', async () => {
@@ -104,7 +106,7 @@ describe('validateSources', () => {
 	});
 
 	test('rejects a source missing required fields', () => {
-		const errors = validateSources({ sources: [{ github: 'a/b' }] });
+		const errors = validateSources({ sources: [{ repository: 'a/b' }] });
 		expect(errors).toEqual(
 			expect.arrayContaining([
 				'sources[0].ref: required',
@@ -113,11 +115,13 @@ describe('validateSources', () => {
 		);
 	});
 
-	test('rejects a bad github slug', () => {
+	test('rejects a bad repository slug', () => {
 		const s = validSource();
-		s.github = 'no-slash';
+		s.repository = 'no-slash';
 		const errors = validateSources({ sources: [s] });
-		expect(errors).toContain("sources[0].github: must match 'owner/repo'");
+		expect(errors).toContain(
+			"sources[0].repository: must match 'owner/repo'"
+		);
 	});
 
 	test('rejects an unknown source field', () => {
@@ -127,7 +131,7 @@ describe('validateSources', () => {
 		expect(errors).toContain("sources[0]: unknown field 'branch'");
 	});
 
-	test('flags a duplicate github + path source', () => {
+	test('flags a duplicate repository + path source', () => {
 		const errors = validateSources({
 			sources: [validSource(), validSource()],
 		});
@@ -203,7 +207,7 @@ describe('indexEntryToRecord', () => {
 			description: 'a remote scaffold',
 			origin: 'remote',
 			_repository: {
-				github: 'rtCamp/wp-shared-workflows',
+				repository: 'rtCamp/wp-shared-workflows',
 				ref: 'v1',
 				path: 'scaffolds/ci/test-remote',
 			},
@@ -213,7 +217,7 @@ describe('indexEntryToRecord', () => {
 
 	test('normalises slashes when joining source.path + entry.path', () => {
 		const record = indexEntryToRecord(
-			{ github: 'a/b', ref: 'v1', path: '/scaffolds/' },
+			{ repository: 'a/b', ref: 'v1', path: '/scaffolds/' },
 			{ ...validIndexEntry(), path: '/ci/test-remote/' }
 		);
 		expect(record._repository.path).toBe('scaffolds/ci/test-remote');

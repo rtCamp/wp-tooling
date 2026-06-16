@@ -669,18 +669,18 @@ class ScaffoldRegistry {
  * cache at all — in which case we skip the source with a warning rather than
  * hard-fail discovery (so local `list`/`add` keep working offline).
  *
- * @param {Object} source    - One validated `sources.json` entry `{ github, ref, path }`.
+ * @param {Object} source    - One validated `sources.json` entry `{ repository, ref, path }`.
  * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile` (cacheDir, refresh, token, warnings).
  * @return {Promise<Object[]>} Thin remote records (empty when the source is unreachable + uncached).
  * @throws {ScaffoldError} EBADSCAFFOLD when a reachable index is invalid JSON or fails its schema.
  */
 async function discoverSource(source, fetchOpts) {
 	const indexRepo = {
-		github: source.github,
+		repository: source.repository,
 		ref: source.ref,
 		path: source.path,
 	};
-	const ref = `${source.github}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
+	const ref = `${source.repository}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
 	let text;
 	try {
 		text = await fetchRemoteFile(indexRepo, INDEX_FILENAME, fetchOpts);
@@ -730,7 +730,7 @@ async function discoverSource(source, fetchOpts) {
  * @throws {ScaffoldError} EBADSCAFFOLD (bad JSON / schema), EFETCHFAIL (network).
  */
 async function hydrateRemote(record, fetchOpts) {
-	const ref = `${record._repository.github}@${record._repository.ref}/${record._repository.path}/scaffold.json`;
+	const ref = `${record._repository.repository}@${record._repository.ref}/${record._repository.path}/scaffold.json`;
 	if (!record._manifest || (fetchOpts && fetchOpts.refresh)) {
 		const text = await fetchRemoteFile(
 			record._repository,

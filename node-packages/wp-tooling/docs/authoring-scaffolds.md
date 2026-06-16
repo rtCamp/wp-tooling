@@ -314,7 +314,7 @@ scaffolds/
 {
   "sources": [
     {
-      "github": "rtCamp/wp-shared-workflows",
+      "repository": "rtCamp/wp-shared-workflows",
       "ref": "v1",
       "path": "scaffolds"
     }
@@ -322,7 +322,7 @@ scaffolds/
 }
 ```
 
-On scan, the engine fetches `<github>/<ref>/<path>/index.json` to discover the repo's scaffolds. On `add ci/test-php`, it fetches that scaffold's `scaffold.json`, validates it, then fetches each `files[].src` from the same directory and renders exactly as a local scaffold. A scaffold id must be unique across local scaffolds and every source (a collision is a hard `EBADSCAFFOLD` at scan).
+On scan, the engine fetches `<repository>/<ref>/<path>/index.json` to discover the repo's scaffolds. On `add ci/test-php`, it fetches that scaffold's `scaffold.json`, validates it, then fetches each `files[].src` from the same directory and renders exactly as a local scaffold. A scaffold id must be unique across local scaffolds and every source (a collision is a hard `EBADSCAFFOLD` at scan).
 
 ### Two different refs
 
