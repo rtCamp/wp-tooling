@@ -19,6 +19,12 @@ const REQUIRED_FIELDS = ['slug', 'name', 'description', 'source', 'files'];
 /**
  * `template` renders files from Mustache templates; `package` registers
  * boot wiring for a class shipped in vendor and writes zero files.
+ *
+ * A scaffold can also be served from a remote repo, but that is NOT a
+ * `source` value — remoteness is expressed by a `sources.json` entry +
+ * the owning repo's index (`src/scaffolds/sources.js`) pointing at an
+ * ordinary `template` scaffold living in another repo. The manifest shape
+ * is identical either way; only its discovery + template loading differ.
  */
 const ALLOWED_SOURCES = ['template', 'package'];
 
@@ -47,6 +53,7 @@ const ALLOWED_INPUT_TRANSFORMS = [
 	'kebab-case',
 	'snake-case',
 	'upper-snake-case',
+	'json-escape',
 ];
 
 /** Optional dependency maps. Each is `{ "<package>": "<version-range>" }`. */
@@ -66,6 +73,8 @@ const SLUG_PATTERN = '^[a-z0-9-]+$';
 const CATEGORY_PATTERN = '^[a-z][a-z0-9/-]*$';
 const INPUT_KEY_PATTERN = '^[a-z][a-z0-9_]*$';
 const SECRET_KEY_PATTERN = '^[A-Z][A-Z0-9_]*$';
+/** `owner/repo` on github.com — used by the sources/index validator. */
+const GITHUB_REPO_PATTERN = '^[\\w.-]+/[\\w.-]+$';
 
 /** Reusable Draft-07 entry shapes. */
 const INPUT_ENTRY = {
@@ -133,6 +142,45 @@ const FILE_ENTRY = {
 			type: 'boolean',
 			description:
 				'When true, the file content is copied verbatim (no Mustache rendering). The `dest` path is still rendered. Use for files that contain literal `{{` or `}}` that would otherwise be misinterpreted as placeholders.',
+		},
+	},
+};
+
+/**
+ * Marks a scaffold as a toggleable feature. Optional + additive: scaffolds
+ * without it behave exactly as before. When present, the feature manager
+ * (`wp-tooling features`) can enable it (run the scaffold + set the flag) or
+ * disable it (remove owned files + clear the flag). The AI `add` path ignores
+ * this block entirely.
+ */
+const FEATURE_BLOCK = {
+	type: 'object',
+	required: ['config_key'],
+	additionalProperties: false,
+	properties: {
+		config_key: {
+			type: 'string',
+			minLength: 1,
+			description:
+				'Key under `features{}` in .wp-tooling.json that records this feature on/off.',
+		},
+		owned_files: {
+			type: 'array',
+			description:
+				'Files created by this feature that are safe to delete on disable (rendered like dest paths).',
+			items: { type: 'string', minLength: 1 },
+		},
+		confirm_remove: {
+			type: 'array',
+			description:
+				'Developer-editable files to delete only after explicit confirmation on disable.',
+			items: { type: 'string', minLength: 1 },
+		},
+		gitignore: {
+			type: 'array',
+			description:
+				'.gitignore lines added on enable and removed on disable.',
+			items: { type: 'string', minLength: 1 },
 		},
 	},
 };
@@ -232,6 +280,7 @@ const SCAFFOLD_SCHEMA = {
 				'Secrets the developer must set (never values, only declarations).',
 			items: SECRET_ENTRY,
 		},
+		feature: FEATURE_BLOCK,
 		scripts: SCRIPTS_BLOCK,
 		npm_dependencies: DEPENDENCY_MAP,
 		npm_dev_dependencies: DEPENDENCY_MAP,
@@ -255,4 +304,5 @@ module.exports = {
 	CATEGORY_PATTERN,
 	INPUT_KEY_PATTERN,
 	SECRET_KEY_PATTERN,
+	GITHUB_REPO_PATTERN,
 };

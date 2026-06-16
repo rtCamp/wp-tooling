@@ -121,7 +121,7 @@ function _getLineQueue() {
 
 	rl.on('line', (line) => {
 		if (waiters.length > 0) {
-			waiters.shift()(line);
+			waiters.shift().resolve(line);
 		} else {
 			lines.push(line);
 		}
@@ -130,21 +130,23 @@ function _getLineQueue() {
 	rl.once('close', () => {
 		closed = true;
 		_lineQueueClosed = true;
-		// Resolve any remaining waiters with empty string.
+		// Stdin is exhausted: reject in-flight readers as cancelled. Resolving
+		// with '' here would loop forever on any prompt with a required
+		// validator (empty answer -> error -> re-prompt -> empty answer ...).
 		while (waiters.length > 0) {
-			waiters.shift()('');
+			waiters.shift().reject(new CancelledError());
 		}
 	});
 
 	_lineQueue = {
 		shift() {
-			return new Promise((resolve) => {
+			return new Promise((resolve, reject) => {
 				if (lines.length > 0) {
 					resolve(lines.shift());
 				} else if (closed) {
-					resolve('');
+					reject(new CancelledError());
 				} else {
-					waiters.push(resolve);
+					waiters.push({ resolve, reject });
 				}
 			});
 		},

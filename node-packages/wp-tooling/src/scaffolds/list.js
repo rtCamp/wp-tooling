@@ -19,8 +19,11 @@
 
 'use strict';
 
-const path = require('path');
-const { ScaffoldRegistry } = require('./registry');
+const {
+	buildRegistry,
+	fetchOptsFrom,
+	requireFlagValue,
+} = require('./cli-support');
 
 function parseArgs(argv) {
 	const opts = {
@@ -28,26 +31,37 @@ function parseArgs(argv) {
 		cwd: process.cwd(),
 		category: null,
 		origin: null,
+		refresh: false,
+		cacheDir: null,
 		help: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag; rejects a missing or flag-shaped
+		// value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--json') {
 			opts.json = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
 		} else if (a === '--category') {
-			opts.category = argv[++i];
+			opts.category = value();
 		} else if (a.startsWith('--category=')) {
 			opts.category = a.slice('--category='.length);
 		} else if (a === '--origin') {
-			opts.origin = argv[++i];
+			opts.origin = value();
 		} else if (a.startsWith('--origin=')) {
 			opts.origin = a.slice('--origin='.length);
+		} else if (a === '--refresh') {
+			opts.refresh = true;
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = value();
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else {
 			throw new Error(`Unexpected argument: ${a}`);
 		}
@@ -62,9 +76,11 @@ function printHelp() {
 			'',
 			'Flags:',
 			'  --category <name>    Show only scaffolds in this category (e.g., wp, ci, block, utility).',
-			'  --origin <default|project>  Show only default-catalogue or only project-local scaffolds.',
+			'  --origin <default|project|remote>  Show only default-catalogue, project-local, or remote (sources) scaffolds.',
 			'  --json               Emit machine-readable JSON instead of the human table.',
 			'  --cwd <path>         Project directory whose bin/scaffolds is merged in (default: cwd).',
+			'  --refresh            Bypass the remote-index cache and re-fetch.',
+			'  --cache-dir <path>   Override the remote-fetch cache directory.',
 			'  --help, -h           Show this help text.',
 			'',
 			'Examples:',
@@ -75,23 +91,6 @@ function printHelp() {
 			'',
 		].join('\n')
 	);
-}
-
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
-}
-
-async function buildRegistry(cwd) {
-	const registry = new ScaffoldRegistry({
-		defaultsDir: defaultsDir(),
-		projectDir: projectDir(cwd),
-	});
-	await registry.scan();
-	return registry;
 }
 
 function makeId(s) {
@@ -110,6 +109,21 @@ function applyFilters(scaffolds, opts) {
 }
 
 function summarise(scaffold) {
+	// Remote (sources) scaffolds are listed from the repo index without
+	// fetching each manifest, so their detailed counts are unknown until
+	// `add`. They render Mustache like any template scaffold.
+	if (scaffold.origin === 'remote') {
+		return {
+			id: makeId(scaffold),
+			slug: scaffold.slug,
+			category: scaffold.category || null,
+			name: scaffold.name,
+			description: scaffold.description,
+			kind: 'template',
+			origin: 'remote',
+			counts: null,
+		};
+	}
 	return {
 		id: makeId(scaffold),
 		slug: scaffold.slug,
@@ -182,6 +196,9 @@ function printHumanTable(summaries) {
 }
 
 function formatCounts(counts) {
+	if (!counts) {
+		return '';
+	}
 	const parts = [];
 	if (counts.inputs) {
 		parts.push(`inputs:${counts.inputs}`);
@@ -202,28 +219,43 @@ function formatCounts(counts) {
 }
 
 async function runCli(argv) {
-	const opts = parseArgs(argv);
+	let opts;
+	try {
+		opts = parseArgs(argv);
+	} catch (err) {
+		process.stderr.write(`Error: ${err.message}\n`);
+		printHelp();
+		return 1;
+	}
 	if (opts.help) {
 		printHelp();
 		return 0;
 	}
-	if (opts.origin && !['default', 'project'].includes(opts.origin)) {
+	if (
+		opts.origin &&
+		!['default', 'project', 'remote'].includes(opts.origin)
+	) {
 		process.stderr.write(
-			`Error: --origin must be 'default' or 'project' (got '${opts.origin}')\n`
+			`Error: --origin must be 'default', 'project', or 'remote' (got '${opts.origin}')\n`
 		);
 		return 1;
 	}
 	try {
-		const registry = await buildRegistry(opts.cwd);
+		const warnings = [];
+		const fetchOpts = { ...fetchOptsFrom(opts), warnings };
+		const registry = await buildRegistry(opts.cwd, fetchOpts);
 		const all = registry.all();
 		const filtered = applyFilters(all, opts);
 		const summaries = filtered.map(summarise);
 		if (opts.json) {
 			process.stdout.write(
-				JSON.stringify({ scaffolds: summaries }) + '\n'
+				JSON.stringify({ scaffolds: summaries, warnings }) + '\n'
 			);
 		} else {
 			printHumanTable(summaries);
+			for (const w of warnings) {
+				process.stderr.write(`warning: ${w}\n`);
+			}
 		}
 		return 0;
 	} catch (err) {

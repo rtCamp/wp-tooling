@@ -124,9 +124,32 @@ Templates render code (PHP, JS, YAML, JSON). HTML escaping is explicitly disable
 The `inputs[]` array is the authoritative declaration. For each input the engine resolves a value in this order:
 
 1. Explicit `--key=value` passed to `add`.
-2. Discovery (currently supports `input:<other-key>` for derivation; e.g. `class` derived from `name` via the `pascal-case` transform).
+2. `discover_from` (see below).
 3. `default`.
 4. Error `EMISSINGINPUT` if the field is `required: true`.
+
+An explicit value always wins over discovery, so AI/CLI callers are never overridden.
+
+### `discover_from` sources
+
+`discover_from` reads a value from elsewhere. Every source is **fallback-safe**: when the file
+or key is absent the input falls through to its `default` (so a project without the file behaves
+exactly as if `discover_from` were not set).
+
+- `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
+- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** (first map key, trailing `\` stripped) — but only for non-path inputs; inputs whose key looks like a path (`base_path`, `*_path`, `*_dir`) keep their own `default`, since the PSR-4 root directory is rarely a scaffold's target sub-path.
+- `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
+
+Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
+
+```json
+{
+    "key": "namespace",
+    "description": "PSR-4 namespace for the class.",
+    "discover_from": "composer.json:autoload.psr-4",
+    "default": "Inc\\Cli"
+}
+```
 
 When `inputs[]` is omitted, the engine falls back to scanning template placeholders (with `collectPlaceholders`) and requires every placeholder to be supplied. The explicit `inputs[]` block is always preferable: it lets you document the input, set defaults, declare transforms, and gate `required`.
 
@@ -138,6 +161,7 @@ Available via `transform`:
 - `kebab-case`: `QmExport` → `qm-export`
 - `snake-case`: `qm-export` → `qm_export`
 - `upper-snake-case`: `wporg-username` → `WPORG_USERNAME`
+- `json-escape`: `Acme\Blog` → `Acme\\Blog` (embed a PHP namespace in a JSON snippet)
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
 
@@ -180,6 +204,49 @@ Use sections inside `snippet_template` to vary the snippet by flag (e.g. the sin
 
 ---
 
+## Features (`feature{}`) — toggleable scaffolds
+
+An optional `feature` block turns a scaffold into something `wp-tooling features` can switch on and
+off (e.g. Tailwind). It is additive: scaffolds without it behave exactly as before, and the
+`add` (AI) path ignores it entirely.
+
+```json
+"feature": {
+    "config_key": "tailwind",
+    "owned_files": [ "postcss.config.js" ],
+    "confirm_remove": [ "src/css/frontend/tailwind.css" ],
+    "gitignore": [ "_tailwind-theme.css" ]
+}
+```
+
+- `config_key` (required): the key under `features{}` in `.wp-tooling.json` that records on/off.
+- `owned_files`: files this feature creates that are safe to delete on disable (rendered like `dest` paths).
+- `confirm_remove`: developer-editable files deleted only after explicit confirmation.
+- `gitignore`: lines added on enable, removed on disable. Omit lines the project's base `.gitignore` already ships (otherwise disable would strip a pre-existing rule).
+
+The CLI:
+
+```bash
+wp-tooling features                       # interactive, one prompt per feature (defaulted to current state)
+wp-tooling features --enable tailwind     # non-interactive
+wp-tooling features --disable tailwind --force   # remove developer-editable files without asking
+wp-tooling features --json                # machine-readable status
+```
+
+Programmatically the registry exposes `enable(id, inputs, opts)`, `disable(id, opts)` (opts may
+include an async `confirmRemove(path)` callback), and `status(cwd)`. The engine **reports** the
+feature's `npm_dev_dependencies` but never installs them — the feature-manager driver does.
+`--no-install` (`install: false`) skips the install and only reports the deps; add
+`--record-deps` (`record: true`) to also write the missing entries into `package.json` so the
+next plain `npm install` brings them in (for init scripts that themselves run inside
+`npm install`).
+
+On enable, the rendered `owned_files` / `confirm_remove` / `gitignore` paths are persisted under
+`featureFiles{}` in `.wp-tooling.json`; disable removes exactly those paths (falling back to
+re-rendering the manifest templates when nothing was persisted).
+
+---
+
 ## Dependency maps
 
 - `composer_dependencies`: runtime PHP deps the scaffold needs.
@@ -196,6 +263,86 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 `category` accepts kebab-case with slashes (`lint/phpcs`, `setup`, `wp`). The combined id is `<category>/<slug>`. Two-level: `wp/cli`. Three-level: `lint/phpcs/vip`.
 
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
+
+---
+
+## Remote scaffolds via per-repo sources + an upstream index
+
+Most scaffolds live entirely inside `wp-tooling` (a `scaffold.json` + templates under `scaffolds/`). A scaffold can instead live **in another repo** — useful when that repo owns the thing being generated, e.g. the `ci/*` callers into `rtCamp/wp-shared-workflows`. In that case the *whole* scaffold (its `scaffold.json` and templates) lives in the owning repo. `wp-tooling` lists only the **repos** (sources); each owning repo publishes its own **index** of the scaffolds it offers.
+
+The upshot: adding, changing, or registering a remote scaffold is **a single PR in the owning repo** — `wp-tooling` only changes when you onboard a *new repo*. A remote scaffold's `scaffold.json` is an **ordinary manifest** — there is no special `source` value or `repository` field inside it. Remoteness is expressed entirely by the source + index. The same files can move between local and remote with zero manifest edits.
+
+### Authoring a remote scaffold
+
+**1. In the owning repo** (e.g. `rtCamp/wp-shared-workflows`), add a normal scaffold directory plus a root index that lists it:
+
+```
+scaffolds/
+  index.json               # lists the scaffolds this repo offers
+  ci/test-php/
+    scaffold.json          # ordinary manifest: source "template", inputs, files, ...
+    ci-test-php.yml.mustache
+```
+
+`scaffolds/index.json`:
+
+```json
+{
+  "scaffolds": [
+    {
+      "id": "ci/test-php",
+      "path": "ci/test-php",
+      "name": "CI: PHPUnit",
+      "description": "GitHub Actions workflow calling rtCamp/wp-shared-workflows ci-test-php.yml.",
+      "checksum": "sha256:…"
+    }
+  ]
+}
+```
+
+`name`/`description` live here so wp-tooling's `list` has something to show without fetching every manifest; `path` is the scaffold's directory relative to the source `path`; `checksum` is optional — when present it is the hex SHA-256 of the scaffold's `scaffold.json` body (with or without a `sha256:` prefix), and the engine verifies the fetched manifest against it on `add`, failing with `EBADSCAFFOLD` on mismatch. Because the templates sit next to the manifest, this is a fully self-contained local scaffold *from that repo's point of view*. Validate it there in CI without making the repo a Node project:
+
+```yaml
+- run: npx --yes @rtcamp/wp-tooling validate ./scaffolds/ci/test-php
+```
+
+(`npx` fetches wp-tooling ephemerally — no `package.json`, no committed `node_modules`.) Then tag the repo (e.g. `v1`).
+
+**2. In `wp-tooling`**, add the *repo* to `scaffolds/sources.json` (only needed the first time a repo is onboarded):
+
+```json
+{
+  "sources": [
+    {
+      "repository": "rtCamp/wp-shared-workflows",
+      "ref": "v1",
+      "path": "scaffolds"
+    }
+  ]
+}
+```
+
+On scan, the engine fetches `<repository>/<ref>/<path>/index.json` to discover the repo's scaffolds. On `add ci/test-php`, it fetches that scaffold's `scaffold.json`, validates it, then fetches each `files[].src` from the same directory and renders exactly as a local scaffold. A scaffold id must be unique across local scaffolds and every source (a collision is a hard `EBADSCAFFOLD` at scan).
+
+### Two different refs
+
+Don't confuse them:
+
+- **`source.ref` (sources.json)** — the version of the owning repo wp-tooling *fetches scaffolds from*. A literal pin the team controls (use a tag or SHA). Bumping it is a wp-tooling change.
+- **A `wsw_ref` *input*** declared by the scaffold — renders into the generated workflow's `uses: ...@<ref>` line, i.e. which workflow version the consumer's CI *calls at runtime*. A normal input with its own default.
+
+They are usually the same value but are independent knobs.
+
+### Caching, auth, offline behaviour
+
+- **Caching.** The index, manifests, and templates are cached under `${XDG_CACHE_HOME:-$HOME/.cache}/wp-tooling/remote/` and validated with HTTP conditional requests (ETag / `If-None-Match`): a `304 Not Modified` serves the cached copy, so content is re-downloaded only when it actually changes at the pinned ref. A SHA pin never changes; a movable tag (`v1`) refreshes when it moves. `npx wp-tooling add ... --refresh` forces a re-fetch; `npx wp-tooling cache clear` empties the cache.
+- **Auth.** Public repos need no setup. For private repos or to dodge the unauthenticated `raw.githubusercontent.com` rate limit, export `WP_TOOLING_GITHUB_TOKEN`; it is sent as `Authorization: Bearer ...`.
+- **`list`** reads the repo index (cached). It is **online-preferred with a cache fallback**: it shows remote scaffolds (`origin: "remote"`, `counts: null`) from the last-seen index, and when a source is unreachable and uncached it is skipped with a warning rather than failing the whole list. A `--dry-run` on a remote scaffold fetches just the (small, cached) manifest to produce the plan and never fetches template bodies.
+- **`validate`** is offline by default: it checks `sources.json`'s shape and recognises remote ids from any **cached** index (so `validate ci/test-php` resolves after a prior run). Pass **`--remote`** to fetch each repo's index + each manifest at its pinned ref and schema-validate them (honours `--refresh` / `--cache-dir`); a network/HTTP failure reports as an `EFETCHFAIL` row, a bad index/manifest as schema errors, and a remote id colliding with a local scaffold is flagged. `--remote` checks manifests only — template correctness is verified in the owning repo (step 1) and at `add` time.
+
+### When to use it
+
+Only when the scaffold genuinely belongs to another repo that owns its content. `setup/*`, `lint/*`, and `wp/*` scaffolds are self-contained and stay local forever. Remote sourcing trades a network round trip + a cross-repo dependency for the ability to ship a scaffold's changes from one repo PR.
 
 ---
 
@@ -222,6 +369,7 @@ Look at these existing scaffolds when authoring a new one:
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
 | Block with `block.json` + framework class | `wp/block-dynamic` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
+| Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 
 Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.
 

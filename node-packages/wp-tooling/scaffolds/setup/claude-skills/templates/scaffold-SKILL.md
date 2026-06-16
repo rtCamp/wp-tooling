@@ -42,7 +42,7 @@ This makes progress legible to the developer and gives them a stable surface to 
 npx wp-tooling list --json
 ```
 
-Result: `{ scaffolds: [{ id, slug, category, kind, counts }, ...] }`. Pick one `category/slug`. If ambiguous, ask the developer with candidates. Never guess.
+Result: `{ scaffolds: [{ id, slug, category, kind, origin, counts }, ...] }`. Pick one `category/slug`. If ambiguous, ask the developer with candidates. Never guess. Entries with `origin: "remote"` live in another repo: their manifest is fetched on the first `add`, so `counts` is `null` here and the kind is always `template`. That first `add` does network I/O and can fail with `EFETCHFAIL` (see Engine errors) — treat a remote scaffold exactly like a local one once it resolves; the only difference is the fetch.
 
 ### 2. Introspect once per session (cache result)
 
@@ -210,9 +210,10 @@ Escalation report format: **what you tried, what you observed, what's blocking, 
 |---|---|
 | `ENOSCAFFOLD` | Surface `available` list, suggest closest, ask. |
 | `EMISSINGINPUT` | Read `missingDetails`, run §2 discovery, retry with resolved values. |
-| `EBADSCAFFOLD` | Surface verbatim. Do not retry. |
+| `EBADSCAFFOLD` | Invalid manifest. Surface verbatim, do not retry. For an `origin: "remote"` scaffold this means the fetched manifest at its pinned ref is broken — surface it; do not try to repair another repo's scaffold. |
 | `EWRITEFAIL` | Surface path + errno. Do not retry. |
 | `ERENDERFAIL` | Scaffold author bug. Surface. |
+| `EFETCHFAIL` | Network/HTTP failure fetching an `origin: "remote"` scaffold's manifest or a template. Surface `url` + `statusCode`. If the payload sets `rateLimited`, tell the developer to set `WP_TOOLING_GITHUB_TOKEN` and stop. A timeout is transient — one retry is reasonable; a 404 means the source pin (`sources.json` repo/ref/path) or the owning repo's index is wrong — surface, do not retry. Never hand-write the artifact to work around a failed fetch (the engine owns it). |
 | Unknown | Surface, exit non-zero, do not crash. |
 
 ## CI/CD variant

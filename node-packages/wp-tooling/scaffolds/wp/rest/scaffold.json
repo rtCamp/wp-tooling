@@ -20,6 +20,7 @@
 		{
 			"key": "tests_namespace",
 			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest'.",
+			"discover_from": "composer.json:autoload.psr-4",
 			"default": "Inc\\Tests\\Rest"
 		},
 		{

@@ -33,6 +33,15 @@ const {
 	SECRET_KEY_PATTERN,
 } = require('./schema');
 const { render, collectPlaceholders } = require('./render');
+const {
+	SOURCES_FILENAME,
+	INDEX_FILENAME,
+	validateSources,
+	validateIndex,
+	indexEntryToRecord,
+} = require('./sources');
+const { fetchRemoteFile, readCached, verifyChecksum } = require('./fetch');
+const { defaultsDir, projectDir, requireFlagValue } = require('./cli-support');
 
 const SLUG_RE = new RegExp(SLUG_PATTERN);
 const CATEGORY_RE = new RegExp(CATEGORY_PATTERN);
@@ -53,6 +62,7 @@ const TOP_LEVEL_KEYS = new Set([
 	'tests',
 	'secrets',
 	'scripts',
+	'feature',
 	...DEPENDENCY_MAPS,
 ]);
 
@@ -139,6 +149,9 @@ function validate(scaffold) {
 	}
 	if (scaffold.scripts !== undefined) {
 		errors.push(...validateScripts(scaffold.scripts));
+	}
+	if (scaffold.feature !== undefined) {
+		errors.push(...validateFeature(scaffold.feature));
 	}
 
 	for (const mapKey of DEPENDENCY_MAPS) {
@@ -444,6 +457,48 @@ function validateScripts(scripts) {
 	return errors;
 }
 
+const FEATURE_LIST_KEYS = ['owned_files', 'confirm_remove', 'gitignore'];
+const FEATURE_KEYS = new Set(['config_key', ...FEATURE_LIST_KEYS]);
+
+function validateFeature(feature) {
+	if (
+		feature === null ||
+		typeof feature !== 'object' ||
+		Array.isArray(feature)
+	) {
+		return ['feature: must be an object'];
+	}
+	const errors = [];
+	if (
+		typeof feature.config_key !== 'string' ||
+		feature.config_key.length === 0
+	) {
+		errors.push('feature.config_key: must be a non-empty string');
+	}
+	for (const arrKey of FEATURE_LIST_KEYS) {
+		if (feature[arrKey] === undefined) {
+			continue;
+		}
+		if (!Array.isArray(feature[arrKey])) {
+			errors.push(`feature.${arrKey}: must be an array`);
+			continue;
+		}
+		feature[arrKey].forEach((v, i) => {
+			if (typeof v !== 'string' || v.length === 0) {
+				errors.push(
+					`feature.${arrKey}[${i}]: must be a non-empty string`
+				);
+			}
+		});
+	}
+	for (const k of Object.keys(feature)) {
+		if (!FEATURE_KEYS.has(k)) {
+			errors.push(`feature: unknown field '${k}'`);
+		}
+	}
+	return errors;
+}
+
 // ---------------------------------------------------------------------------
 // CLI surface (`wp-tooling validate [scaffold-id...] [flags]`)
 //
@@ -457,17 +512,36 @@ function validateScripts(scripts) {
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-	const opts = { ids: [], cwd: null, json: false, help: false };
+	const opts = {
+		ids: [],
+		cwd: null,
+		json: false,
+		help: false,
+		remote: false,
+		refresh: false,
+		cacheDir: null,
+	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag; rejects a missing or flag-shaped
+		// value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--json') {
 			opts.json = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
+		} else if (a === '--remote') {
+			opts.remote = true;
+		} else if (a === '--refresh') {
+			opts.refresh = true;
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = value();
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
 			throw new Error(`Unexpected flag: ${a}`);
 		} else {
@@ -484,24 +558,22 @@ function printHelp() {
 			'',
 			'Validates scaffold manifests. With no id, checks the whole bundled catalogue.',
 			'With one or more ids (e.g. wp/cli, lint/phpcs/vip), only those are checked.',
+			'Remote scaffolds (from sources.json) are recognised; by default only the',
+			'sources.json shape is checked offline (plus remote ids from any cached index).',
+			'Pass --remote to fetch each repo index + scaffold manifest and schema-validate.',
 			'',
 			'Flags:',
-			'  --cwd <path>   Also include project-local scaffolds at <path>/bin/scaffolds.',
-			'  --json         Machine-readable output.',
-			'  --help, -h     Show this help.',
+			'  --cwd <path>      Also include project-local scaffolds at <path>/bin/scaffolds.',
+			'  --remote          Fetch + schema-validate each remote index + manifest (network).',
+			'  --refresh         With --remote, bypass the cache and re-fetch.',
+			'  --cache-dir <p>   With --remote, override the remote-fetch cache directory.',
+			'  --json            Machine-readable output.',
+			'  --help, -h        Show this help.',
 			'',
 			'Exit code: 0 if all valid, 1 if any errors.',
 			'',
 		].join('\n')
 	);
-}
-
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
 }
 
 function findScaffoldJsons(root) {
@@ -638,6 +710,222 @@ function collectFiles(opts) {
 	return files;
 }
 
+/**
+ * Validate the `sources.json` file(s) and the remote scaffolds they reach.
+ *
+ * Emits rows shaped like `validateOne` output:
+ *   - one file-level row per `sources.json` (`id: 'sources'`) carrying its
+ *     shape result (malformed JSON, bad/duplicate source entries);
+ *   - one row per remote scaffold (`id: <category/slug>`, `remote: true`) so
+ *     that `validate <remote-id>` resolves instead of erroring; and
+ *   - an index-level error row when a reachable index is unfetchable/invalid.
+ *
+ * Default is offline: the `sources.json` shape is checked, and remote ids are
+ * enumerated only from a **cached** index (none → no per-id rows). With
+ * `opts.remote`, each repo's `index.json` and every scaffold's `scaffold.json`
+ * is fetched at the pinned ref and schema-validated (reusing the same
+ * `validate()` the registry runs on `add`); network/HTTP failures become
+ * `EFETCHFAIL`-tagged errors. Per-id rows are only produced when the
+ * `sources.json` shape is sound.
+ *
+ * Absent `sources.json` files contribute nothing — the dormant default leaves
+ * `validate` behaving exactly as before.
+ *
+ * @param {Object}      opts     - Parsed CLI options (`cwd`, `remote`, `refresh`, `cacheDir`, `ids`).
+ * @param {Set<string>} localIds - Ids of the discovered local scaffolds.
+ * @return {Promise<Array<{file: string, id: string, valid: boolean, errors: string[], remote?: boolean}>>} Result rows.
+ */
+async function collectSourcesResults(opts, localIds) {
+	const dirs = [defaultsDir()];
+	if (opts.cwd) {
+		dirs.push(projectDir(opts.cwd));
+	}
+	const fetchOpts = {};
+	if (opts.refresh) {
+		fetchOpts.refresh = true;
+	}
+	if (opts.cacheDir) {
+		fetchOpts.cacheDir = opts.cacheDir;
+	}
+	const wanted = opts.ids.length ? new Set(opts.ids) : null;
+
+	const results = [];
+	for (const dir of dirs) {
+		const file = path.join(dir, SOURCES_FILENAME);
+		if (!fs.existsSync(file)) {
+			continue;
+		}
+		const fileRow = { file, id: 'sources', valid: true, errors: [] };
+		let parsed;
+		try {
+			parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+		} catch (err) {
+			fileRow.valid = false;
+			fileRow.errors.push(`Invalid JSON: ${err.message}`);
+			results.push(fileRow);
+			continue;
+		}
+		const shapeErrs = validateSources(parsed);
+		if (shapeErrs.length) {
+			fileRow.valid = false;
+			fileRow.errors.push(...shapeErrs);
+		}
+		results.push(fileRow);
+
+		// Per-remote-id rows require a sound sources file: we never fetch from a
+		// malformed source list.
+		if (!fileRow.valid) {
+			continue;
+		}
+		for (const source of parsed.sources) {
+			const records = await resolveSourceRecords(
+				source,
+				opts,
+				fetchOpts,
+				results,
+				file
+			);
+			for (const record of records) {
+				const id = makeId(record);
+				if (wanted && !wanted.has(id)) {
+					continue;
+				}
+				const row = {
+					file,
+					id,
+					valid: true,
+					errors: [],
+					remote: true,
+				};
+				if (localIds.has(id)) {
+					row.valid = false;
+					row.errors.push(
+						`id '${id}' collides with a local scaffold`
+					);
+				}
+				if (opts.remote && row.valid) {
+					await validateRemoteManifest(record, fetchOpts, row);
+				}
+				results.push(row);
+			}
+		}
+	}
+	return results;
+}
+
+/**
+ * Resolve the thin remote records a source offers: under `opts.remote` fetch +
+ * validate its `index.json`; otherwise read a cached index only (offline). An
+ * unfetchable/invalid reachable index pushes an error row into `results` and
+ * yields no records.
+ *
+ * @param {Object} source    - A validated `sources.json` entry `{ repository, ref, path }`.
+ * @param {Object} opts      - Parsed CLI options.
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile`.
+ * @param {Array}  results   - Result rows (mutated to append index-level errors).
+ * @param {string} file      - The `sources.json` path (for row attribution).
+ * @return {Promise<Object[]>} Thin remote records (empty on uncached-offline or index error).
+ */
+async function resolveSourceRecords(source, opts, fetchOpts, results, file) {
+	const indexRepo = {
+		repository: source.repository,
+		ref: source.ref,
+		path: source.path,
+	};
+	const ref = `${source.repository}@${source.ref}/${source.path}/${INDEX_FILENAME}`;
+	const indexErr = (errors) =>
+		results.push({
+			file,
+			id: `${source.repository} (index)`,
+			valid: false,
+			errors,
+			remote: true,
+		});
+
+	let text;
+	if (opts.remote) {
+		try {
+			text = await fetchRemoteFile(indexRepo, INDEX_FILENAME, fetchOpts);
+		} catch (err) {
+			indexErr([`${err.code || 'EFETCHFAIL'}: ${err.message}`]);
+			return [];
+		}
+	} else {
+		text = await readCached(indexRepo, INDEX_FILENAME, {
+			cacheDir: opts.cacheDir || undefined,
+		});
+		if (text === null) {
+			return [];
+		}
+	}
+
+	let indexParsed;
+	try {
+		indexParsed = JSON.parse(text);
+	} catch (err) {
+		indexErr([`invalid index JSON (${ref}): ${err.message}`]);
+		return [];
+	}
+	const errs = validateIndex(indexParsed);
+	if (errs.length) {
+		indexErr(errs.map((e) => `index (${ref}): ${e}`));
+		return [];
+	}
+	return indexParsed.scaffolds.map((entry) =>
+		indexEntryToRecord(source, entry)
+	);
+}
+
+/**
+ * Fetch a remote scaffold's `scaffold.json` at its pinned ref and schema-validate
+ * it, mutating `row` in place. A fetch failure (`EFETCHFAIL`) or invalid manifest
+ * (bad JSON / schema errors) marks the row invalid with attributed messages.
+ *
+ * @param {Object} record    - A thin remote record (`_repository`).
+ * @param {Object} fetchOpts - Forwarded to `fetchRemoteFile` (`refresh`, `cacheDir`).
+ * @param {Object} row       - The result row to annotate.
+ * @return {Promise<void>} Resolves once `row` reflects the manifest's validity.
+ */
+async function validateRemoteManifest(record, fetchOpts, row) {
+	const repo = record._repository;
+	const ref = `${repo.repository}@${repo.ref}/${repo.path}/scaffold.json`;
+	let text;
+	try {
+		text = await fetchRemoteFile(repo, 'scaffold.json', fetchOpts);
+	} catch (err) {
+		row.valid = false;
+		row.errors.push(`${err.code || 'EFETCHFAIL'}: ${err.message}`);
+		return;
+	}
+	// Same integrity gate add() applies in hydrateRemote — else validate would
+	// pass a manifest add will reject.
+	if (record._checksum) {
+		const { ok, expected, actual } = verifyChecksum(record._checksum, text);
+		if (!ok) {
+			row.valid = false;
+			row.errors.push(
+				`remote manifest checksum mismatch (${ref}): index declares sha256:${expected}, fetched manifest is sha256:${actual}`
+			);
+			return;
+		}
+	}
+	let manifest;
+	try {
+		manifest = JSON.parse(text);
+	} catch (err) {
+		row.valid = false;
+		row.errors.push(
+			`remote manifest not valid JSON (${ref}): ${err.message}`
+		);
+		return;
+	}
+	const errs = validate(manifest);
+	if (errs.length) {
+		row.valid = false;
+		row.errors.push(...errs.map((e) => `remote manifest (${ref}): ${e}`));
+	}
+}
+
 function filterByIds(results, ids) {
 	if (!ids.length) {
 		return results;
@@ -650,12 +938,13 @@ function printHuman(results) {
 	const writeln = (s) => process.stdout.write(`${s}\n`);
 	const totals = { valid: 0, invalid: 0 };
 	for (const r of results) {
+		const tag = r.remote ? ' (remote)' : '';
 		if (r.valid) {
 			totals.valid++;
-			writeln(`ok   ${r.id || '(unknown)'}`);
+			writeln(`ok   ${r.id || '(unknown)'}${tag}`);
 		} else {
 			totals.invalid++;
-			writeln(`FAIL ${r.id || '(unknown)'}  (${r.file})`);
+			writeln(`FAIL ${r.id || '(unknown)'}${tag}  (${r.file})`);
 			for (const e of r.errors) {
 				writeln(`     - ${e}`);
 			}
@@ -681,6 +970,8 @@ async function runCli(argv) {
 	}
 	const files = collectFiles(opts);
 	const allResults = files.map(validateOne);
+	const localIds = new Set(allResults.map((r) => r.id).filter(Boolean));
+	allResults.push(...(await collectSourcesResults(opts, localIds)));
 	const results = filterByIds(allResults, opts.ids);
 	if (opts.ids.length && results.length === 0) {
 		const available = allResults.map((r) => r.id).filter(Boolean);

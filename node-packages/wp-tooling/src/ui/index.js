@@ -11,6 +11,7 @@ const { text, confirm, password } = require('./prompts/index');
 const { checkbox, radio } = require('./selects/flat');
 const { checkboxTree } = require('./selects/tree');
 const { spinner } = require('./spinner/index');
+const { style } = require('./style/index');
 const { CancelledError } = require('./errors');
 
 module.exports = {
@@ -26,6 +27,8 @@ module.exports = {
 	checkboxTree,
 	// Spinner
 	spinner,
+	// Styled text (TTY-aware colours)
+	style,
 	// Errors
 	CancelledError,
 };

@@ -142,13 +142,13 @@ Phase A — Project setup:
   1. setup/editorconfig    → .editorconfig
   2. setup/psr4            → wiring in composer.json  (namespace: Acme\ImageOptimizer, path: includes/)
   3. lint/phpcs/vip        → phpcs.xml.dist           (WordPress-VIP-Minimum + WordPress-Docs)
-  4. lint/phpstan          → phpstan.neon.dist         (level 5)
+  4. lint/phpstan          → phpstan.neon.dist         (extends rtCamp wp-phpstan baseline)
   5. lint/eslint           → eslint.config.js
   6. setup/phpunit         → phpunit.xml.dist, tests/bootstrap.php
 
 Phase B — Feature scaffolds:
-  7. wp/cli                → includes/CLI/OptimizeImagesCommand.php
-                             (namespace: Acme\ImageOptimizer\CLI, class suffix: Command,
+  7. wp/cli                → includes/Cli/OptimizeImagesCommand.php
+                             (namespace: Acme\ImageOptimizer\Cli, class suffix: Command,
                               registers via $this->boot(...) in includes/Plugin.php)
 
 Skipped (already present): none.
@@ -205,7 +205,7 @@ For `wp/cli`, pass the same project conventions detected in Stage 1 (namespace, 
 ```bash
 npx wp-tooling add wp/cli \
     --non-interactive --json --cwd . \
-    --namespace='Acme\ImageOptimizer\CLI' --base-path='includes/CLI' \
+    --namespace='Acme\ImageOptimizer\Cli' --base-path='includes/Cli' \
     --name=optimize-images --class=OptimizeImagesCommand
 ```
 
@@ -233,7 +233,7 @@ When `setup/psr4` wiring is received:
 1. Show the current `"autoload"` block in `composer.json` (or note it is absent).
 2. Show the intended entry: namespace `Acme\ImageOptimizer` maps to `includes/`.
 3. Ask: `Apply PSR-4 autoload to composer.json? [apply / skip]`
-4. If apply: edit `composer.json`. JSON-encode backslashes: each `\` in the PHP namespace becomes `\\`, and add a trailing `\\`. Example: `Acme\ImageOptimizer` → JSON key `"Acme\\ImageOptimizer\\"`.
+4. If apply: paste the engine's `ai.wiring[0].snippet` verbatim. The engine already emits the PSR-4 key JSON-encoded with its trailing backslash (e.g. `"Acme\\ImageOptimizer\\"`) — **do not escape it again**, or you will double the backslashes and break autoload.
 5. Remind: run `composer dump-autoload --optimize` after applying.
 
 If `composer.json` does not exist, offer to create a minimal one:
@@ -265,21 +265,21 @@ Setup complete.
 Files written (Phase A):
   .editorconfig
   phpcs.xml.dist       (WordPress VIP Minimum + Docs)
-  phpstan.neon.dist    (level 5)
+  phpstan.neon.dist    (extends rtCamp wp-phpstan baseline)
   eslint.config.js
   phpunit.xml.dist
   tests/bootstrap.php
   composer.json        (PSR-4 autoload added, Acme\ImageOptimizer → includes/)
 
 Files written (Phase B):
-  includes/CLI/OptimizeImagesCommand.php
-  tests/Unit/CLI/OptimizeImagesCommandTest.php
+  includes/Cli/OptimizeImagesCommand.php
+  tests/Cli/OptimizeImagesCommandTest.php
 
 Wiring applied:
-  includes/Plugin.php:43 — $this->boot('optimize-images', \Acme\ImageOptimizer\CLI\OptimizeImagesCommand::class);
+  includes/Plugin.php:43 — $this->boot('optimize-images', \Acme\ImageOptimizer\Cli\OptimizeImagesCommand::class);
 
 Tests:
-  tests/Unit/CLI/OptimizeImagesCommandTest.php — stub passing.
+  tests/Cli/OptimizeImagesCommandTest.php — stub passing.
 
 Developer actions (run these yourself):
 

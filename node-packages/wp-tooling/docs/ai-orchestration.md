@@ -36,12 +36,14 @@ Result shape, in brief:
 ```json
 {
     "scaffold":  { "id", "slug", "kind", "dryRun" },
-    "engine":    { "wrote": [...], "skipped": [...] },
+    "engine":    { "wrote": [...], "skipped": [...], "inputs": {...} },
     "developer": { "install": { "composer": {...}, "npm": {...} }, "secrets": [...] },
     "ai":        { "wiring": [...], "tests": [...] },
     "warnings":  [...]
 }
 ```
+
+`engine.inputs` is the fully resolved input map the engine rendered with (after `supplied → discovered → default` precedence). Use it to see exactly which values discovery filled in, instead of re-deriving them.
 
 ## 3. Engine guarantees
 
@@ -53,10 +55,13 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - `developer.install` (Composer and npm) describes what the developer should install. The engine never runs `composer require` or `npm install`.
 - `developer.secrets` is a verbatim passthrough of the scaffold manifest's `secrets[]` block. The engine never accepts secret **values** as inputs, never embeds values in any output field, never reads them from the environment, never logs them. Only `key`, `scope`, `description`, and `required` ever appear in the output.
 - The engine is idempotent under `scaffold.dryRun: true`: identical inputs produce identical output across runs.
-- The engine never reads or writes any path outside `--cwd`.
+- The engine never reads or writes any path outside `--cwd`. This is enforced: a rendered `dest`, test path, or feature-owned path that resolves outside the target directory (e.g. via `..` in a path input or a third-party remote manifest) fails with `EWRITEFAIL` (`errno: "EOUTSIDE"`) before anything touches the filesystem.
 - The engine never invokes `gh`, `git`, `composer`, `npm`, or any other external CLI on behalf of the caller.
-- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Callers branch on this rather than checking `engine.wrote.length === 0`.
+- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
+- `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds come from a repo's cached index (`sources.json` → each repo's `index.json`), so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`. `list` is online-preferred with a cache fallback: it reads the index (cached, ETag-validated), and a `warnings` array reports any source that was unreachable and uncached. The top-level `{ scaffolds, warnings }` shape carries those notes.
 - The engine core has zero dependency on the TTY UI kit. AI orchestration mode never loads any terminal-UI primitive. Skills can rely on the engine being usable from any context, including non-TTY containers, CI runners, and headless test harnesses.
+- File-based `discover_from` (`composer.json:<dot.path>`, `package.json:<dot.path>`, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` and `plugin-header:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
+- A scaffold may carry an optional `feature` block, marking it a **toggleable feature** (the bundled example is `setup/tailwind`). This block is **invisible to `add`/`execute`**: it never appears in the result, and `add` behaves identically whether or not it is present. Turning features on and off is a separate surface (§13).
 
 ## 4. Skill responsibilities
 
@@ -156,6 +161,23 @@ A Mustache template referenced a placeholder not in the resolved inputs. Engine 
 
 **Skill response:** surface as a scaffold-author bug.
 
+### `EFETCHFAIL`
+
+A fetch for a remote (sources) scaffold failed — the repo `index.json`, a scaffold's `scaffold.json` manifest, or one of its templates: non-2xx HTTP response, timeout, or transport error. The caller's machine has no internet, the source's repo/ref/path does not exist, or `raw.githubusercontent.com` rate-limited the request. (`EBADSCAFFOLD` is thrown instead when a fetched index/manifest is reachable but invalid JSON / fails schema validation. A *discovery* index fetch that fails with no cache is non-fatal — the source is skipped with a warning — so `EFETCHFAIL` surfaces from `add` of a specific remote scaffold, or from `validate --remote`.)
+
+```json
+{
+    "code": "EFETCHFAIL",
+    "message": "GET https://raw.githubusercontent.com/rtCamp/wp-shared-workflows/v1/scaffolds/ci/test-php/ci-test-php.yml.mustache returned HTTP 404",
+    "url": "https://raw.githubusercontent.com/rtCamp/wp-shared-workflows/v1/scaffolds/ci/test-php/ci-test-php.yml.mustache",
+    "statusCode": 404
+}
+```
+
+When the response looks like a GitHub rate-limit (HTTP 403 with `"rate limit"` in the body), the payload additionally carries `"rateLimited": true` — set `WP_TOOLING_GITHUB_TOKEN` to raise the unauthenticated quota.
+
+**Skill response:** surface to the developer. If `rateLimited` is true, recommend setting `WP_TOOLING_GITHUB_TOKEN` (or waiting). For 404 / wrong-ref errors, recommend re-checking the `sources.json` entry's `{github,ref,path}` and the owning repo's `index.json`. Do not retry automatically.
+
 ## 6. Project introspection
 
 Before any `add` call, the skill must learn what the project actually looks like. The engine and the scaffold templates are written against rtCamp skeleton conventions, but real client projects diverge (different namespace, different base path, different bootstrap method). Even projects originally scaffolded from the rtCamp skeleton routinely drop scaffold anchor comments during cleanup, code review, or refactoring.
@@ -174,6 +196,20 @@ The skill discovers project shape from existing artifacts. No config file is req
   - **CI/CD workflow scaffolds:** workflow filename convention (`wp-ci.yml` vs `ci.yml` vs `pr.yml`), trigger conventions.
 - **Treat scaffold anchor comments as a supplementary signal, not the primary one.** Anchors are useful for finding the exact insertion line when present, but their absence does not mean the project lacks a registration point. Long-lived rtCamp-skeleton-based projects often have all their anchors stripped by linters or code reviewers.
 - **Resolve `inputs[]` per `discover_from` hints** declared in the scaffold manifest. For each input, read the source named in `discover_from` (`composer.json:autoload.psr-4`, `package.json:name`, `code:bootstrap-class`, `code:cli-pattern`, etc.), extract the value, and pass to the engine. If discovery is ambiguous, the skill **must ask the developer** with the discovered options as suggestions rather than guess.
+
+### Engine-side discovery (what the skill no longer has to do)
+
+The engine now resolves the **file-based** `discover_from` sources itself, so the division of labour is:
+
+- **`composer.json:<dot.path>`, `package.json:<dot.path>`, `config:<key>` → the engine resolves these.** The skill does not need to pre-read these files and pass the value; the engine reads them from `--cwd` and fills the input before applying the `default`. The most important case: `namespace` and `tests_namespace` on every `wp/*` scaffold declare `discover_from: composer.json:autoload.psr-4`, so they are **auto-filled from the project's first PSR-4 root** whenever a `composer.json` exists — with the kind sub-namespace preserved: the discovered root replaces only the *first segment* of the manifest default, so a default of `Inc\Cli` and a PSR-4 root of `Acme\Blog` yield `Acme\Blog\Cli` (and `Inc\Tests\Cli` yields `Acme\Blog\Tests\Cli`). A skill that previously always passed `--namespace` no longer has to — though doing so is still safe (see precedence below).
+- **`code:*` and `plugin-header:*` → still the skill's job.** The engine cannot read a bootstrap class, sample existing patterns, or parse a plugin header. For these the engine returns the manifest `default`; the skill must do the introspection in this section and pass the value in.
+
+Rules the skill can rely on:
+
+- **Precedence is `supplied → discovered → default`.** An explicit `--namespace=...` (or any supplied input) always wins over engine discovery, which always wins over the manifest `default`. Passing values explicitly is therefore always authoritative and safe.
+- **Fail-safe.** A missing or malformed `composer.json` / `package.json` / `.wp-tooling.json` is ignored — the input falls back to its `default`, identical to behaviour before this feature existed. The engine never throws because a project file is absent or unparsable.
+- **Path inputs are not overwritten by `autoload.psr-4`.** Inputs whose key ends in `_path` or `_dir` (e.g. `base_path`) keep their `default`; only namespace-style inputs receive the PSR-4 root. This prevents a directory input from being set to a namespace string.
+- **`autoload.psr-4` uses the first declared root, grafted onto the default's sub-namespace.** When a project declares multiple PSR-4 roots, the engine takes the first key (trailing `\` stripped) and substitutes it for the first segment of the manifest `default` (`Inc\Cli` + root `Acme\Blog` → `Acme\Blog\Cli`). If that is not the intended namespace for this class, pass `--namespace=...` explicitly, or — per §6 — ask the developer rather than letting the heuristic guess.
 
 **Confirm with the developer once per session.** Present discovered values as a single block:
 
@@ -344,3 +380,23 @@ The JSON shape is part of `@rtcamp/wp-tooling`'s public API and follows semver:
 - **New `scope` values** for secrets (currently `github-actions`, `env`, `dotenv`) may be added in a minor bump.
 
 Pinning `@rtcamp/wp-tooling` to a specific major in your skill's package manifest is the supported way to maintain forward compatibility.
+
+## 13. Feature scaffolds (toggleable on/off)
+
+Some scaffolds carry an optional `feature` block in their manifest — they are **toggleable features** a project can turn on or off (the bundled example is `setup/tailwind`). The block declares a `config_key`, the files the feature owns, files that need confirmation before deletion (`confirm_remove`), and `.gitignore` lines. Feature state is persisted in the project's `.wp-tooling.json` under `features.<config_key>`.
+
+Rules for the skill:
+
+- **`add` and the `feature` block are independent.** `add <id>` on a feature scaffold behaves exactly like any other scaffold — it renders the files and returns the normal four-block result. The `feature` block never appears in the output, so the skill does not detect or branch on it.
+- **Prefer the `features` command to turn a feature on or off** — do **not** use `add` for that. The feature manager does three things `add` does not: it sets `features.<config_key> = true` in `.wp-tooling.json`, appends the feature's (Mustache-rendered) `.gitignore` lines, and registers the toggle so it can later be cleanly disabled.
+
+  ```bash
+  npx wp-tooling features --json                       # status of every feature; makes no change
+  npx wp-tooling features --enable <id>  --json --no-install [--cwd <path>]
+  npx wp-tooling features --disable <id> --json [--force]    [--cwd <path>]
+  ```
+
+- **Disable is safe by default.** `--disable` removes the feature's owned files and `.gitignore` lines but **keeps** developer-editable files (the manifest's `confirm_remove[]`) unless `--force` is given. Files that are absent are reported as `missing`, never an error — disable is idempotent. The result is `{ removed, kept, missing }`.
+- **Skills must pass `--no-install`.** Without it, the feature manager runs `npm install` itself — that is the human-CLI convenience path, and it violates §4/§11 when a skill triggers it without explicit developer approval. With `--no-install` the deps are surfaced in the result's `install` block and **nothing else is touched**: present them to the developer exactly like an `add` result's `developer.install`. (`--record-deps` additionally writes the missing entries into `package.json` for init scripts that run inside `npm install` — a skill must not pass it without explicit consent to edit `package.json`.)
+- **Enable is idempotent.** Re-enabling an already-on feature writes nothing new (existing files are skipped), does not duplicate `.gitignore` lines, and leaves the flag `true`.
+- **`features` is a distinct surface from `add`.** `add` is for one-shot AI scaffolding (the contract in §1–§12). `features` is for project-level feature state. They share the engine but serve different jobs.

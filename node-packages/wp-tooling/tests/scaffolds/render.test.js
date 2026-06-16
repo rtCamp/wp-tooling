@@ -160,6 +160,15 @@ describe('applyTransform', () => {
 		);
 	});
 
+	it('json-escape doubles backslashes', () => {
+		expect(applyTransform('Acme\\Blog', 'json-escape')).toBe(
+			'Acme\\\\Blog'
+		);
+		expect(applyTransform('NoBackslash', 'json-escape')).toBe(
+			'NoBackslash'
+		);
+	});
+
 	it('returns value unchanged when no transform', () => {
 		expect(applyTransform('Foo', undefined)).toBe('Foo');
 	});

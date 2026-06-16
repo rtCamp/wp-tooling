@@ -17,8 +17,12 @@
 
 'use strict';
 
-const path = require('path');
-const { ScaffoldRegistry, ScaffoldError } = require('./registry');
+const { ScaffoldError } = require('./registry');
+const {
+	buildRegistry,
+	fetchOptsFrom,
+	requireFlagValue,
+} = require('./cli-support');
 
 function parseArgs(argv) {
 	const opts = {
@@ -28,10 +32,15 @@ function parseArgs(argv) {
 		dryRun: false,
 		json: false,
 		cwd: process.cwd(),
+		refresh: false,
+		cacheDir: undefined,
 		help: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
+		// Value of a space-separated flag (`--name foo`); rejects a missing or
+		// flag-shaped value rather than swallowing the next flag.
+		const value = () => requireFlagValue(argv[++i], a);
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
 		} else if (a === '--non-interactive') {
@@ -41,15 +50,21 @@ function parseArgs(argv) {
 		} else if (a === '--json') {
 			opts.json = true;
 			opts.nonInteractive = true;
+		} else if (a === '--refresh') {
+			opts.refresh = true;
 		} else if (a === '--cwd') {
-			opts.cwd = argv[++i];
+			opts.cwd = value();
 		} else if (a.startsWith('--cwd=')) {
 			opts.cwd = a.slice('--cwd='.length);
+		} else if (a === '--cache-dir') {
+			opts.cacheDir = value();
+		} else if (a.startsWith('--cache-dir=')) {
+			opts.cacheDir = a.slice('--cache-dir='.length);
 		} else if (a.startsWith('--')) {
 			const eq = a.indexOf('=');
 			if (eq === -1) {
 				const k = a.slice(2);
-				opts.inputs[snakify(k)] = argv[++i];
+				opts.inputs[snakify(k)] = value();
 			} else {
 				const k = a.slice(2, eq);
 				opts.inputs[snakify(k)] = a.slice(eq + 1);
@@ -77,6 +92,8 @@ function printHelp() {
 			'  --dry-run            Print the plan without writing files.',
 			'  --json               Emit a single JSON line on stdout. Implies --non-interactive.',
 			'  --cwd <path>         Target directory. Defaults to the current working directory.',
+			'  --refresh            Force re-fetch of remote scaffold indexes, manifests + templates.',
+			'  --cache-dir <path>   Override the default cache directory for remote templates.',
 			'  --help, -h           Show this help text.',
 			'',
 			'Examples:',
@@ -86,24 +103,6 @@ function printHelp() {
 			'',
 		].join('\n')
 	);
-}
-
-// wp-tooling's bundled scaffolds. From src/scaffolds/ that's two levels up.
-function defaultsDir() {
-	return path.join(__dirname, '..', '..', 'scaffolds');
-}
-
-function projectDir(cwd) {
-	return path.join(cwd, 'bin', 'scaffolds');
-}
-
-async function buildRegistry(cwd) {
-	const registry = new ScaffoldRegistry({
-		defaultsDir: defaultsDir(),
-		projectDir: projectDir(cwd),
-	});
-	await registry.scan();
-	return registry;
 }
 
 function formatErrorPayload(err) {
@@ -119,6 +118,16 @@ function formatErrorPayload(err) {
 			'errno',
 			'placeholder',
 			'template',
+			'url',
+			'statusCode',
+			'rateLimited',
+			'timeout',
+			'cause',
+			'file',
+			'errors',
+			'id',
+			'source',
+			'repository',
 		]) {
 			if (err[k] !== undefined) {
 				payload[k] = err[k];
@@ -263,7 +272,10 @@ async function runInteractive(opts) {
 		{
 			name: 'discover',
 			async run(ctx) {
-				ctx.registry = await buildRegistry(ctx.opts.cwd);
+				ctx.registry = await buildRegistry(
+					ctx.opts.cwd,
+					fetchOptsFrom(ctx.opts)
+				);
 				ctx.scaffold = ctx.registry.get(ctx.opts.id);
 				if (!ctx.scaffold) {
 					throw new ScaffoldError(
@@ -292,7 +304,11 @@ async function runInteractive(opts) {
 						ctx.result = await ctx.registry.execute(
 							ctx.opts.id,
 							ctx.inputs,
-							{ dryRun: true, cwd: ctx.opts.cwd }
+							{
+								dryRun: true,
+								cwd: ctx.opts.cwd,
+								fetchOpts: fetchOptsFrom(ctx.opts),
+							}
 						);
 						return;
 					} catch (err) {
@@ -336,7 +352,11 @@ async function runInteractive(opts) {
 					ctx.result = await ctx.registry.execute(
 						ctx.opts.id,
 						ctx.inputs,
-						{ dryRun: false, cwd: ctx.opts.cwd }
+						{
+							dryRun: false,
+							cwd: ctx.opts.cwd,
+							fetchOpts: fetchOptsFrom(ctx.opts),
+						}
 					);
 					s.succeed(`Scaffolded ${ctx.opts.id}`);
 				} catch (err) {
@@ -354,10 +374,11 @@ async function runInteractive(opts) {
 }
 
 async function runNonInteractive(opts) {
-	const registry = await buildRegistry(opts.cwd);
+	const registry = await buildRegistry(opts.cwd, fetchOptsFrom(opts));
 	const result = await registry.execute(opts.id, opts.inputs, {
 		dryRun: opts.dryRun,
 		cwd: opts.cwd,
+		fetchOpts: fetchOptsFrom(opts),
 	});
 	if (opts.json) {
 		process.stdout.write(JSON.stringify(result) + '\n');
@@ -368,7 +389,14 @@ async function runNonInteractive(opts) {
 }
 
 async function runCli(argv) {
-	const opts = parseArgs(argv);
+	let opts;
+	try {
+		opts = parseArgs(argv);
+	} catch (err) {
+		process.stderr.write(`Error: ${err.message}\n`);
+		printHelp();
+		return 1;
+	}
 	if (opts.help) {
 		printHelp();
 		return 0;

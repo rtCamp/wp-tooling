@@ -14,6 +14,7 @@ const os = require('os');
 const path = require('path');
 
 const add = require('../../src/scaffolds/add');
+const { ScaffoldError } = require('../../src/scaffolds/errors');
 
 function makeTmpDir() {
 	return fssync.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-add-'));
@@ -70,6 +71,44 @@ describe('add command argument parsing', () => {
 		process.stdout.write = originalOut;
 		process.stderr.write = originalErr;
 		expect(code).toBe(1);
+	});
+
+	// The missing/flag-shaped-value contract is pinned in cli-support.test.js;
+	// here we only confirm add wires it in (input flags + runCli handling).
+	it('still accepts --flag=value for values starting with --', () => {
+		const opts = add.parseArgs(['wp/cli', '--description=--weird']);
+		expect(opts.inputs.description).toBe('--weird');
+	});
+
+	it('exits 1 (not interactive hang) on a parse error', async () => {
+		const originalOut = process.stdout.write.bind(process.stdout);
+		const originalErr = process.stderr.write.bind(process.stderr);
+		let stderr = '';
+		process.stdout.write = () => true;
+		process.stderr.write = (chunk) => {
+			stderr += chunk;
+			return true;
+		};
+		const code = await add.runCli(['wp/cli', '--name', '--json']);
+		process.stdout.write = originalOut;
+		process.stderr.write = originalErr;
+		expect(code).toBe(1);
+		expect(stderr).toContain('Missing value for --name');
+	});
+});
+
+describe('formatErrorPayload', () => {
+	it('keeps EBADSCAFFOLD file + errors fields (documented payload)', () => {
+		const err = new ScaffoldError('EBADSCAFFOLD', 'Invalid scaffold', {
+			file: '/path/scaffold.json',
+			errors: ['files[0].dest: must be a non-empty string'],
+		});
+		const payload = add.formatErrorPayload(err);
+		expect(payload).toMatchObject({
+			code: 'EBADSCAFFOLD',
+			file: '/path/scaffold.json',
+			errors: ['files[0].dest: must be a non-empty string'],
+		});
 	});
 });
 
