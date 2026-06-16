@@ -22,12 +22,15 @@ function parseArgs(argv) {
 	const opts = {
 		action: null,
 		cacheDir: undefined,
+		dryRun: false,
 		help: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === '--help' || a === '-h') {
 			opts.help = true;
+		} else if (a === '--dry-run') {
+			opts.dryRun = true;
 		} else if (a === '--cache-dir') {
 			opts.cacheDir = requireFlagValue(argv[++i], a);
 		} else if (a.startsWith('--cache-dir=')) {
@@ -51,6 +54,7 @@ function printHelp() {
 			'',
 			'Flags:',
 			'  --cache-dir <path> Override the default cache directory.',
+			'  --dry-run          Print what would be removed without deleting.',
 			'  --help, -h         Show this help text.',
 			'',
 		].join('\n')
@@ -82,6 +86,12 @@ async function runCli(argv) {
 	}
 	const dir = opts.cacheDir || defaultCacheDir();
 	if (opts.action === 'clear') {
+		if (opts.dryRun) {
+			process.stdout.write(
+				`Would clear remote scaffold cache at ${dir} (dry run)\n`
+			);
+			return 0;
+		}
 		await clear(dir);
 		process.stdout.write(`Cleared remote scaffold cache at ${dir}\n`);
 		return 0;

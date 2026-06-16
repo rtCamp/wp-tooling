@@ -48,6 +48,13 @@ describe('parseArgs', () => {
 		});
 	});
 
+	test('extracts --dry-run', () => {
+		expect(parseArgs(['clear', '--dry-run'])).toMatchObject({
+			action: 'clear',
+			dryRun: true,
+		});
+	});
+
 	test('extracts --help', () => {
 		expect(parseArgs(['--help'])).toMatchObject({ help: true });
 	});
@@ -79,6 +86,17 @@ describe('runCli', () => {
 		const code = await runCli(['clear', `--cache-dir=${dir}`]);
 		expect(code).toBe(0);
 		expect(fs.existsSync(dir)).toBe(false);
+	});
+
+	test('clear --dry-run reports without removing the dir', async () => {
+		const dir = makeTmpDir();
+		fs.writeFileSync(path.join(dir, 'a'), 'x');
+		const code = await runCli(['clear', '--dry-run', `--cache-dir=${dir}`]);
+		expect(code).toBe(0);
+		expect(fs.existsSync(dir)).toBe(true);
+		expect(stdoutSpy).toHaveBeenCalledWith(
+			expect.stringContaining('(dry run)')
+		);
 	});
 
 	test('--help returns 0 and prints usage', async () => {

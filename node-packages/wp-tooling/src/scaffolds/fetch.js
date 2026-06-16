@@ -70,6 +70,16 @@ function composeUrl(source, relPath) {
 		strip(source.path),
 		strip(relPath),
 	].filter((s) => s.length > 0);
+	// A `..` segment escapes the pinned repo/ref/path to unaudited content —
+	// the fetch-side mirror of the write-side resolveInside guard.
+	for (const part of parts) {
+		if (part.split('/').includes('..')) {
+			throw new ScaffoldError(
+				'EFETCHFAIL',
+				`remote path may not contain '..': ${part}`
+			);
+		}
+	}
 	return `${RAW_GITHUB_BASE}/${parts.join('/')}`;
 }
 
@@ -336,13 +346,14 @@ async function fetchRemoteFile(source, relPath, opts = {}) {
 		throw err;
 	}
 
-	if (res.status === 304 && cached) {
+	// Honour a cached 304 only for a conditional request. --refresh sends no
+	// validator, so a 304 then is a stray proxy answer — re-fetch instead.
+	if (res.status === 304 && cached && !opts.refresh) {
 		return cached.body;
 	}
 
-	// A 304 with no cache to satisfy it is a server quirk — re-fetch
-	// unconditionally so we always return a real body.
-	if (res.status === 304 && !cached) {
+	// Nothing cached, or --refresh forcing a re-fetch: get a real body.
+	if (res.status === 304) {
 		const fresh = await httpGet(url, { token });
 		await writeCacheEntry(
 			cacheDir,

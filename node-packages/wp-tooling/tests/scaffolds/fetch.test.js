@@ -126,6 +126,33 @@ describe('composeUrl', () => {
 			'https://raw.githubusercontent.com/rtCamp/wp-shared-workflows/v1/scaffolds/ci/test-php/ci-test-php.yml.mustache'
 		);
 	});
+
+	test("rejects a '..' segment in the relative path", () => {
+		expect(() =>
+			composeUrl(
+				{ repository: 'a/b', ref: 'v1', path: 'scaffolds' },
+				'../../../etc/passwd'
+			)
+		).toThrow(/may not contain '\.\.'/);
+	});
+
+	test("rejects a '..' segment in the source path with EFETCHFAIL", () => {
+		let err;
+		try {
+			composeUrl(
+				{
+					repository: 'a/b',
+					ref: 'v1',
+					path: 'scaffolds/../../secret',
+				},
+				'file.txt'
+			);
+		} catch (e) {
+			err = e;
+		}
+		expect(err).toBeDefined();
+		expect(err.code).toBe('EFETCHFAIL');
+	});
 });
 
 describe('fetchRemoteFile', () => {
@@ -213,6 +240,31 @@ describe('fetchRemoteFile', () => {
 		});
 		expect(body).toBe('FRESH');
 		expect(calls[0].options.headers['If-None-Match']).toBeUndefined();
+		expect(fs.readFileSync(cachePathFor(expectedUrl), 'utf8')).toBe(
+			'FRESH'
+		);
+	});
+
+	test('--refresh ignores a stray 304 and re-fetches a real body', async () => {
+		await fsp.mkdir(cacheDir, { recursive: true });
+		await fsp.writeFile(cachePathFor(expectedUrl), 'STALE', 'utf8');
+		await fsp.writeFile(
+			`${cachePathFor(expectedUrl)}.etag`,
+			'W/"v1"',
+			'utf8'
+		);
+		// A misbehaving proxy answers 304 even though --refresh sent no
+		// validator; the second (unconditional) GET returns the real body.
+		stubResponses([
+			{ statusCode: 304 },
+			{ statusCode: 200, body: 'FRESH', etag: 'W/"v2"' },
+		]);
+		const body = await fetchRemoteFile(repo, fileSrc, {
+			cacheDir,
+			refresh: true,
+		});
+		expect(body).toBe('FRESH');
+		expect(https.get).toHaveBeenCalledTimes(2);
 		expect(fs.readFileSync(cachePathFor(expectedUrl), 'utf8')).toBe(
 			'FRESH'
 		);
