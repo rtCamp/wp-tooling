@@ -45,9 +45,28 @@ function validateGroups(groups) {
 }
 
 /**
+ * An item may be a plain string (unchecked by default) or an object with a
+ * `label` and an optional `checked` default. Lets callers pre-select items for
+ * a "keep, uncheck to drop" model.
+ *
+ * @param {string|{label: string, checked?: boolean}} item - Item.
+ * @return {string} Display label.
+ */
+const itemLabel = (item) => (typeof item === 'string' ? item : item.label);
+
+/**
+ * Whether an item is pre-checked.
+ *
+ * @param {string|{label: string, checked?: boolean}} item - Item.
+ * @return {boolean} True if checked by default.
+ */
+const itemChecked = (item) =>
+	typeof item === 'object' && item !== null && true === item.checked;
+
+/**
  * Build a flat list of renderable rows from groups.
  *
- * @param {Array<{label: string, items: string[]}>} groups - Grouped items.
+ * @param {Array<{label: string, items: Array}>} groups - Grouped items.
  * @return {Array<{type: string, label: string, groupIndex?: number, itemIndex?: number}>} Flat rows.
  */
 function buildRows(groups) {
@@ -57,7 +76,7 @@ function buildRows(groups) {
 		for (let i = 0; i < groups[g].items.length; i++) {
 			rows.push({
 				type: 'item',
-				label: groups[g].items[i],
+				label: itemLabel(groups[g].items[i]),
 				groupIndex: g,
 				itemIndex: i,
 			});
@@ -81,6 +100,15 @@ function interactiveCheckboxTree({ message, groups }) {
 		const rows = buildRows(groups);
 		let cursor = 0;
 		const selected = new Set(); // stores "groupIndex:itemIndex" keys
+
+		// Pre-check items flagged checked by default (keep model).
+		for (let g = 0; g < groups.length; g++) {
+			for (let i = 0; i < groups[g].items.length; i++) {
+				if (itemChecked(groups[g].items[i])) {
+					selected.add(`${g}:${i}`);
+				}
+			}
+		}
 
 		/**
 		 * Check if every item in a group is selected.
@@ -192,7 +220,7 @@ function interactiveCheckboxTree({ message, groups }) {
 				for (let g = 0; g < groups.length; g++) {
 					for (let i = 0; i < groups[g].items.length; i++) {
 						if (selected.has(`${g}:${i}`)) {
-							result.push(groups[g].items[i]);
+							result.push(itemLabel(groups[g].items[i]));
 						}
 					}
 				}
@@ -217,24 +245,54 @@ function interactiveCheckboxTree({ message, groups }) {
 async function plainCheckboxTree({ message, groups }) {
 	writeLine(`${message}:`);
 	const allItems = [];
+	const defaults = new Set(); // indices pre-checked
 	let counter = 1;
 	for (const group of groups) {
 		writeLine(`  ${group.label}:`);
 		for (const item of group.items) {
-			writeLine(`    ${counter}. ${item}`);
-			allItems.push(item);
+			const label = itemLabel(item);
+			const checked = itemChecked(item);
+			if (checked) {
+				defaults.add(allItems.length);
+			}
+			writeLine(`    ${counter}. [${checked ? 'x' : ' '}] ${label}`);
+			allItems.push(label);
 			counter++;
 		}
 	}
 
-	const answer = await readLine('Enter numbers separated by commas: ');
-	const indices = answer
+	// With nothing pre-checked, keep the classic "enter numbers to select"
+	// behaviour (deduped, display order). With defaults present, the model is
+	// "enter numbers to toggle" off/on from the pre-checked state.
+	if (0 === defaults.size) {
+		const answer = await readLine('Enter numbers separated by commas: ');
+		const indices = answer
+			.split(',')
+			.map((s) => parseInt(s.trim(), 10) - 1)
+			.filter((i) => i >= 0 && i < allItems.length);
+		return [...new Set(indices)]
+			.sort((a, b) => a - b)
+			.map((i) => allItems[i]);
+	}
+
+	const answer = await readLine(
+		'Enter numbers to toggle (comma-separated), then Enter: '
+	);
+	const toggles = answer
 		.split(',')
 		.map((s) => parseInt(s.trim(), 10) - 1)
 		.filter((i) => i >= 0 && i < allItems.length);
-	const normalizedIndices = [...new Set(indices)].sort((a, b) => a - b);
 
-	return normalizedIndices.map((i) => allItems[i]);
+	const finalSet = new Set(defaults);
+	for (const i of toggles) {
+		if (finalSet.has(i)) {
+			finalSet.delete(i);
+		} else {
+			finalSet.add(i);
+		}
+	}
+
+	return [...finalSet].sort((a, b) => a - b).map((i) => allItems[i]);
 }
 
 /**

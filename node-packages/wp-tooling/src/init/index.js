@@ -79,9 +79,15 @@ Scaffold options (first run):
   --name=NAME      Use NAME without prompting (required with --yes).
   --version=VER    Set the project version (default 1.0.0).
   -y, --yes        Accept defaults, no prompts; for CI. Needs --name.
-  --remove-examples[=a,b]  Remove all (or just the listed) example sets.
-  --keep-examples    Keep every example set (non-interactive).
+  --remove-examples[=a,b]  Remove all (or just the listed) capability sets.
+  --keep-examples    Keep every capability set (non-interactive).
+  --features=a,b     Enable exactly these optional features (empty = none).
+  --enable=a,b       Enable features (delta over defaults).
+  --disable=a,b      Disable features (delta over defaults).
   --reinit         Force a fresh scaffold even if already set up.
+
+  Interactive runs show ONE grouped "Select the capabilities to include"
+  prompt (by category); unchecking a capability removes it entirely.
 
 Manage options (after set up):
   --list           Print feature status and exit.
@@ -122,6 +128,24 @@ const parseFlags = (argv) => {
 				.filter(Boolean);
 		} else if ('--keep-examples' === arg) {
 			flags.keepExamples = true;
+		} else if (arg.startsWith('--features=')) {
+			flags.features = arg
+				.slice('--features='.length)
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
+		} else if (arg.startsWith('--enable=')) {
+			flags.enable = arg
+				.slice('--enable='.length)
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
+		} else if (arg.startsWith('--disable=')) {
+			flags.disable = arg
+				.slice('--disable='.length)
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
 		} else {
 			unknown.push(arg);
 		}
@@ -316,61 +340,127 @@ const setupSteps = (config, root, flags) => {
 			},
 		},
 		{
-			name: 'Select features',
-			skip: (c) => c.cancelled || !(config.features || []).length,
-			async run(c) {
-				const api = makeFeatureApi(root, c.persistPayload, ui);
-				let wantOn;
-				if (flags.yes) {
-					// Preserve already-enabled features (matters on --reinit over an existing tree) plus defaultOn.
-					const detected = detectMap(config, api);
-					wantOn = new Set(
-						(config.features || [])
-							.filter((f) => f.defaultOn || detected[f.key])
-							.map((f) => f.key)
-					);
-				}
-				const result = await toggleFeatures(config, root, {
-					mode: 'scaffold',
-					wantOn,
-					flags,
-					api,
-					ui,
-				});
-				c.persistPayload.features =
-					(result && result.finalMap) || detectMap(config, api);
-			},
-		},
-		{
-			name: 'Example classes',
+			// One categorized prompt for BOTH example capabilities (keep/remove)
+			// and optional features (enable/disable). Non-interactive when any
+			// selection flag is present (AI/CI); otherwise a grouped "keep" tree.
+			name: 'Select capabilities',
 			skip: (c) =>
 				c.cancelled ||
-				!(config.examples && (config.examples.groups || []).length),
-			async run() {
-				const groups = config.examples.groups;
-				let removeKeys;
-				if (true === flags.removeExamples) {
-					removeKeys = new Set(groups.map((g) => g.key));
-				} else if (Array.isArray(flags.removeExamples)) {
-					removeKeys = new Set(flags.removeExamples);
-				} else if (flags.keepExamples || flags.yes) {
+				(!(config.features || []).length &&
+					!(config.examples && (config.examples.groups || []).length)),
+			async run(c) {
+				const features = config.features || [];
+				const groups =
+					(config.examples && config.examples.groups) || [];
+				const api = makeFeatureApi(root, c.persistPayload, ui);
+
+				let removeKeys; // example group keys to remove
+				let wantOn; // feature keys to enable
+
+				const interactive =
+					!flags.yes &&
+					undefined === flags.removeExamples &&
+					!flags.keepExamples &&
+					undefined === flags.features &&
+					!flags.enable &&
+					!flags.disable;
+
+				if (interactive) {
 					removeKeys = new Set();
+					wantOn = new Set();
+					if (features.length || groups.length) {
+						// Build capabilities (examples default-checked = kept;
+						// features checked iff defaultOn), grouped by category.
+						const caps = [
+							...groups.map((g) => ({
+								key: g.key,
+								label: g.label,
+								category: g.category || 'Other',
+								checked: true,
+							})),
+							...features.map((f) => ({
+								key: f.key,
+								label: f.label,
+								category: f.category || 'Other',
+								checked: !!f.defaultOn,
+							})),
+						];
+						const order = [];
+						const byCat = new Map();
+						for (const cap of caps) {
+							if (!byCat.has(cap.category)) {
+								byCat.set(cap.category, []);
+								order.push(cap.category);
+							}
+							byCat.get(cap.category).push(cap);
+						}
+						const treeGroups = order.map((category) => ({
+							label: category,
+							items: byCat.get(category).map((cap) => ({
+								label: cap.label,
+								checked: cap.checked,
+							})),
+						}));
+						const checked = new Set(
+							await ui.checkboxTree({
+								message:
+									'Select the capabilities to include in your plugin',
+								groups: treeGroups,
+							})
+						);
+						removeKeys = new Set(
+							groups
+								.filter((g) => !checked.has(g.label))
+								.map((g) => g.key)
+						);
+						wantOn = new Set(
+							features
+								.filter((f) => checked.has(f.label))
+								.map((f) => f.key)
+						);
+					}
 				} else {
-					// Checkbox can't pre-select, so ask what to REMOVE — leaving it
-					// empty keeps everything (the safe default).
-					const byChoice = new Map(groups.map((g) => [g.label, g]));
-					const picked = await ui.checkbox({
-						message:
-							'Select example sets to remove (leave empty to keep all):',
-						choices: groups.map((g) => g.label),
-					});
-					removeKeys = new Set(
-						picked.map((label) => byChoice.get(label).key)
-					);
+					// Examples from flags.
+					if (true === flags.removeExamples) {
+						removeKeys = new Set(groups.map((g) => g.key));
+					} else if (Array.isArray(flags.removeExamples)) {
+						removeKeys = new Set(flags.removeExamples);
+					} else {
+						removeKeys = new Set(); // --keep-examples / --yes default
+					}
+					// Features from flags (--features exact set, or --enable /
+					// --disable deltas over defaultOn + detected).
+					if (undefined !== flags.features) {
+						wantOn = new Set(flags.features);
+					} else {
+						const detected = detectMap(config, api);
+						wantOn = new Set(
+							features
+								.filter((f) => f.defaultOn || detected[f.key])
+								.map((f) => f.key)
+						);
+						(flags.enable || []).forEach((k) => wantOn.add(k));
+						(flags.disable || []).forEach((k) => wantOn.delete(k));
+					}
 				}
-				// Always runs: strips the marker comments; drops the code + files
-				// only for the selected groups.
-				applyExamples(config, root, ui, removeKeys);
+
+				// Remove declined example capabilities, then toggle features.
+				if (groups.length) {
+					applyExamples(config, root, ui, removeKeys);
+				}
+				if (features.length) {
+					const result = await toggleFeatures(config, root, {
+						mode: 'scaffold',
+						wantOn,
+						flags,
+						api,
+						ui,
+					});
+					c.persistPayload.features =
+						(result && result.finalMap) || detectMap(config, api);
+				} else {
+					c.persistPayload.features = {};
+				}
 			},
 		},
 		{
