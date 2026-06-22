@@ -4,8 +4,8 @@
 
 'use strict';
 
-const fs = require( 'fs' );
-const { resolveWithin } = require( './transform' );
+const fs = require('fs');
+const { resolveWithin } = require('./transform');
 
 /**
  * Delete each target (file or directory) under `root` if it exists. Targets that
@@ -16,27 +16,27 @@ const { resolveWithin } = require( './transform' );
  * @param {Object}   ui      - `@rtcamp/wp-tooling/ui`.
  * @return {number} Count of targets removed.
  */
-const runCleanup = ( root, targets, ui ) => {
+const runCleanup = (root, targets, ui) => {
 	let removed = 0;
-	( targets || [] ).forEach( ( target ) => {
+	(targets || []).forEach((target) => {
 		let full;
 		try {
-			full = resolveWithin( root, target );
-		} catch ( err ) {
-			ui.warn( err.message );
+			full = resolveWithin(root, target);
+		} catch (err) {
+			ui.warn(err.message);
 			return;
 		}
-		if ( ! fs.existsSync( full ) ) {
+		if (!fs.existsSync(full)) {
 			return;
 		}
 		try {
-			fs.rmSync( full, { recursive: true, force: true } );
-			ui.info( `removed ${ target }` );
+			fs.rmSync(full, { recursive: true, force: true });
+			ui.info(`removed ${target}`);
 			removed++;
-		} catch ( err ) {
-			ui.warn( `Could not remove ${ target }: ${ err.message }` );
+		} catch (err) {
+			ui.warn(`Could not remove ${target}: ${err.message}`);
 		}
-	} );
+	});
 	return removed;
 };
 

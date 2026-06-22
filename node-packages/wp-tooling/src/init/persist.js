@@ -7,8 +7,8 @@
 
 'use strict';
 
-const fs = require( 'fs' );
-const path = require( 'path' );
+const fs = require('fs');
+const path = require('path');
 
 /** Name of the persisted identity file at the project root. */
 const IDENTITY_FILE = '.wp-scaffold.json';
@@ -21,11 +21,15 @@ const IDENTITY_FILE = '.wp-scaffold.json';
  * @param {Object} [ui]    - `@rtcamp/wp-tooling/ui` for an optional log line.
  * @return {string} Absolute path written.
  */
-const writeIdentityFile = ( root, payload, ui ) => {
-	const filePath = path.join( root, IDENTITY_FILE );
-	fs.writeFileSync( filePath, `${ JSON.stringify( payload, null, '\t' ) }\n`, 'utf8' );
-	if ( ui ) {
-		ui.info( `wrote ${ IDENTITY_FILE }` );
+const writeIdentityFile = (root, payload, ui) => {
+	const filePath = path.join(root, IDENTITY_FILE);
+	fs.writeFileSync(
+		filePath,
+		`${JSON.stringify(payload, null, '\t')}\n`,
+		'utf8'
+	);
+	if (ui) {
+		ui.info(`wrote ${IDENTITY_FILE}`);
 	}
 	return filePath;
 };
@@ -36,13 +40,13 @@ const writeIdentityFile = ( root, payload, ui ) => {
  * @param {string} root - Project root.
  * @return {Object|null} The parsed identity, or null.
  */
-const readIdentityFile = ( root ) => {
-	const filePath = path.join( root, IDENTITY_FILE );
-	if ( ! fs.existsSync( filePath ) ) {
+const readIdentityFile = (root) => {
+	const filePath = path.join(root, IDENTITY_FILE);
+	if (!fs.existsSync(filePath)) {
 		return null;
 	}
 	try {
-		return JSON.parse( fs.readFileSync( filePath, 'utf8' ) );
+		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 	} catch {
 		return null;
 	}
@@ -54,9 +58,9 @@ const readIdentityFile = ( root ) => {
  * @param {string} root - Project root.
  * @return {Object} Features map.
  */
-const readFeatures = ( root ) => {
-	const identity = readIdentityFile( root );
-	return ( identity && identity.features ) || {};
+const readFeatures = (root) => {
+	const identity = readIdentityFile(root);
+	return (identity && identity.features) || {};
 };
 
 /**
@@ -68,10 +72,16 @@ const readFeatures = ( root ) => {
  * @param {Object} [ui]        - UI for an optional log line.
  * @return {string} Absolute path written.
  */
-const writeFeatures = ( root, featuresMap, ui ) => {
-	const identity = readIdentityFile( root ) || {};
+const writeFeatures = (root, featuresMap, ui) => {
+	const identity = readIdentityFile(root) || {};
 	identity.features = featuresMap;
-	return writeIdentityFile( root, identity, ui );
+	return writeIdentityFile(root, identity, ui);
 };
 
-module.exports = { writeIdentityFile, readIdentityFile, readFeatures, writeFeatures, IDENTITY_FILE };
+module.exports = {
+	writeIdentityFile,
+	readIdentityFile,
+	readFeatures,
+	writeFeatures,
+	IDENTITY_FILE,
+};

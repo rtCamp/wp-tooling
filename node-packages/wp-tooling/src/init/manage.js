@@ -9,9 +9,9 @@
 
 'use strict';
 
-const { makeFeatureApi, reconcile, toggleFeatures } = require( './features' );
-const { readIdentityFile, readFeatures } = require( './persist' );
-const { editDetailsFlow } = require( './identity' );
+const { makeFeatureApi, reconcile, toggleFeatures } = require('./features');
+const { readIdentityFile, readFeatures } = require('./persist');
+const { editDetailsFlow } = require('./identity');
 
 /**
  * Capitalise the first letter.
@@ -19,7 +19,7 @@ const { editDetailsFlow } = require( './identity' );
  * @param {string} word - Input.
  * @return {string} Capitalised.
  */
-const cap = ( word ) => word.charAt( 0 ).toUpperCase() + word.slice( 1 );
+const cap = (word) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /**
  * Split a comma list flag value into trimmed keys.
@@ -27,7 +27,13 @@ const cap = ( word ) => word.charAt( 0 ).toUpperCase() + word.slice( 1 );
  * @param {string} value - Raw flag value.
  * @return {string[]} Keys.
  */
-const splitList = ( value ) => ( value ? value.split( ',' ).map( ( s ) => s.trim() ).filter( Boolean ) : [] );
+const splitList = (value) =>
+	value
+		? value
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean)
+		: [];
 
 /**
  * Parse manage-mode CLI flags.
@@ -35,27 +41,27 @@ const splitList = ( value ) => ( value ? value.split( ',' ).map( ( s ) => s.trim
  * @param {string[]} argv - Arguments.
  * @return {{flags: Object, unknown: string[]}} Parsed.
  */
-const parseManageFlags = ( argv ) => {
+const parseManageFlags = (argv) => {
 	const flags = { yes: false, list: false };
 	const unknown = [];
 
-	argv.forEach( ( arg ) => {
-		if ( '--yes' === arg || '-y' === arg ) {
+	argv.forEach((arg) => {
+		if ('--yes' === arg || '-y' === arg) {
 			flags.yes = true;
-		} else if ( '--list' === arg ) {
+		} else if ('--list' === arg) {
 			flags.list = true;
-		} else if ( '--manage' === arg ) {
+		} else if ('--manage' === arg) {
 			// Explicit manage marker; already in manage mode, no-op.
-		} else if ( arg.startsWith( '--features=' ) ) {
-			flags.features = splitList( arg.slice( '--features='.length ) );
-		} else if ( arg.startsWith( '--enable=' ) ) {
-			flags.enable = splitList( arg.slice( '--enable='.length ) );
-		} else if ( arg.startsWith( '--disable=' ) ) {
-			flags.disable = splitList( arg.slice( '--disable='.length ) );
+		} else if (arg.startsWith('--features=')) {
+			flags.features = splitList(arg.slice('--features='.length));
+		} else if (arg.startsWith('--enable=')) {
+			flags.enable = splitList(arg.slice('--enable='.length));
+		} else if (arg.startsWith('--disable=')) {
+			flags.disable = splitList(arg.slice('--disable='.length));
 		} else {
-			unknown.push( arg );
+			unknown.push(arg);
 		}
-	} );
+	});
 
 	return { flags, unknown };
 };
@@ -68,21 +74,26 @@ const parseManageFlags = ( argv ) => {
  * @param {Object}   ui      - UI.
  * @return {void}
  */
-const showStatus = ( rows, unknown, ui ) => {
-	if ( ! rows.length ) {
-		ui.info( 'No optional features are declared for this project.' );
+const showStatus = (rows, unknown, ui) => {
+	if (!rows.length) {
+		ui.info('No optional features are declared for this project.');
 		return;
 	}
 	ui.table(
-		rows.map( ( r ) => [ r.label, `${ r.on ? 'enabled' : 'disabled' }${ r.drift ? '  (drift)' : '' }` ] ),
+		rows.map((r) => [
+			r.label,
+			`${r.on ? 'enabled' : 'disabled'}${r.drift ? '  (drift)' : ''}`,
+		]),
 		{ title: 'Feature status' }
 	);
-	rows.forEach( ( r ) => {
-		if ( r.description ) {
-			ui.info( `${ r.label }: ${ r.description }` );
+	rows.forEach((r) => {
+		if (r.description) {
+			ui.info(`${r.label}: ${r.description}`);
 		}
-	} );
-	( unknown || [] ).forEach( ( key ) => ui.warn( `${ key }: recorded in .wp-scaffold.json but no longer declared.` ) );
+	});
+	(unknown || []).forEach((key) =>
+		ui.warn(`${key}: recorded in .wp-scaffold.json but no longer declared.`)
+	);
 };
 
 /**
@@ -91,7 +102,7 @@ const showStatus = ( rows, unknown, ui ) => {
  * @param {string} root - Project root.
  * @return {Object} Features map.
  */
-const reqReadFeatures = ( root ) => readFeatures( root );
+const reqReadFeatures = (root) => readFeatures(root);
 
 /**
  * Manage-mode entry. Routes flags or an interactive menu into `toggleFeatures`.
@@ -104,92 +115,132 @@ const reqReadFeatures = ( root ) => readFeatures( root );
  * @param {Function} reinit   - Callback to re-run the full scaffold flow.
  * @return {Promise<void>}
  */
-const manageFlow = async ( config, root, argv, identity, ui, reinit ) => {
-	const { flags, unknown } = parseManageFlags( argv );
-	if ( unknown.length ) {
-		ui.error( `Unknown argument(s): ${ unknown.join( ' ' ) }` );
+const manageFlow = async (config, root, argv, identity, ui, reinit) => {
+	const { flags, unknown } = parseManageFlags(argv);
+	if (unknown.length) {
+		ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
 		process.exitCode = 1;
 		return;
 	}
-	if ( flags.features && ( flags.enable || flags.disable ) ) {
-		ui.error( '--features cannot be combined with --enable/--disable.' );
+	if (flags.features && (flags.enable || flags.disable)) {
+		ui.error('--features cannot be combined with --enable/--disable.');
 		process.exitCode = 1;
 		return;
 	}
-	if ( flags.list && ( flags.features || flags.enable || flags.disable ) ) {
-		ui.error( '--list cannot be combined with --features/--enable/--disable.' );
+	if (flags.list && (flags.features || flags.enable || flags.disable)) {
+		ui.error(
+			'--list cannot be combined with --features/--enable/--disable.'
+		);
 		process.exitCode = 1;
 		return;
 	}
 
 	const features = config.features || [];
-	const api = makeFeatureApi( root, identity, ui );
-	const { rows, unknown: retired } = reconcile( config, identity.features || {}, api );
+	const api = makeFeatureApi(root, identity, ui);
+	const { rows, unknown: retired } = reconcile(
+		config,
+		identity.features || {},
+		api
+	);
 
-	if ( flags.list ) {
-		showStatus( rows, retired, ui );
+	if (flags.list) {
+		showStatus(rows, retired, ui);
 		return;
 	}
 
-	const validKeys = new Set( features.map( ( f ) => f.key ) );
-	const requested = [ ...( flags.features || [] ), ...( flags.enable || [] ), ...( flags.disable || [] ) ];
-	const badKey = requested.find( ( k ) => ! validKeys.has( k ) );
-	if ( badKey ) {
-		ui.error( `Unknown feature "${ badKey }". Valid: ${ [ ...validKeys ].join( ', ' ) || '(none)' }` );
+	const validKeys = new Set(features.map((f) => f.key));
+	const requested = [
+		...(flags.features || []),
+		...(flags.enable || []),
+		...(flags.disable || []),
+	];
+	const badKey = requested.find((k) => !validKeys.has(k));
+	if (badKey) {
+		ui.error(
+			`Unknown feature "${badKey}". Valid: ${[...validKeys].join(', ') || '(none)'}`
+		);
 		process.exitCode = 1;
 		return;
 	}
 
-	const hasFlagSelection = Boolean( flags.features || flags.enable || flags.disable );
-	if ( flags.yes && ! hasFlagSelection ) {
-		ui.error( '--yes in manage mode requires --features / --enable / --disable.' );
+	const hasFlagSelection = Boolean(
+		flags.features || flags.enable || flags.disable
+	);
+	if (flags.yes && !hasFlagSelection) {
+		ui.error(
+			'--yes in manage mode requires --features / --enable / --disable.'
+		);
 		process.exitCode = 1;
 		return;
 	}
 
-	if ( hasFlagSelection ) {
+	if (hasFlagSelection) {
 		let wantOn;
-		if ( flags.features ) {
-			wantOn = new Set( flags.features );
+		if (flags.features) {
+			wantOn = new Set(flags.features);
 		} else {
-			wantOn = new Set( rows.filter( ( r ) => r.on ).map( ( r ) => r.key ) );
-			( flags.enable || [] ).forEach( ( k ) => wantOn.add( k ) );
-			( flags.disable || [] ).forEach( ( k ) => wantOn.delete( k ) );
+			wantOn = new Set(rows.filter((r) => r.on).map((r) => r.key));
+			(flags.enable || []).forEach((k) => wantOn.add(k));
+			(flags.disable || []).forEach((k) => wantOn.delete(k));
 		}
-		await toggleFeatures( config, root, { mode: 'manage', wantOn, flags, api, ui, rows, unknown: retired } );
+		await toggleFeatures(config, root, {
+			mode: 'manage',
+			wantOn,
+			flags,
+			api,
+			ui,
+			rows,
+			unknown: retired,
+		});
 		return;
 	}
 
 	// Interactive menu.
-	ui.heading( `${ cap( config.kind || 'project' ) } -- manage` );
-	for ( ;; ) {
-		const choices = [ 'Edit project details' ];
-		if ( features.length ) {
-			choices.push( 'Toggle features', 'Show status' );
+	ui.heading(`${cap(config.kind || 'project')} -- manage`);
+	for (;;) {
+		const choices = ['Edit project details'];
+		if (features.length) {
+			choices.push('Toggle features', 'Show status');
 		}
-		choices.push( 'Re-run full setup', 'Exit' );
+		choices.push('Re-run full setup', 'Exit');
 
-		const choice = await ui.radio( { message: 'What would you like to do?', choices } );
+		const choice = await ui.radio({
+			message: 'What would you like to do?',
+			choices,
+		});
 
-		if ( 'Exit' === choice ) {
+		if ('Exit' === choice) {
 			return;
 		}
-		if ( 'Edit project details' === choice ) {
-			await editDetailsFlow( config, root, readIdentityFile( root ) || identity, ui, flags );
+		if ('Edit project details' === choice) {
+			await editDetailsFlow(
+				config,
+				root,
+				readIdentityFile(root) || identity,
+				ui,
+				flags
+			);
 			continue;
 		}
-		if ( 'Show status' === choice ) {
-			const r = reconcile( config, reqReadFeatures( root ), api );
-			showStatus( r.rows, r.unknown, ui );
+		if ('Show status' === choice) {
+			const r = reconcile(config, reqReadFeatures(root), api);
+			showStatus(r.rows, r.unknown, ui);
 			continue;
 		}
-		if ( 'Re-run full setup' === choice ) {
+		if ('Re-run full setup' === choice) {
 			await reinit();
 			return;
 		}
 		// Toggle features: re-read fresh rows each loop.
-		const r = reconcile( config, reqReadFeatures( root ), api );
-		await toggleFeatures( config, root, { mode: 'manage', flags, api, ui, rows: r.rows, unknown: r.unknown } );
+		const r = reconcile(config, reqReadFeatures(root), api);
+		await toggleFeatures(config, root, {
+			mode: 'manage',
+			flags,
+			api,
+			ui,
+			rows: r.rows,
+			unknown: r.unknown,
+		});
 	}
 };
 

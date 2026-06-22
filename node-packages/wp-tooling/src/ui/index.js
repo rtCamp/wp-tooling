@@ -12,6 +12,14 @@ const { checkbox, radio } = require('./selects/flat');
 const { checkboxTree } = require('./selects/tree');
 const { spinner } = require('./spinner/index');
 const { style } = require('./style/index');
+const {
+	heading,
+	success,
+	warn,
+	error,
+	info,
+	table,
+} = require('./report/index');
 const { CancelledError } = require('./errors');
 
 module.exports = {
@@ -29,6 +37,13 @@ module.exports = {
 	spinner,
 	// Styled text (TTY-aware colours)
 	style,
+	// Reporting (status lines + table)
+	heading,
+	success,
+	warn,
+	error,
+	info,
+	table,
 	// Errors
 	CancelledError,
 };
