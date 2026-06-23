@@ -192,6 +192,48 @@ describe('checkboxTree (non-TTY)', () => {
 		expect(result).toEqual(['cache', 'algolia']);
 	});
 
+	it('should keep pre-checked items when input is empty (keep model)', async () => {
+		terminal.readLine.mockResolvedValueOnce('');
+
+		const result = await checkboxTree({
+			message: 'Select capabilities',
+			groups: [
+				{
+					label: 'Content',
+					items: [
+						{ label: 'Post Types', checked: true },
+						{ label: 'Taxonomies', checked: true },
+					],
+				},
+				{ label: 'Dev', items: [{ label: 'Tailwind', checked: false }] },
+			],
+		});
+
+		expect(result).toEqual(['Post Types', 'Taxonomies']);
+	});
+
+	it('should toggle items off and on from the pre-checked state', async () => {
+		// Flat order: 1 Post Types(x), 2 Taxonomies(x), 3 Tailwind( ).
+		// Toggle 2 off and 3 on -> keep Post Types, add Tailwind.
+		terminal.readLine.mockResolvedValueOnce('2, 3');
+
+		const result = await checkboxTree({
+			message: 'Select capabilities',
+			groups: [
+				{
+					label: 'Content',
+					items: [
+						{ label: 'Post Types', checked: true },
+						{ label: 'Taxonomies', checked: true },
+					],
+				},
+				{ label: 'Dev', items: [{ label: 'Tailwind', checked: false }] },
+			],
+		});
+
+		expect(result).toEqual(['Post Types', 'Tailwind']);
+	});
+
 	it('should handle empty selection', async () => {
 		terminal.readLine.mockResolvedValueOnce('');
 

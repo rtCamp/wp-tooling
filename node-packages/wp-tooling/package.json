@@ -21,6 +21,7 @@
   },
   "exports": {
     "./ui": "./src/ui/index.js",
+    "./init": "./src/init/index.js",
     "./scaffolds": "./src/scaffolds/index.js",
     "./features": "./src/scaffolds/features.js",
     "./release": "./src/release/index.js",
