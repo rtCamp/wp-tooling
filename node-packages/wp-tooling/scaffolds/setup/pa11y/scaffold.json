@@ -2,7 +2,7 @@
 	"slug": "pa11y",
 	"category": "setup",
 	"name": "pa11y-ci",
-	"description": "Adds .pa11yci.json for WCAG2AA accessibility testing against a running WordPress environment.",
+	"description": "Adds .pa11yci.json for WCAG2AA accessibility testing (axe + htmlcs) against a running WordPress environment. Scans project-owned URLs — the front page plus configurable page paths (sample_page, search_page, extra_page) — extend urls[] in the generated file for more. Unauthenticated wp-admin/wp-login scans are deliberately excluded: they only audit core-owned login chrome.",
 	"source": "template",
 	"files": [
 		{
@@ -15,6 +15,21 @@
 			"key": "base_url",
 			"description": "Base URL of the WordPress environment to test against (e.g. http://localhost:8888).",
 			"required": true
+		},
+		{
+			"key": "sample_page",
+			"description": "Path of a post or page to scan, appended to base_url (e.g. /hello-world/ or a permalink path).",
+			"default": "/?p=1"
+		},
+		{
+			"key": "search_page",
+			"description": "Path of the search-results page to scan, appended to base_url.",
+			"default": "/?s=hello"
+		},
+		{
+			"key": "extra_page",
+			"description": "Optional path of one more page to scan, appended to base_url. Omitted when empty; add further URLs directly in .pa11yci.json.",
+			"default": ""
 		}
 	],
 	"npm_dev_dependencies": {

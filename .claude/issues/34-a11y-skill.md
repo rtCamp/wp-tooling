@@ -22,6 +22,8 @@ This task adds a `wp-tooling a11y` command that runs the consumer-installed `pa1
 - [2026-07-06] URL-level load failures (`net::ERR_*`) are classified as `scanError` + `summary.failedUrls`, never as violations; the CLI exits 1 for them (environment problem), keeping exit 3 meaningful.
 - [2026-07-06] The `accessibility` skill treats `setup/pa11y` as one way to get a config, not a requirement — a project with its own pa11y setup works as-is.
 - [2026-07-06] Skill housed in wp-tooling (`skills/accessibility/`) and distributed via `setup/claude-skills`, rather than wp-dev-tools as the Phase 2 plan sketches, because wp-dev-tools has no public repo yet for remote scaffold sources. Migrate later if the lens suite consolidates there.
+- [2026-07-06] `setup/pa11y` template ships `"runners": ["axe", "htmlcs"]` (the engines catch disjoint issues — proven in the evals: axe found a nested-list violation htmlcs missed) per the Phase 2 plan §5.3.
+- [2026-07-06] Template URLs changed to project-owned surfaces: front page + `sample_page` (default `/?p=1`) + `search_page` (default `/?s=hello`) + optional `extra_page`, each appended to `base_url`. `wp-admin`/`wp-login` dropped: unauthenticated `/wp-admin/` only audits the login redirect (double-counting it), and `wp-login.php` chrome is core-owned — permanently exit-3 on findings no project can fix. Page paths are scaffold inputs (engine renderer cannot iterate lists, so slot inputs + a falsy-omitted section; further URLs are added directly in the generated file).
 
 ---
 
