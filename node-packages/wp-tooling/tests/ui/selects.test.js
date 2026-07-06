@@ -205,7 +205,10 @@ describe('checkboxTree (non-TTY)', () => {
 						{ label: 'Taxonomies', checked: true },
 					],
 				},
-				{ label: 'Dev', items: [{ label: 'Tailwind', checked: false }] },
+				{
+					label: 'Dev',
+					items: [{ label: 'Tailwind', checked: false }],
+				},
 			],
 		});
 
@@ -227,7 +230,10 @@ describe('checkboxTree (non-TTY)', () => {
 						{ label: 'Taxonomies', checked: true },
 					],
 				},
-				{ label: 'Dev', items: [{ label: 'Tailwind', checked: false }] },
+				{
+					label: 'Dev',
+					items: [{ label: 'Tailwind', checked: false }],
+				},
 			],
 		});
 

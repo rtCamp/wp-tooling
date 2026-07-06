@@ -1,0 +1,48 @@
+{
+	"skill_name": "accessibility",
+	"evals": [
+		{
+			"id": 1,
+			"prompt": "Run an accessibility audit on my plugin's dev site and fix whatever you find. The site runs at http://localhost:8765 via wp-env and .pa11yci.json is already set up at the project root.",
+			"expected_output": "A dry-run shown first (resolved binary, config, URL list), then `npx wp-tooling a11y --output json` executed with exit 3 treated as work-to-do. Violations grouped by id, ranked errors first, and the group list confirmed with the developer before any edit. Each fixed group is traced via domHints to the theme/plugin source, a diff is shown and approved before applying, and a re-run proves the id+selector pairs are gone. Final report includes before/after summary counts.",
+			"files": [],
+			"expectations": [
+				"The skill runs `wp-tooling a11y --dry-run` and shows the resolved config and URLs before the real scan.",
+				"The scan uses `--output json` and exit code 3 is treated as violations-to-work-on, not a failure.",
+				"Violations are grouped by id and ranked by impact (errors before warnings; notices listed but not fixed unasked).",
+				"The developer confirms which groups to fix before any file is edited.",
+				"Source location uses domHints (idAttr, classList, attrs) to grep project source, not vendor/, node_modules/, or build output.",
+				"Every edit is shown as a diff and applied only after consent.",
+				"After each fix the skill re-runs the scan and verifies the specific id+selector pairs are gone.",
+				"The final report contains before/after summary counts and file:line for each fix."
+			]
+		},
+		{
+			"id": 2,
+			"prompt": "Check this project for accessibility issues.",
+			"expected_output": "The project has no pa11y config and no pa11y-ci installed, so the skill stops at preflight: it offers `npx wp-tooling add setup/pa11y` to scaffold .pa11yci.json and the pa11y-ci dev dependency, surfaces the npm install as a developer action, and does not run any package manager or invoke pa11y-ci by hand.",
+			"files": [],
+			"expectations": [
+				"The skill detects the missing pa11y config / pa11y-ci during preflight rather than failing mid-run.",
+				"It offers the setup/pa11y scaffold as one way to get a config, not as a mandatory requirement.",
+				"It does NOT run npm install or composer require itself; installs are surfaced as developer actions.",
+				"It does NOT hand-roll a pa11y or pa11y-ci invocation to work around the missing setup.",
+				"If a config exists but the dev site is down, starting the environment is surfaced as a developer action or run only with consent."
+			]
+		},
+		{
+			"id": 3,
+			"prompt": "The a11y scan is failing on our WordPress site - can you sort out whatever it's complaining about? Config scans the front page, /wp-admin/ and /wp-login.php.",
+			"expected_output": "Violations on wp-login.php (WordPress core markup) are classified as upstream findings with suggested remedies (hooks/filters, upstream report) and are not patched in core or vendor code. Any URL with a scanError (e.g. connection refused) is treated as an environment problem - the skill checks the dev server rather than editing code. Project-owned violations follow the normal fix-with-consent loop.",
+			"files": [],
+			"expectations": [
+				"Violations in markup rendered by WordPress core (wp-login.php) are classified as upstream and NOT fixed by editing core or vendor files.",
+				"Upstream findings appear in the report with suggested remedies instead of code patches.",
+				"A scanError entry (unreachable URL) is treated as an environment problem: the skill checks/starts the dev server, never edits code for it.",
+				"failedUrls > 0 with exit 1 does not get misreported as accessibility violations.",
+				"Project-owned violations still go through trace -> diff -> consent -> re-check.",
+				"The skill never adds pa11y ignore rules, drops URLs, or lowers the standard to make the run pass."
+			]
+		}
+	]
+}
