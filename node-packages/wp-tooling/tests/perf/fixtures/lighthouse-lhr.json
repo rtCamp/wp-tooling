@@ -1,0 +1,61 @@
+{
+	"lighthouseVersion": "13.4.0",
+	"requestedUrl": "http://localhost:8888/",
+	"finalUrl": "http://localhost:8888/",
+	"categories": {
+		"performance": {
+			"id": "performance",
+			"title": "Performance",
+			"score": 0.87
+		}
+	},
+	"audits": {
+		"render-blocking-resources": {
+			"id": "render-blocking-resources",
+			"title": "Eliminate render-blocking resources",
+			"score": 0.4,
+			"scoreDisplayMode": "numeric",
+			"displayValue": "Potential savings of 300 ms"
+		},
+		"unused-css-rules": {
+			"id": "unused-css-rules",
+			"title": "Reduce unused CSS",
+			"score": 0.72,
+			"scoreDisplayMode": "numeric",
+			"displayValue": "Potential savings of 40 KiB"
+		},
+		"largest-contentful-paint": {
+			"id": "largest-contentful-paint",
+			"title": "Largest Contentful Paint",
+			"score": 0.91,
+			"scoreDisplayMode": "numeric",
+			"displayValue": "2.4 s"
+		},
+		"first-contentful-paint": {
+			"id": "first-contentful-paint",
+			"title": "First Contentful Paint",
+			"score": 0.96,
+			"scoreDisplayMode": "numeric",
+			"displayValue": "0.8 s"
+		},
+		"uses-long-cache-ttl": {
+			"id": "uses-long-cache-ttl",
+			"title": "Uses efficient cache policy on static assets",
+			"score": 0.2,
+			"scoreDisplayMode": "numeric",
+			"displayValue": "3 resources found"
+		},
+		"viewport": {
+			"id": "viewport",
+			"title": "Has a viewport meta tag",
+			"score": 1,
+			"scoreDisplayMode": "binary"
+		},
+		"third-party-summary": {
+			"id": "third-party-summary",
+			"title": "Minimize third-party usage",
+			"score": null,
+			"scoreDisplayMode": "informative"
+		}
+	}
+}

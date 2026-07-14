@@ -1,0 +1,12 @@
+{
+	"urls": ["http://localhost:8888/", "http://localhost:8888/?p=1"],
+	"webVitals": { "settleMs": 100, "timeoutMs": 5000, "chromeArgs": ["--no-sandbox"] },
+	"lighthouse": { "enabled": true, "categories": ["performance"], "topAudits": 5 },
+	"server": {
+		"enabled": true,
+		"command": ["npx", "wp-env", "run", "cli", "--env-cwd=wp-content/plugins/dummy-plugin", "--", "wp"],
+		"shim": "server-profile.php",
+		"top": 15
+	},
+	"thresholds": { "cwv": "poor", "lighthousePerformance": 0.5 }
+}

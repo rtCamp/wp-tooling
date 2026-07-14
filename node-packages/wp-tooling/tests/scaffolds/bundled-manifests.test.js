@@ -113,3 +113,95 @@ describe('ci/test-measure rendering', () => {
 		expect(onYaml).toContain('run-a11y: true');
 	});
 });
+
+describe('setup/perf rendered config', () => {
+	it('renders valid JSON with default page paths and the server layer disabled', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8888/',
+			'http://localhost:8888/?p=1',
+			'http://localhost:8888/?s=hello',
+		]);
+		expect(config.lighthouse.enabled).toBe(true);
+		expect(config.server.enabled).toBe(false);
+		expect(config.server.command).toEqual([
+			'npx',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=.',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('renders custom page paths, appends extra_page, and enables the server layer when server_env_cwd is given', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{
+				base_url: 'http://localhost:8765',
+				sample_page: '/hello-world/',
+				search_page: '/?s=wordpress',
+				extra_page: '/about/',
+				server_env_cwd: 'wp-content/plugins/dummy-plugin',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8765/',
+			'http://localhost:8765/hello-world/',
+			'http://localhost:8765/?s=wordpress',
+			'http://localhost:8765/about/',
+		]);
+		expect(config.server.enabled).toBe(true);
+		expect(config.server.command).toEqual([
+			'npx',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=wp-content/plugins/dummy-plugin',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('copies the server-profile.php shim verbatim (raw: true, no mustache rendering)', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888' },
+			{ cwd: target }
+		);
+		const shim = fs.readFileSync(
+			path.join(target, 'server-profile.php'),
+			'utf8'
+		);
+		const source = fs.readFileSync(
+			path.join(
+				DEFAULTS_DIR,
+				'setup',
+				'perf',
+				'templates',
+				'server-profile.php'
+			),
+			'utf8'
+		);
+		expect(shim).toBe(source);
+		expect(shim).toContain('\\rtCamp\\WPDevTools\\Support\\XHProfProfiler');
+	});
+});
