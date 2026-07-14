@@ -37,9 +37,14 @@
 			"default": ""
 		},
 		{
+			"key": "server_enabled",
+			"description": "Enable the server-side xhprof layer (needs rtcamp/wp-dev-tools and the xhprof/tideways_xhprof PHP extension in the WP-CLI environment). One of true/false/yes/no.",
+			"default": "false"
+		},
+		{
 			"key": "server_env_cwd",
-			"description": "Project path inside the WP-CLI environment (e.g. wp-content/plugins/my-plugin), as `wp-env run cli --env-cwd` expects it. Leave empty to disable the server-side xhprof layer.",
-			"default": ""
+			"description": "Project path inside the WP-CLI environment, as `wp-env run cli --env-cwd` expects it (e.g. wp-content/plugins/my-plugin, or `.` to profile from the WordPress root).",
+			"default": "."
 		}
 	],
 	"npm_dev_dependencies": {

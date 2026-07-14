@@ -228,6 +228,17 @@ describe('perf runCli', () => {
 		const parsed = JSON.parse(stdout.join(''));
 		expect(parsed.summary.failedUrls).toBeGreaterThan(0);
 		expect(stderr.join('')).toMatch(/failed to load/);
+
+		// Lighthouse needs the same reachability as puppeteer, so it must be
+		// skipped for a failed URL: only the initial --version probe ran, no
+		// per-URL lighthouse invocation.
+		const nonProbeCalls = execFileSync.mock.calls.filter(
+			(call) => !call[1].includes('--version')
+		);
+		expect(nonProbeCalls).toHaveLength(0);
+		// The server layer profiles via WP-CLI, not the browser, so it still
+		// runs even though the frontend layer failed to load.
+		expect(spawnSync).toHaveBeenCalled();
 	});
 
 	test('a lighthouse runtime failure degrades that layer without affecting the exit code', async () => {
@@ -290,8 +301,13 @@ describe('perf runCli', () => {
 		expect(out).toMatch(/server:/);
 
 		// Only the lighthouse --version probe ran; nothing else was invoked.
-		expect(execFileSync.mock.calls).toHaveLength(1);
-		expect(execFileSync.mock.calls[0][1]).toContain('--version');
+		// Filtered rather than asserting the raw total, so this doesn't
+		// depend on perfect mock-call isolation from other test files
+		// sharing the same auto-mocked child_process module.
+		const versionProbes = execFileSync.mock.calls.filter((call) =>
+			call[1].includes('--version')
+		);
+		expect(versionProbes).toHaveLength(1);
 		expect(spawnSync).not.toHaveBeenCalled();
 		expect(collectVitalsModule.launchBrowser).not.toHaveBeenCalled();
 		expect(collectVitalsModule.collectVitals).not.toHaveBeenCalled();

@@ -131,7 +131,12 @@ describe('setup/perf rendered config', () => {
 			'http://localhost:8888/?p=1',
 			'http://localhost:8888/?s=hello',
 		]);
-		expect(config.lighthouse.enabled).toBe(true);
+		// webVitals/lighthouse/thresholds/server.shim/server.top are
+		// deliberately absent from the rendered file -- config.js's
+		// mergeConfig fills them from DEFAULTS at read time, so the scaffold
+		// never re-hardcodes a value that could drift from those defaults.
+		expect(config.lighthouse).toBeUndefined();
+		expect(config.webVitals).toBeUndefined();
 		expect(config.server.enabled).toBe(false);
 		expect(config.server.command).toEqual([
 			'npx',
@@ -144,7 +149,7 @@ describe('setup/perf rendered config', () => {
 		]);
 	});
 
-	it('renders custom page paths, appends extra_page, and enables the server layer when server_env_cwd is given', async () => {
+	it('renders custom page paths, appends extra_page, and enables the server layer when server_enabled is given', async () => {
 		const r = registry;
 		const target = makeTmpDir();
 		await r.execute(
@@ -154,6 +159,7 @@ describe('setup/perf rendered config', () => {
 				sample_page: '/hello-world/',
 				search_page: '/?s=wordpress',
 				extra_page: '/about/',
+				server_enabled: 'true',
 				server_env_cwd: 'wp-content/plugins/dummy-plugin',
 			},
 			{ cwd: target }
@@ -174,6 +180,29 @@ describe('setup/perf rendered config', () => {
 			'run',
 			'cli',
 			'--env-cwd=wp-content/plugins/dummy-plugin',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('enables the server layer at the WordPress root when server_env_cwd is left at its "." default', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_enabled: 'true' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.server.enabled).toBe(true);
+		expect(config.server.command).toEqual([
+			'npx',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=.',
 			'--',
 			'wp',
 		]);

@@ -75,17 +75,29 @@ function tryParse(text) {
  */
 function runServerProfile(server, url, options = {}) {
 	const cwd = options.cwd || process.cwd();
-	const { origin, pathAndQuery } = splitUrl(url);
-	const [command, ...prefix] = server.command;
-	const args = [
-		...prefix,
-		'eval-file',
-		server.shim,
-		pathAndQuery,
-		String(server.top),
-		`--url=${origin}`,
-	];
 
+	// splitUrl (and building args from server.command) can throw on malformed
+	// input -- this module always degrades instead, so a bad URL or config
+	// must not abort the URLs after this one.
+	let origin;
+	let pathAndQuery;
+	let args;
+	try {
+		({ origin, pathAndQuery } = splitUrl(url));
+		const [, ...prefix] = server.command;
+		args = [
+			...prefix,
+			'eval-file',
+			server.shim,
+			pathAndQuery,
+			String(server.top),
+			`--url=${origin}`,
+		];
+	} catch (err) {
+		return { data: null, diagnostic: null, error: err.message };
+	}
+
+	const command = server.command[0];
 	const result = spawnSync(command, args, {
 		cwd,
 		encoding: 'utf8',
