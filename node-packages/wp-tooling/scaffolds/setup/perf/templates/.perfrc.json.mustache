@@ -1,0 +1,28 @@
+{
+	"urls": [
+		"{{base_url}}/",
+		"{{base_url}}{{sample_page}}",
+		"{{base_url}}{{search_page}}"{{#extra_page}},
+		"{{base_url}}{{extra_page}}"{{/extra_page}}
+	],
+	"webVitals": {
+		"settleMs": 3000,
+		"timeoutMs": 30000,
+		"chromeArgs": ["--no-sandbox"]
+	},
+	"lighthouse": {
+		"enabled": true,
+		"categories": ["performance"],
+		"topAudits": 5
+	},
+	"server": {
+		"enabled": {{#server_env_cwd}}true{{/server_env_cwd}}{{^server_env_cwd}}false{{/server_env_cwd}},
+		"command": ["npx", "wp-env", "run", "cli", "--env-cwd={{^server_env_cwd}}.{{/server_env_cwd}}{{server_env_cwd}}", "--", "wp"],
+		"shim": "server-profile.php",
+		"top": 15
+	},
+	"thresholds": {
+		"cwv": "poor",
+		"lighthousePerformance": 0.5
+	}
+}
