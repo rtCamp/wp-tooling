@@ -26,6 +26,12 @@ const THRESHOLDS = {
 	INP: [200, 500],
 };
 
+/** All lab metric names, derived from THRESHOLDS so the two stay in sync. */
+const METRIC_NAMES = Object.keys(THRESHOLDS);
+
+/** Metrics this collector actually measures — INP never is (no interaction is performed). */
+const MEASURABLE_METRIC_NAMES = METRIC_NAMES.filter((name) => name !== 'INP');
+
 /** Fidelity caveat surfaced on every server-profile result (epic task 03). */
 const SERVER_FIDELITY_NOTE =
 	'profiled via `wp eval-file` in CLI context — representative for hot functions and N+1s, not a real HTTP request (routing/superglobals differ and it will not reflect web-server/opcache warmth).';
@@ -155,7 +161,7 @@ function isCwvIssue(rating, mode) {
  */
 function buildAssessment(metrics, lighthouse, thresholds) {
 	const lines = [];
-	for (const name of ['LCP', 'CLS', 'FCP', 'TTFB']) {
+	for (const name of MEASURABLE_METRIC_NAMES) {
 		const m = metrics[name];
 		if (!m) {
 			continue;
@@ -187,11 +193,13 @@ function buildAssessment(metrics, lighthouse, thresholds) {
 /**
  * Normalise raw per-URL perf capture into the final two-layer report.
  *
- * @param {Object[]} rawResults            Raw per-URL capture (see `run.js`'s `collectOne`):
- *                                         `{ url, scanError, vitals, lighthouse, server, notes }`.
+ * `raw.lighthouse` is expected to already be the extracted `{scores, audits}`
+ * shape (or `null`), never a raw LHR.
+ *
+ * @param {Object[]} rawResults           Raw per-URL capture: `{ url, scanError,
+ *                                        vitals, lighthouse, server, notes }`.
  * @param {Object}   [options]
- * @param {Object}   [options.thresholds]  Resolved `thresholds` config section.
- * @param {number}   [options.topAudits=5] Max failing lighthouse audits per URL.
+ * @param {Object}   [options.thresholds] Resolved `thresholds` config section.
  * @return {Object} Normalised report.
  */
 function normalizePerf(rawResults, options = {}) {
@@ -199,7 +207,6 @@ function normalizePerf(rawResults, options = {}) {
 		cwv: 'poor',
 		lighthousePerformance: 0.5,
 	};
-	const topAudits = options.topAudits || 5;
 
 	const results = [];
 	let passedUrls = 0;
@@ -213,13 +220,9 @@ function normalizePerf(rawResults, options = {}) {
 			results.push({
 				url: raw.url,
 				scanError: raw.scanError,
-				metrics: {
-					LCP: null,
-					CLS: null,
-					INP: null,
-					FCP: null,
-					TTFB: null,
-				},
+				metrics: Object.fromEntries(
+					METRIC_NAMES.map((name) => [name, null])
+				),
 				attribution: {
 					lcpElement: null,
 					clsSources: [],
@@ -237,7 +240,7 @@ function normalizePerf(rawResults, options = {}) {
 		const metrics = {};
 		let urlIssues = 0;
 
-		for (const name of ['LCP', 'CLS', 'FCP', 'TTFB']) {
+		for (const name of MEASURABLE_METRIC_NAMES) {
 			const m = vitals.metrics[name];
 			if (m && typeof m.value === 'number') {
 				const rating = m.rating || rateMetric(name, m.value);
@@ -263,7 +266,7 @@ function normalizePerf(rawResults, options = {}) {
 		}
 		metrics.INP = null;
 
-		const lighthouse = extractLighthouse(raw.lighthouse, { topAudits });
+		const lighthouse = raw.lighthouse;
 		if (
 			lighthouse &&
 			typeof lighthouse.scores.performance === 'number' &&
@@ -320,5 +323,6 @@ module.exports = {
 	extractLighthouse,
 	normalizeServer,
 	THRESHOLDS,
+	METRIC_NAMES,
 	SERVER_FIDELITY_NOTE,
 };

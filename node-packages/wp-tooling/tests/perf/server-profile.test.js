@@ -123,4 +123,12 @@ describe('runServerProfile', () => {
 		expect(result.data).toBeNull();
 		expect(result.error).toMatch(/no parseable output/);
 	});
+
+	test('degrades (never throws) on a malformed URL — e.g. a scheme-less base_url typo', () => {
+		const result = runServerProfile(SERVER, 'not-a-valid-url');
+		expect(result.data).toBeNull();
+		expect(result.diagnostic).toBeNull();
+		expect(result.error).toBeTruthy();
+		expect(spawnSync).not.toHaveBeenCalled();
+	});
 });

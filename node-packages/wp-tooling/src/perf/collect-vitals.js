@@ -16,8 +16,7 @@
 'use strict';
 
 const { RunnerError } = require('./errors');
-
-const METRIC_NAMES = ['LCP', 'CLS', 'INP', 'FCP', 'TTFB'];
+const { METRIC_NAMES } = require('./normalize');
 
 /**
  * Registers web-vitals attribution listeners and stashes the latest reading
@@ -141,5 +140,4 @@ module.exports = {
 	launchBrowser,
 	collectVitals,
 	buildResult,
-	REGISTER_SNIPPET,
 };

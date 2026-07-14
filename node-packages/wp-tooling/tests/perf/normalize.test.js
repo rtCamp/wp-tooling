@@ -307,6 +307,7 @@ describe('normalizePerf', () => {
 	});
 
 	test('a lighthouse performance score below threshold is an issue', () => {
+		// normalizePerf expects raw.lighthouse already extracted, not a raw LHR.
 		const report = normalizePerf(
 			[
 				{
@@ -316,7 +317,7 @@ describe('normalizePerf', () => {
 						metrics: { LCP: { value: 1000, rating: 'good' } },
 						attribution: {},
 					},
-					lighthouse: LHR,
+					lighthouse: extractLighthouse(LHR),
 					server: null,
 					notes: [],
 				},

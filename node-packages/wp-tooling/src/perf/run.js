@@ -31,10 +31,28 @@ const { detectBin } = require('./resolve-bin');
 const { launchBrowser, collectVitals } = require('./collect-vitals');
 const { runLighthouse, BIN: LIGHTHOUSE_BIN } = require('./lighthouse');
 const { runServerProfile } = require('./server-profile');
-const { normalizePerf } = require('./normalize');
+const { normalizePerf, extractLighthouse } = require('./normalize');
 
 const INSTALL_HINT = 'wp-tooling add setup/perf';
 const WEB_VITALS_DIST = 'dist/web-vitals.attribution.iife.js';
+
+/**
+ * Throw `EBINMISSING` with the standard install hint unless `condition` holds.
+ *
+ * @param {*}      condition Truthy value required to proceed.
+ * @param {string} message   Error message.
+ * @param {Object} [details] Extra `RunnerError` details (merged with `install`).
+ * @return {void}
+ * @throws {RunnerError} `EBINMISSING` when `condition` is falsy.
+ */
+function requireInstalled(condition, message, details = {}) {
+	if (!condition) {
+		throw new RunnerError('EBINMISSING', message, {
+			install: INSTALL_HINT,
+			...details,
+		});
+	}
+}
 
 /**
  * Run the perf layers against the config's (or `--url`'s) URLs and return
@@ -56,36 +74,28 @@ async function runPerf(options = {}) {
 	});
 
 	const puppeteer = requireModule('puppeteer', { cwd });
-	if (!puppeteer) {
-		throw new RunnerError(
-			'EBINMISSING',
-			`puppeteer not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`,
-			{ install: INSTALL_HINT }
-		);
-	}
+	requireInstalled(
+		puppeteer,
+		`puppeteer not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`
+	);
 
 	const webVitalsFile = resolveModuleFile('web-vitals', WEB_VITALS_DIST, {
 		cwd,
 	});
-	if (!webVitalsFile) {
-		throw new RunnerError(
-			'EBINMISSING',
-			`web-vitals attribution build not found at node_modules/web-vitals/${WEB_VITALS_DIST}. Install it in the project (\`${INSTALL_HINT}\` sets it up).`,
-			{ install: INSTALL_HINT }
-		);
-	}
+	requireInstalled(
+		webVitalsFile,
+		`web-vitals attribution build not found at node_modules/web-vitals/${WEB_VITALS_DIST}. Install it in the project (\`${INSTALL_HINT}\` sets it up).`
+	);
 	const scriptSource = fs.readFileSync(webVitalsFile, 'utf8');
 
 	let lighthouseBin = null;
 	if (config.lighthouse.enabled) {
 		lighthouseBin = detectBin(LIGHTHOUSE_BIN, { cwd });
-		if (!lighthouseBin.available) {
-			throw new RunnerError(
-				'EBINMISSING',
-				`${LIGHTHOUSE_BIN} not found. Install it in the project (\`${INSTALL_HINT}\` sets it up), or set lighthouse.enabled to false.`,
-				{ bin: LIGHTHOUSE_BIN, install: INSTALL_HINT }
-			);
-		}
+		requireInstalled(
+			lighthouseBin.available,
+			`${LIGHTHOUSE_BIN} not found. Install it in the project (\`${INSTALL_HINT}\` sets it up), or set lighthouse.enabled to false.`,
+			{ bin: LIGHTHOUSE_BIN }
+		);
 	}
 
 	let chromePath = null;
@@ -119,10 +129,7 @@ async function runPerf(options = {}) {
 		await browser.close();
 	}
 
-	return normalizePerf(rawResults, {
-		thresholds: config.thresholds,
-		topAudits: config.lighthouse.topAudits,
-	});
+	return normalizePerf(rawResults, { thresholds: config.thresholds });
 }
 
 /**
@@ -159,11 +166,19 @@ async function collectOne(url, ctx) {
 	}
 
 	let lighthouse = null;
-	if (config.lighthouse.enabled && lighthouseBin) {
+	// Lighthouse needs the same network reachability as puppeteer -- skip it
+	// once the page already failed to load, rather than spend its own timeout
+	// on a dead URL.
+	if (!scanError && config.lighthouse.enabled && lighthouseBin) {
 		try {
-			lighthouse = runLighthouse(lighthouseBin, url, config.lighthouse, {
+			const lhr = runLighthouse(lighthouseBin, url, config.lighthouse, {
 				cwd,
 				chromePath,
+			});
+			// A raw LHR can run several MB; extract immediately so only the
+			// slim shape is kept for the rest of the run.
+			lighthouse = extractLighthouse(lhr, {
+				topAudits: config.lighthouse.topAudits,
 			});
 		} catch (err) {
 			const detail = (err && err.message ? err.message : '').toString();
@@ -174,6 +189,8 @@ async function collectOne(url, ctx) {
 		}
 	}
 
+	// The server layer profiles via WP-CLI, not the browser, so it runs
+	// regardless of whether the page loaded.
 	let server = null;
 	if (config.server.enabled) {
 		server = runServerProfile(config.server, url, { cwd });
@@ -280,6 +297,9 @@ function emit(report, mode) {
 				.map((f) => `${f.fn} (${f.wallMs.toFixed(1)}ms)`)
 				.join(', ');
 			lines.push(`  server top: ${top || 'none'}`);
+			if (r.server.error) {
+				lines.push(`  server error: ${r.server.error}`);
+			}
 		}
 		for (const note of r.notes) {
 			lines.push(`  note: ${note}`);
@@ -368,8 +388,11 @@ function runDryRun(opts, cwd) {
 	}
 
 	if (config.server.enabled) {
+		const commandParts = Array.isArray(config.server.command)
+			? config.server.command
+			: [String(config.server.command)];
 		lines.push(
-			`  server:      ${config.server.command.join(' ')} eval-file ${config.server.shim} <path> ${config.server.top} --url=<origin>`
+			`  server:      ${commandParts.join(' ')} eval-file ${config.server.shim} <path> ${config.server.top} --url=<origin>`
 		);
 	} else {
 		lines.push('  server:      disabled');
