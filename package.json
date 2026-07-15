@@ -3,9 +3,6 @@
   "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
   "version": "0.1.0",
   "author": "rtCamp",
-  "bin": {
-    "wp-tooling": "./bin/wp-tooling.js"
-  },
   "bugs": {
     "url": "https://github.com/rtCamp/wp-tooling/issues"
   },
@@ -31,7 +28,6 @@
     "./tailwind-config/postcss": "./src/tailwind/postcss.js"
   },
   "files": [
-    "bin",
     "src",
     "README.md",
     "LICENSE"
