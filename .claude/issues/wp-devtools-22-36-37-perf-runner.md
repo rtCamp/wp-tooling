@@ -1,15 +1,17 @@
-# Issue wp-devtools#22 — Add `wp-tooling perf` command + runner (two-layer: web-vitals/Lighthouse + server xhprof)
+# Issue wp-devtools#22, #36, #37 — `wp-tooling perf` command + runner, setup/perf scaffold, and server xhprof normalization
 
-**Status:** in-progress <!-- in-progress | in-review | done -->
+**Status:** in-review
 **Branch:** `v1.0.0/task/perf-runner`
-**PR:** #<pr-number> <!-- fill once opened -->
+**PR:** #36
 **Assignee:** @Adi-ty
 
 ---
 
 ## Summary
 
-rtCamp/wp-devtools#22 asks for a `wp-tooling perf` command mirroring the shipped `a11y` runner: one normalised JSON report an agent (or CI) can act on. Per the (cross-repo) planning docs' two-layer model, Layer 1 is the *symptom* — lab Core Web Vitals via the `web-vitals` attribution build under headless Chromium, plus Lighthouse — and Layer 2 is the *cause* — server-side function hotspots via xhprof, run over WP-CLI through a consumer-installed `server-profile.php` shim. This task ships both layers, the `setup/perf` scaffold that installs the consumer-side wiring, and verifies end-to-end on two consumers with real profiler data.
+rtCamp/wp-devtools#22 asks for a `wp-tooling perf` command mirroring the shipped `a11y` runner: one normalised JSON report an agent (or CI) can act on. Per the (cross-repo) planning docs' two-layer model, Layer 1 is the *symptom* — lab Core Web Vitals via the `web-vitals` attribution build under headless Chromium, plus Lighthouse — and Layer 2 is the *cause* — server-side function hotspots via xhprof, run over WP-CLI through a consumer-installed `server-profile.php` shim.
+
+This single PR delivers #22 together with the two issues chained under it — **#36** (the `setup/perf` scaffold that installs the consumer-side wiring: dev deps, config, the bundled shim) and **#37** (folding the shim's xhprof JSON into a `server` section of the normalised report, with a CLI-context fidelity note) — both of which declare `Depends on #22` in their own issue bodies. The three are delivered together rather than split across PRs because they are one working system in practice: #22's runner cannot be verified end-to-end without #36's scaffold actually installing the shim it invokes, and #37's `server` section is exactly what `normalize.js` needed to shape the shim's output into the final report. Verified end-to-end on two consumers with real profiler data.
 
 ---
 
@@ -33,6 +35,7 @@ rtCamp/wp-devtools#22 asks for a `wp-tooling perf` command mirroring the shipped
 - [2026-07-15] Cleanup: consolidated three near-identical `EBINMISSING` throws in `run.js` into one helper; derived the metric-name list from `THRESHOLDS` (`normalize.js`) instead of repeating it at four call sites across `normalize.js`/`collect-vitals.js`; dropped the unused `REGISTER_SNIPPET` export; de-flaked a dry-run test that asserted a raw total `execFileSync` call count (filters for the `--version` probe specifically instead, since the total isn't isolation-safe across test files sharing the auto-mocked `child_process` module).
 - [2026-07-15] Left as-is: the `MAX_BUFFER`/timeout constants duplicated across `lighthouse.js`/`server-profile.js`, and the empty-attribution literal repeated across `normalize.js`/`collect-vitals.js` — both match `a11y`'s own established convention and the project's "three similar lines beats a premature abstraction" rule. Also left the dynamic `require()` in `resolve-module.js` as-is — it has direct in-repo precedent (`src/cli/index.js`'s command auto-discovery), and reworking it to `require.resolve` + explicit `paths` would touch an already-verified module for a stylistic gain with no behaviour change.
 - [2026-07-15] Split the scaffold's single `server_env_cwd` input (empty string doing double duty as both "disabled" and "no path") into `server_enabled` (boolean-string) + `server_env_cwd` (now defaults to `.`), so profiling from the WordPress root — a legitimate choice, not just a leftover default — is expressible; before, an empty `server_env_cwd` could only mean "disabled". The rendered `.perfrc.json` also dropped every section that already matches `config.js`'s built-in defaults (`webVitals`, `lighthouse`, `thresholds`, `server.shim`, `server.top`) — `mergeConfig` fills them in identically at read time, so keeping them out of the template removes a drift risk (a future default change no longer silently diverges between freshly-scaffolded and config-less projects).
+- [2026-07-15] Renamed this file from tracking #22 alone to tracking #22, #36, and #37 together — #36 (`setup/perf` scaffold) and #37 (xhprof `server` section in `normalize.js`) were already fully implemented as part of shipping #22 end-to-end (see Summary), so the file should reflect what the PR actually closes rather than only its root issue.
 
 ---
 
@@ -91,6 +94,7 @@ Re-verified live after the `server-profile.js`/`collectOne` fixes above (fresh s
 
 ## Notes for the reviewer
 
+- This PR is in `wp-tooling`, but the issues it closes (#22, #36, #37) are in `wp-devtools` — GitHub's `Closes #<N>` keyword only auto-closes issues in the *same* repo as the PR, not cross-repo, so all three need closing by hand once this merges (the PR body should still name them for traceability).
 - The exit-code contract mirrors `a11y`: 0 clean · 1 run failure or unreachable URL · 2 usage/module-missing · 3 issues found. `failedUrls > 0` downgrades an otherwise-clean run to exit 1, same as `a11y`.
 - `puppeteer`, `web-vitals`, and `lighthouse` are never dependencies of `@rtcamp/wp-tooling` (zero-runtime-deps rule) — the runner resolves the consumer's install; Lighthouse falls back to `npx --no-install` and never fetches from the network.
 - The server layer's dependency (`rtcamp/wp-dev-tools`) is not on Packagist — consumers add it via a path or VCS composer repository. The scaffold description says so; the shim's `class_exists` guard keeps a project without it working (frontend layers only, `server: null`).
