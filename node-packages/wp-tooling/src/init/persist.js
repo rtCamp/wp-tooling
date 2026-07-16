@@ -14,6 +14,21 @@ const path = require('path');
 const IDENTITY_FILE = '.wp-scaffold.json';
 
 /**
+ * Thrown when `.wp-scaffold.json` exists but cannot be parsed. A corrupt
+ * identity file must never be silently treated as absent: that would drop an
+ * initialized project back into setup mode (and re-run destructive scaffold
+ * steps). Callers branch on `code === 'EIDENTITYCORRUPT'`.
+ */
+class IdentityFileError extends Error {
+	constructor(message, details = {}) {
+		super(message);
+		this.name = 'IdentityFileError';
+		this.code = 'EIDENTITYCORRUPT';
+		Object.assign(this, details);
+	}
+}
+
+/**
  * Write the identity payload to `<root>/.wp-scaffold.json` (tab-indented).
  *
  * @param {string} root    - Project root.
@@ -35,10 +50,13 @@ const writeIdentityFile = (root, payload, ui) => {
 };
 
 /**
- * Read the persisted identity, or null when absent / unparseable.
+ * Read the persisted identity. Absent file -> null; unparseable file -> throw.
  *
  * @param {string} root - Project root.
- * @return {Object|null} The parsed identity, or null.
+ * @return {Object|null} The parsed identity, or null when the file is absent.
+ * @throws {IdentityFileError} EIDENTITYCORRUPT when the file exists but cannot
+ *                             be parsed (callers decide whether --reinit may
+ *                             discard it).
  */
 const readIdentityFile = (root) => {
 	const filePath = path.join(root, IDENTITY_FILE);
@@ -47,8 +65,12 @@ const readIdentityFile = (root) => {
 	}
 	try {
 		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-	} catch {
-		return null;
+	} catch (err) {
+		throw new IdentityFileError(
+			`${IDENTITY_FILE} exists but is not valid JSON (${err.message}). ` +
+				'Fix or delete the file, or pass --reinit to discard it.',
+			{ path: filePath }
+		);
 	}
 };
 
@@ -83,5 +105,6 @@ module.exports = {
 	readIdentityFile,
 	readFeatures,
 	writeFeatures,
+	IdentityFileError,
 	IDENTITY_FILE,
 };

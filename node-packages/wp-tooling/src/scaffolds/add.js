@@ -18,6 +18,7 @@
 'use strict';
 
 const { ScaffoldError } = require('./registry');
+const { formatErrorPayload } = require('./errors');
 const {
 	buildRegistry,
 	fetchOptsFrom,
@@ -103,42 +104,6 @@ function printHelp() {
 			'',
 		].join('\n')
 	);
-}
-
-function formatErrorPayload(err) {
-	if (err instanceof ScaffoldError) {
-		const payload = { code: err.code, message: err.message };
-		for (const k of [
-			'scaffold',
-			'requested',
-			'available',
-			'missing',
-			'missingDetails',
-			'path',
-			'errno',
-			'placeholder',
-			'template',
-			'url',
-			'statusCode',
-			'rateLimited',
-			'timeout',
-			'cause',
-			'file',
-			'errors',
-			'id',
-			'source',
-			'repository',
-		]) {
-			if (err[k] !== undefined) {
-				payload[k] = err[k];
-			}
-		}
-		return payload;
-	}
-	return {
-		code: 'EUNKNOWN',
-		message: err && err.message ? err.message : String(err),
-	};
 }
 
 function printHumanReport(result) {
