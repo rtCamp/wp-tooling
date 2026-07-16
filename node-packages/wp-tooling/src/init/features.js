@@ -519,6 +519,30 @@ const detectMap = (config, api) => {
 };
 
 /**
+ * Guarded variant of `detectMap` for read-only reporting (`--list`): a
+ * throwing config-supplied `detect` probe must degrade to "unknown" instead of
+ * crashing the machine contract. Toggle flows keep the loud `detectMap`.
+ *
+ * @param {Object} config - Per-project scaffold config.
+ * @param {Object} api    - FeatureApi.
+ * @return {{map: Object, errors: Array<{key: string, message: string}>}}
+ *         `map[key]` is boolean, or null when that feature's probe threw.
+ */
+const safeDetectMap = (config, api) => {
+	const map = {};
+	const errors = [];
+	(config.features || []).forEach((feature) => {
+		try {
+			map[feature.key] = detectFeature(feature, api);
+		} catch (err) {
+			map[feature.key] = null;
+			errors.push({ key: feature.key, message: err.message });
+		}
+	});
+	return { map, errors };
+};
+
+/**
  * Whether a feature touches package.json (so we know to suggest npm install).
  *
  * @param {Object} feature - Feature definition.
@@ -702,5 +726,6 @@ module.exports = {
 	reconcile,
 	computeDiff,
 	detectMap,
+	safeDetectMap,
 	toggleFeatures,
 };
