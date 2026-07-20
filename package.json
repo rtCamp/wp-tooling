@@ -1,6 +1,6 @@
 {
   "name": "@rtcamp/wp-tooling",
-  "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
+  "description": "Shared build/dev tooling for rtCamp WordPress projects — a zero-dependency TTY UI kit and shared ESLint/Stylelint/Tailwind configs.",
   "version": "0.1.0",
   "author": "rtCamp",
   "bugs": {
@@ -55,6 +55,30 @@
     "tailwindcss": "^4.3.0"
   },
   "peerDependenciesMeta": {
+    "eslint-import-resolver-typescript": {
+      "optional": true
+    },
+    "@eslint-community/eslint-plugin-eslint-comments": {
+      "optional": true
+    },
+    "@wordpress/eslint-plugin": {
+      "optional": true
+    },
+    "@wordpress/stylelint-config": {
+      "optional": true
+    },
+    "eslint": {
+      "optional": true
+    },
+    "eslint-plugin-jest": {
+      "optional": true
+    },
+    "stylelint": {
+      "optional": true
+    },
+    "stylelint-scss": {
+      "optional": true
+    },
     "@tailwindcss/postcss": {
       "optional": true
     },
