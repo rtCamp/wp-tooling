@@ -2,7 +2,7 @@
 
 Shared build- and dev-time tooling for rtCamp WordPress projects, consumed as an
 npm package by the plugin and theme skeletons. It is a **library**: import the
-piece you need through a subpath export — there is no CLI on this branch.
+piece you need through a subpath export. It exposes no command-line binary.
 
 **Node 22+.** The UI kit has zero runtime dependencies; the lint/Tailwind configs
 declare their toolchains as optional peer dependencies (install only what you use).
