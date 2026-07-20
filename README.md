@@ -28,8 +28,18 @@ implementations live on the `release/v1.0.0` line and land here as they stabilis
 
 ## Install
 
+Once published to a registry:
+
 ```bash
 npm install @rtcamp/wp-tooling
+```
+
+Or install straight from the public repo (no registry needed) — pin a tag or
+commit for stability:
+
+```bash
+npm install github:rtCamp/wp-tooling
+npm install github:rtCamp/wp-tooling#v1.0.0
 ```
 
 ## Usage
