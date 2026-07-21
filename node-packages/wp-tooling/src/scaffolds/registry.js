@@ -393,8 +393,21 @@ class ScaffoldRegistry {
 		// `target_file` templates often build on a path input (e.g.
 		// `{{base_path}}/../Modules/Cli.php`); normalise so the caller gets
 		// `includes/Modules/Cli.php`, not a `..` segment to clean up.
+		//
+		// The `../Modules/<Kind>.php` shape assumes `base_path` is a SIBLING of
+		// the Modules directory (the flat default, e.g. `includes/Cli`). When a
+		// consumer nests artifact dirs INSIDE Modules (e.g. base_path
+		// `inc/Modules/Cli`), the `..` climbs to `inc/Modules` and the literal
+		// `Modules/` re-descends, producing a doubled `inc/Modules/Modules/...`.
+		// Collapse that accidental double so the emitted wiring target is the
+		// real module file in either layout. This only fires when the double
+		// actually occurs, so the flat layout is unaffected.
+		const collapseModules = (p) =>
+			p.replace('/Modules/Modules/', '/Modules/');
 		const aiWiring = (scaffold.wiring || []).map((w) => ({
-			targetFile: path.posix.normalize(render(w.target_file, resolved)),
+			targetFile: collapseModules(
+				path.posix.normalize(render(w.target_file, resolved))
+			),
 			anchor: w.anchor,
 			snippet: render(w.snippet_template, resolved),
 			description: w.description || '',

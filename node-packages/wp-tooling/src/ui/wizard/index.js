@@ -6,6 +6,7 @@
 'use strict';
 
 const { writeLine, ANSI, isTTY } = require('../core/terminal');
+const debug = require('../../debug');
 
 /**
  * Wizard class -- orchestrates an array of steps in order.
@@ -55,6 +56,7 @@ class Wizard {
 						? `${ANSI.dim}>> ${label} (skipped)${ANSI.reset}`
 						: `>> ${label} (skipped)`
 				);
+				debug.skipped(step.name);
 				continue;
 			}
 
@@ -63,7 +65,7 @@ class Wizard {
 					? `\n${ANSI.cyan}>${ANSI.reset} ${ANSI.bold}${label}${ANSI.reset}`
 					: `\n> ${label}`
 			);
-			await step.run(this.context);
+			await debug.phase(step.name, () => step.run(this.context));
 		}
 		return this.context;
 	}

@@ -19,6 +19,7 @@
 
 const { ScaffoldError } = require('./registry');
 const { formatErrorPayload } = require('./errors');
+const debug = require('../debug');
 const {
 	buildRegistry,
 	fetchOptsFrom,
@@ -339,12 +340,16 @@ async function runInteractive(opts) {
 }
 
 async function runNonInteractive(opts) {
-	const registry = await buildRegistry(opts.cwd, fetchOptsFrom(opts));
-	const result = await registry.execute(opts.id, opts.inputs, {
-		dryRun: opts.dryRun,
-		cwd: opts.cwd,
-		fetchOpts: fetchOptsFrom(opts),
-	});
+	const registry = await debug.phase('scan', () =>
+		buildRegistry(opts.cwd, fetchOptsFrom(opts))
+	);
+	const result = await debug.phase('execute', () =>
+		registry.execute(opts.id, opts.inputs, {
+			dryRun: opts.dryRun,
+			cwd: opts.cwd,
+			fetchOpts: fetchOptsFrom(opts),
+		})
+	);
 	if (opts.json) {
 		process.stdout.write(JSON.stringify(result) + '\n');
 	} else {
@@ -373,14 +378,28 @@ async function runCli(argv) {
 		printHelp();
 		return 1;
 	}
+	let mode = 'interactive';
+	if (opts.json) {
+		mode = 'json';
+	} else if (opts.nonInteractive) {
+		mode = 'non-interactive';
+	}
+	debug.start(`add ${argv.join(' ')}`.trim(), {
+		id: opts.id,
+		mode: mode + (opts.dryRun ? '+dry-run' : ''),
+		cwd: opts.cwd,
+	});
+	let result = 'ok';
 	try {
 		return opts.nonInteractive
 			? await runNonInteractive(opts)
 			: await runInteractive(opts);
 	} catch (err) {
 		if (err && err.name === 'CancelledError') {
+			result = 'cancelled';
 			throw err; // dispatcher handles
 		}
+		result = 'error';
 		if (opts.json) {
 			process.stderr.write(
 				JSON.stringify(formatErrorPayload(err)) + '\n'
@@ -401,6 +420,8 @@ async function runCli(argv) {
 			}
 		}
 		return 1;
+	} finally {
+		debug.finish({ result });
 	}
 }
 

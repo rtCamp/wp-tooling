@@ -22,6 +22,7 @@ const { execFileSync } = require('child_process');
 // Every UI primitive -- Wizard, prompts, spinner, styled status lines, table --
 // comes from the wp-tooling kit.
 const ui = require('../ui');
+const debug = require('../debug');
 
 const {
 	identityFromName,
@@ -783,146 +784,158 @@ const run = async (config, options = {}) => {
 		return;
 	}
 
-	// --list / --json: the read-only machine-query contract. Intercepted ahead
-	// of every other flow so config and identity failures also answer in JSON
-	// when asked to: one stdout line on success, one stderr line on failure.
-	if (argv.includes('--list') || argv.includes('--json')) {
-		const wantJson = argv.includes('--json');
+	// Diagnostic timing + output capture (opt-in via WP_TOOLING_DEBUG); inert
+	// when off. --help returns above, so it is intentionally not timed.
+	debug.start(`init ${argv.join(' ')}`.trim(), { kind, cwd: root });
+	let result = 'ok';
+	try {
+		// --list / --json: the read-only machine-query contract. Intercepted ahead
+		// of every other flow so config and identity failures also answer in JSON
+		// when asked to: one stdout line on success, one stderr line on failure.
+		if (argv.includes('--list') || argv.includes('--json')) {
+			const wantJson = argv.includes('--json');
+			try {
+				if (!argv.includes('--list')) {
+					throw usageError('--json is only supported with --list');
+				}
+				// --manage is excluded: mode derives from identity/--reinit alone,
+				// so accepting it here would silently ignore it. --yes is accepted
+				// (and ignored) so scripted `--list --yes` calls keep working.
+				const allowed = new Set([
+					'--list',
+					'--json',
+					'--reinit',
+					'--yes',
+					'-y',
+				]);
+				const extra = argv.filter((arg) => !allowed.has(arg));
+				if (extra.length) {
+					throw usageError(
+						`--list cannot be combined with: ${extra.join(' ')}`
+					);
+				}
+				try {
+					validateFeatures(config);
+				} catch (err) {
+					err.code = 'ECONFIG';
+					throw err;
+				}
+				const seedWarnings = [];
+				let identity = null;
+				try {
+					identity = readIdentityFile(root);
+				} catch (err) {
+					if (!argv.includes('--reinit')) {
+						throw err;
+					}
+					// --reinit means "discard what's there": report setup mode.
+					seedWarnings.push(
+						'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
+					);
+				}
+				const mode =
+					identity && !argv.includes('--reinit') ? 'manage' : 'setup';
+				listFlow(config, root, {
+					mode,
+					json: wantJson,
+					identity: 'manage' === mode ? identity : null,
+					seedWarnings,
+				});
+			} catch (err) {
+				result = 'error';
+				if (wantJson) {
+					emitJsonError(err);
+				} else {
+					ui.error(err.message);
+				}
+				process.exitCode = 1;
+			}
+			return;
+		}
+
 		try {
-			if (!argv.includes('--list')) {
-				throw usageError('--json is only supported with --list');
-			}
-			// --manage is excluded: mode derives from identity/--reinit alone,
-			// so accepting it here would silently ignore it. --yes is accepted
-			// (and ignored) so scripted `--list --yes` calls keep working.
-			const allowed = new Set([
-				'--list',
-				'--json',
-				'--reinit',
-				'--yes',
-				'-y',
-			]);
-			const extra = argv.filter((arg) => !allowed.has(arg));
-			if (extra.length) {
-				throw usageError(
-					`--list cannot be combined with: ${extra.join(' ')}`
+			// Cleanup works in either mode.
+			if (argv.includes('--clean') || argv.includes('-c')) {
+				const others = argv.filter(
+					(arg) => '--clean' !== arg && '-c' !== arg
 				);
+				if (others.length) {
+					ui.error('Invalid arguments.');
+					process.exitCode = 1;
+					return;
+				}
+				await cleanFlow(config, root);
+				return;
 			}
+
+			// Validate the feature manifest once, before touching disk, for both modes.
 			try {
 				validateFeatures(config);
 			} catch (err) {
-				err.code = 'ECONFIG';
-				throw err;
+				ui.error(err.message);
+				process.exitCode = 1;
+				return;
 			}
-			const seedWarnings = [];
+
+			// A corrupt identity file must not silently re-enter setup mode (that
+			// would re-run destructive scaffold steps on an initialized project).
+			// Only an explicit --reinit may discard it.
 			let identity = null;
 			try {
 				identity = readIdentityFile(root);
 			} catch (err) {
 				if (!argv.includes('--reinit')) {
-					throw err;
+					ui.error(err.message);
+					process.exitCode = 1;
+					return;
 				}
-				// --reinit means "discard what's there": report setup mode.
-				seedWarnings.push(
+				ui.warn(
 					'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
 				);
 			}
-			const mode =
-				identity && !argv.includes('--reinit') ? 'manage' : 'setup';
-			listFlow(config, root, {
-				mode,
-				json: wantJson,
-				identity: 'manage' === mode ? identity : null,
-				seedWarnings,
-			});
-		} catch (err) {
-			if (wantJson) {
-				emitJsonError(err);
-			} else {
-				ui.error(err.message);
-			}
-			process.exitCode = 1;
-		}
-		return;
-	}
 
-	try {
-		// Cleanup works in either mode.
-		if (argv.includes('--clean') || argv.includes('-c')) {
-			const others = argv.filter(
-				(arg) => '--clean' !== arg && '-c' !== arg
-			);
-			if (others.length) {
-				ui.error('Invalid arguments.');
+			// Manage mode: already scaffolded (unless forced to re-scaffold with --reinit).
+			if (identity && !argv.includes('--reinit')) {
+				await manageFlow(config, root, argv, identity, ui, () =>
+					setupFlow(config, root, { yes: false })
+				);
+				return;
+			}
+
+			// Scaffold mode (no identity, or --reinit).
+			const setupArgv = argv.filter((arg) => '--reinit' !== arg);
+			const { flags, unknown } = parseFlags(setupArgv);
+			if (unknown.length) {
+				ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
 				process.exitCode = 1;
 				return;
 			}
-			await cleanFlow(config, root);
-			return;
-		}
+			if (flags.yes && !flags.name) {
+				ui.error('--yes requires --name=<name>.');
+				process.exitCode = 1;
+				return;
+			}
 
-		// Validate the feature manifest once, before touching disk, for both modes.
-		try {
-			validateFeatures(config);
+			await setupFlow(config, root, flags);
 		} catch (err) {
-			ui.error(err.message);
-			process.exitCode = 1;
-			return;
-		}
-
-		// A corrupt identity file must not silently re-enter setup mode (that
-		// would re-run destructive scaffold steps on an initialized project).
-		// Only an explicit --reinit may discard it.
-		let identity = null;
-		try {
-			identity = readIdentityFile(root);
-		} catch (err) {
-			if (!argv.includes('--reinit')) {
+			if (err instanceof ui.CancelledError) {
+				result = 'cancelled';
+				ui.warn('\nCancelled.');
+				process.exitCode = 130;
+				return;
+			}
+			if (err instanceof IdentityFileError) {
+				// Mid-flow corruption (e.g. a manage re-read): report, don't crash.
+				result = 'error';
 				ui.error(err.message);
 				process.exitCode = 1;
 				return;
 			}
-			ui.warn(
-				'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
-			);
+			result = 'error';
+			throw err;
 		}
-
-		// Manage mode: already scaffolded (unless forced to re-scaffold with --reinit).
-		if (identity && !argv.includes('--reinit')) {
-			await manageFlow(config, root, argv, identity, ui, () =>
-				setupFlow(config, root, { yes: false })
-			);
-			return;
-		}
-
-		// Scaffold mode (no identity, or --reinit).
-		const setupArgv = argv.filter((arg) => '--reinit' !== arg);
-		const { flags, unknown } = parseFlags(setupArgv);
-		if (unknown.length) {
-			ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
-			process.exitCode = 1;
-			return;
-		}
-		if (flags.yes && !flags.name) {
-			ui.error('--yes requires --name=<name>.');
-			process.exitCode = 1;
-			return;
-		}
-
-		await setupFlow(config, root, flags);
-	} catch (err) {
-		if (err instanceof ui.CancelledError) {
-			ui.warn('\nCancelled.');
-			process.exitCode = 130;
-			return;
-		}
-		if (err instanceof IdentityFileError) {
-			// Mid-flow corruption (e.g. a manage re-read): report, don't crash.
-			ui.error(err.message);
-			process.exitCode = 1;
-			return;
-		}
-		throw err;
+	} finally {
+		debug.finish({ result });
 	}
 };
 
