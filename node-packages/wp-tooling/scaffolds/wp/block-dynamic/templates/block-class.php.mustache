@@ -36,9 +36,13 @@ class {{class}} extends AbstractBlock {
 	 * so the editor receives the bundled assets and not raw ES modules.
 	 * Run `npm run build` to populate this directory.
 	 *
-	 * @return string|null
+	 * Narrowed to a non-null `string` (the parent declares `?string`): this
+	 * override always returns a concrete path, and an always-non-null `?string`
+	 * trips PHPStan level 5's checkTooWideReturnTypesInProtectedAndPublicMethods.
+	 *
+	 * @return string
 	 */
-	public function get_block_dir(): ?string {
+	public function get_block_dir(): string {
 		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
 	}
 

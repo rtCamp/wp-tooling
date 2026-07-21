@@ -129,6 +129,21 @@ const reqReadFeatures = (root) => readFeatures(root);
 const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 	const { flags, unknown } = parseManageFlags(argv);
 	if (unknown.length) {
+		// Scaffold-only flags (advertised in the pre-setup help) do not apply once
+		// the project is set up. Explain the mode instead of a bare error, so a
+		// caller (including an AI agent) does not treat it as a failure and investigate.
+		const scaffoldOnly = unknown.filter((arg) =>
+			/^--(name|version|remove-examples|keep-examples)(=|$)/.test(arg)
+		);
+		if (scaffoldOnly.length) {
+			ui.info(
+				`${scaffoldOnly.join(
+					', '
+				)} apply only during first-time setup and are ignored now: this project is already set up (.wp-scaffold.json exists), so 'npm run init' is in MANAGE mode. To edit the name or version, run 'npm run init' with no flags and use the interactive editor. Run 'npm run init -- --help' to see the manage options, or 'npm run init -- --reinit' to re-run first-time setup.`
+			);
+			process.exitCode = 1;
+			return;
+		}
 		ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
 		process.exitCode = 1;
 		return;
