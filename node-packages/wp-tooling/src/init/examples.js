@@ -59,8 +59,19 @@ const expandGlob = (root, pattern) => {
 };
 
 /**
- * Match a marker line, e.g. `// wp:example` or `// wp:example:end`. Accepts
+ * Match a marker line, e.g. `// wp:example` or `// wp:example:end.`. Accepts
  * `//`, `#` and `*` comment leaders.
+ *
+ * A single trailing `.`, `!` or `?` is tolerated so a marker can satisfy
+ * linters that require comments to end in a sentence terminator --
+ * `Squiz.Commenting.InlineComment.InvalidEndChar` in WordPress Coding Standards
+ * flags every bare `// wp:example`. Without this, projects had to bracket each
+ * marker with a `phpcs:ignore`, which then outlived the marker: the annotations
+ * sit outside the region, so stripping left them behind pointing at nothing.
+ * Optional rather than required, so unpunctuated markers keep working.
+ *
+ * The terminator is matched only at end of line, so a longer marker is still
+ * distinct: `// wp:example:settings` does not match the `wp:example` opener.
  *
  * @param {string} marker - Marker token.
  * @param {string} suffix - '' for the opener, ':end' for the closer.
@@ -68,7 +79,7 @@ const expandGlob = (root, pattern) => {
  */
 const markerLine = (marker, suffix) =>
 	new RegExp(
-		`^\\s*(?://|#|\\*)\\s*${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${suffix}\\s*$`
+		`^\\s*(?://|#|\\*)\\s*${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${suffix}[.!?]?\\s*$`
 	);
 
 /**
