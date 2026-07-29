@@ -63,7 +63,22 @@ function defaultCacheDir() {
  * @return {string} Absolute URL.
  */
 function composeUrl(source, relPath) {
-	const strip = (s) => String(s).replace(/^\/+|\/+$/g, '');
+	// Index walk rather than /^\/+|\/+$/g: that pattern is quadratic on a value
+	// with a long run of slashes in the middle (the `\/+$` branch retries from
+	// every position in the run). Source values come from config, so keep it
+	// linear and unconditional.
+	const strip = (s) => {
+		const str = String(s);
+		let start = 0;
+		let end = str.length;
+		while (start < end && str[start] === '/') {
+			start++;
+		}
+		while (end > start && str[end - 1] === '/') {
+			end--;
+		}
+		return str.slice(start, end);
+	};
 	const parts = [
 		strip(source.repository),
 		strip(source.ref),

@@ -17,12 +17,17 @@ const fs = require('fs');
 
 /**
  * Default bucket regexes. A file is counted in a bucket if its path matches.
+ *
+ * `gha` spells the trailing path out as explicit segments rather than `.+`.
+ * `.` also matches `/`, which makes `.+\.yml$` ambiguous — every position in a
+ * long path is a candidate split, so a crafted path costs quadratic time.
+ * `[^/]` cannot match the separator, so there is exactly one way to advance.
  */
 const DEFAULT_PATTERNS = {
 	css: /\.s?css$|(?:^|\/)package(?:-lock)?\.json$/,
 	js: /\.(?:js|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
 	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
-	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/.+\.yml$/,
+	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+)*\.yml$/,
 };
 
 /**

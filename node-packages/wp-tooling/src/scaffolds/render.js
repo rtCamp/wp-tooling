@@ -40,10 +40,8 @@ class RenderError extends Error {
 }
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-const SECTION_RE =
-	/\{\{#\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/g;
-const INVERTED_SECTION_RE =
-	/\{\{\^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/g;
+const SECTION_OPEN_RE = /\{\{([#^])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+const SECTION_CLOSE_RE = /\{\{\/\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 const ANY_TAG_RE = /\{\{[#^/]?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 
 const FALSY_STRINGS = new Set(['', 'false', 'no', '0']);
@@ -56,12 +54,115 @@ function isTruthy(value) {
 }
 
 /**
+ * Index every closing tag in a template by key, in one linear scan.
+ *
+ * Positions per key come out in ascending order, which lets the section walk
+ * consume them with a monotonic cursor instead of re-scanning the template for
+ * each opening tag.
+ *
+ * @param {string} template - The template to scan.
+ * @return {Map<string, Array<{index: number, length: number}>>} Closes by key.
+ */
+function indexCloseTags(template) {
+	const byKey = new Map();
+	let match;
+
+	SECTION_CLOSE_RE.lastIndex = 0;
+	while ((match = SECTION_CLOSE_RE.exec(template)) !== null) {
+		const key = match[1];
+		let list = byKey.get(key);
+		if (!list) {
+			list = [];
+			byKey.set(key, list);
+		}
+		list.push({ index: match.index, length: match[0].length });
+	}
+
+	return byKey;
+}
+
+/**
+ * Resolve every section of one kind — `#` (keep inner when truthy) or `^`
+ * (keep inner when falsy) — in a single left-to-right pass.
+ *
+ * Closing tags are indexed once up front, so matching an opening tag to its
+ * close is a cursor bump rather than a search. That keeps the pass linear even
+ * when the template is nothing but unclosed opening tags — both the original
+ * `{{#key}}([\s\S]*?){{/key}}` pattern and a naive scan-forward-for-each-open
+ * rescan to end-of-string every time, which is quadratic.
+ *
+ * An opening tag with no matching close is left in the output verbatim, which
+ * is what the old pattern did by simply failing to match.
+ *
+ * @param {string} template - The template to scan.
+ * @param {string} wanted   - Section kind to resolve: `'#'` or `'^'`.
+ * @param {Object} safeVars - Resolved input values keyed by name.
+ * @return {string} Template with that kind of section resolved.
+ * @throws {RenderError} If a section flag is not in `safeVars`.
+ */
+function renderSections(template, wanted, safeVars) {
+	const closesByKey = indexCloseTags(template);
+	// How far into each key's close list we have already looked. Opening tags
+	// are visited left to right, so these only ever move forward.
+	const seen = new Map();
+	let out = '';
+	let cursor = 0;
+	let open;
+
+	SECTION_OPEN_RE.lastIndex = 0;
+	while ((open = SECTION_OPEN_RE.exec(template)) !== null) {
+		const [openTag, kind, key] = open;
+		if (kind !== wanted) {
+			continue;
+		}
+		const innerStart = open.index + openTag.length;
+
+		// First close for this key at or after innerStart. Closes for other
+		// keys are ignored, matching the old backreference behaviour.
+		const closes = closesByKey.get(key);
+		if (!closes) {
+			continue;
+		}
+		let at = seen.get(key) || 0;
+		while (at < closes.length && closes[at].index < innerStart) {
+			at++;
+		}
+		seen.set(key, at);
+		if (at >= closes.length) {
+			continue;
+		}
+		const close = closes[at];
+
+		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
+			throw new RenderError(`undefined placeholder '${key}'`, {
+				code: 'ERENDERFAIL',
+				placeholder: key,
+			});
+		}
+
+		const truthy = isTruthy(safeVars[key]);
+		const keep = wanted === '#' ? truthy : !truthy;
+		const inner = template.slice(innerStart, close.index);
+
+		out += template.slice(cursor, open.index) + (keep ? inner : '');
+		cursor = close.index + close.length;
+		SECTION_OPEN_RE.lastIndex = cursor;
+	}
+
+	return out + template.slice(cursor);
+}
+
+/**
  * Render a Mustache-style template string with the given variables.
  *
  * Three passes, in order:
  *   1. Sections          `{{#flag}}...{{/flag}}` keep inner when truthy.
  *   2. Inverted sections `{{^flag}}...{{/flag}}` keep inner when falsy.
  *   3. Variables         `{{name}}` substituted with `vars[name]`.
+ *
+ * Sections stay two separate passes rather than one combined walk: the second
+ * pass sees tags the first one left behind, and collapsing them into a single
+ * ordered walk changes the output for same-key nesting.
  *
  * Section flags and variables are looked up the same way (both throw
  * ERENDERFAIL when the key is not in `vars`).
@@ -80,25 +181,8 @@ function render(template, vars) {
 	}
 	const safeVars = vars && typeof vars === 'object' ? vars : {};
 
-	let result = template.replace(SECTION_RE, (_match, key, inner) => {
-		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
-			throw new RenderError(`undefined placeholder '${key}'`, {
-				code: 'ERENDERFAIL',
-				placeholder: key,
-			});
-		}
-		return isTruthy(safeVars[key]) ? inner : '';
-	});
-
-	result = result.replace(INVERTED_SECTION_RE, (_match, key, inner) => {
-		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {
-			throw new RenderError(`undefined placeholder '${key}'`, {
-				code: 'ERENDERFAIL',
-				placeholder: key,
-			});
-		}
-		return !isTruthy(safeVars[key]) ? inner : '';
-	});
+	let result = renderSections(template, '#', safeVars);
+	result = renderSections(result, '^', safeVars);
 
 	return result.replace(PLACEHOLDER_RE, (_match, key) => {
 		if (!Object.prototype.hasOwnProperty.call(safeVars, key)) {

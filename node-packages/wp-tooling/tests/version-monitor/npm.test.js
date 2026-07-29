@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 
 jest.mock('../../src/version-monitor/http', () => ({
@@ -8,7 +9,12 @@ jest.mock('../../src/version-monitor/http', () => ({
 }));
 const { getJson } = require('../../src/version-monitor/http');
 const npm = require('../../src/version-monitor/detectors/npm');
-const { configWith, FIXTURE_ROOT } = require('./_helpers');
+const {
+	configWith,
+	copyFixture,
+	cleanup,
+	FIXTURE_ROOT,
+} = require('./_helpers');
 
 const repo = path.join(FIXTURE_ROOT, 'repo');
 const config = configWith('npm', ['package.json']);
@@ -65,5 +71,25 @@ describe('npm detector', () => {
 		mockRegistry({ lodash: '5.0.0-beta.1', jest: '29.0.0' });
 		const updates = await npm.detect(config, { cwd: repo });
 		expect(updates.some((u) => u.package === 'lodash')).toBe(false);
+	});
+
+	it('percent-encodes the slash in a scoped package name', async () => {
+		const dir = copyFixture('repo');
+		try {
+			fs.writeFileSync(
+				path.join(dir, 'package.json'),
+				JSON.stringify({
+					name: 'scoped-fixture',
+					dependencies: { '@wordpress/scripts': '^30.0.0' },
+				})
+			);
+			mockRegistry({ '@wordpress%2Fscripts': '30.1.0' });
+			await npm.detect(config, { cwd: dir });
+			expect(getJson).toHaveBeenCalledWith(
+				expect.stringContaining('/@wordpress%2Fscripts/latest')
+			);
+		} finally {
+			cleanup(dir);
+		}
 	});
 });

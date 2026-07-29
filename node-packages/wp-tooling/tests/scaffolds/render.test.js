@@ -135,6 +135,25 @@ describe('render — sections', () => {
 			'use Singleton;'
 		);
 	});
+
+	it('tolerates whitespace inside section tags', () => {
+		expect(render('a{{# f }}B{{/ f }}c', { f: 'true' })).toBe('aBc');
+		expect(render('a{{^ f }}B{{/ f }}c', { f: 'true' })).toBe('ac');
+	});
+
+	it('leaves an unclosed section tag verbatim', () => {
+		expect(render('a{{#f}}B', { f: 'true' })).toBe('a{{#f}}B');
+		expect(render('a{{/f}}b', { f: 'true' })).toBe('a{{/f}}b');
+	});
+
+	it('resolves a template of unclosed section tags in linear time', () => {
+		// Regression guard: the old {{#key}}([\s\S]*?){{/key}} pattern rescanned
+		// to end-of-string per opening tag, so this input was quadratic.
+		const tpl = '{{#a}}'.repeat(20000);
+		const started = Date.now();
+		expect(render(tpl, {})).toBe(tpl);
+		expect(Date.now() - started).toBeLessThan(1000);
+	});
 });
 
 describe('applyTransform', () => {

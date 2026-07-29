@@ -279,7 +279,20 @@ function validateIndex(index) {
  */
 function indexEntryToRecord(source, entry) {
 	const { category, slug } = parseId(entry.id);
-	const strip = (s) => String(s).replace(/^\/+|\/+$/g, '');
+	// Index walk rather than /^\/+|\/+$/g: that pattern is quadratic on a value
+	// with a long run of slashes in the middle. Mirrors composeUrl() in fetch.js.
+	const strip = (s) => {
+		const str = String(s);
+		let start = 0;
+		let end = str.length;
+		while (start < end && str[start] === '/') {
+			start++;
+		}
+		while (end > start && str[end - 1] === '/') {
+			end--;
+		}
+		return str.slice(start, end);
+	};
 	const scaffoldPath = [strip(source.path), strip(entry.path)]
 		.filter((s) => s.length > 0)
 		.join('/');

@@ -44,7 +44,9 @@ function isUnresolvable(spec) {
  * @return {Promise<string|undefined>} Latest version, or `undefined`.
  */
 async function fetchLatest(name) {
-	const encoded = name.replace('/', '%2F');
+	// Global: a string argument replaces only the first match. Scoped names hold
+	// a single '/' today, so this is defensive rather than a live fix.
+	const encoded = name.replace(/\//g, '%2F');
 	const data = await getJson(`${REGISTRY}/${encoded}/latest`);
 	return data && data.version;
 }

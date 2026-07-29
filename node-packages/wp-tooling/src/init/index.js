@@ -347,7 +347,9 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) =>
 				c.cancelled ||
 				(!(config.features || []).length &&
-					!(config.examples && (config.examples.groups || []).length)),
+					!(
+						config.examples && (config.examples.groups || []).length
+					)),
 			async run(c) {
 				const features = config.features || [];
 				const groups =
@@ -387,18 +389,18 @@ const setupSteps = (config, root, flags) => {
 						];
 						const order = [];
 						const byCat = new Map();
-						for (const cap of caps) {
-							if (!byCat.has(cap.category)) {
-								byCat.set(cap.category, []);
-								order.push(cap.category);
+						for (const entry of caps) {
+							if (!byCat.has(entry.category)) {
+								byCat.set(entry.category, []);
+								order.push(entry.category);
 							}
-							byCat.get(cap.category).push(cap);
+							byCat.get(entry.category).push(entry);
 						}
 						const treeGroups = order.map((category) => ({
 							label: category,
-							items: byCat.get(category).map((cap) => ({
-								label: cap.label,
-								checked: cap.checked,
+							items: byCat.get(category).map((entry) => ({
+								label: entry.label,
+								checked: entry.checked,
 							})),
 						}));
 						const checked = new Set(

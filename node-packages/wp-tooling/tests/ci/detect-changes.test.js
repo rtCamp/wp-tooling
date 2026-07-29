@@ -164,6 +164,28 @@ describe('detectChanges', () => {
 		expect(r['gha-count']).toBe(1);
 	});
 
+	test('gha bucket still matches nested composite-action paths', () => {
+		const r = detectChanges({
+			files: [
+				'.github/actions/setup/action.yml',
+				'.github/actions/a/b/c/deep.yml',
+				'sub/.github/workflows/ci.yml',
+			],
+			ignore: null,
+		});
+		expect(r['gha-count']).toBe(3);
+	});
+
+	test('gha bucket classifies a pathological path in linear time', () => {
+		// Regression guard: the old `.+\.yml$` pattern was quadratic here
+		// because `.` also matches `/`.
+		const file = '/.github/actions/'.repeat(20000) + 'x';
+		const started = Date.now();
+		const r = detectChanges({ files: [file], ignore: null });
+		expect(r['gha-count']).toBe(0);
+		expect(Date.now() - started).toBeLessThan(1000);
+	});
+
 	test('includeFiles adds <bucket>-files arrays alongside counts', () => {
 		const r = detectChanges({
 			files: [

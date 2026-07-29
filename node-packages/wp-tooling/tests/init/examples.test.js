@@ -73,9 +73,11 @@ describe('stripRegions', () => {
 	it('treats punctuated and bare markers as the same region', () => {
 		// Mixed spellings must still pair up, so an existing file part-migrated
 		// to punctuated markers does not silently stop stripping.
-		const text = ['// wp:example', 'use Example;', '// wp:example:end.'].join(
-			'\n'
-		);
+		const text = [
+			'// wp:example',
+			'use Example;',
+			'// wp:example:end.',
+		].join('\n');
 		expect(stripRegions(text, 'wp:example', true)).toBe('');
 	});
 
