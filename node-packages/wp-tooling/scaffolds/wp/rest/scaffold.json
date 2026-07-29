@@ -1,0 +1,77 @@
+{
+	"slug": "rest",
+	"category": "wp",
+	"name": "REST controller",
+	"description": "Adds a REST API controller extending AbstractRESTController from rtcamp/wp-framework. The base extends WP_REST_Controller; the consumer's Rest module instantiates each controller via the Loader.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the controller class. Default 'Inc\\Rest' matches the rtCamp skeleton; pass the project's actual sub-namespace to override.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Rest"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the controller file. Default 'includes/Rest'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Rest"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Rest"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Rest'.",
+			"default": "tests/Rest"
+		},
+		{
+			"key": "name",
+			"description": "Resource slug, kebab- or snake-case, used as the REST route segment, e.g. 'images' for /wp-json/myplugin/v1/images.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "rest_namespace",
+			"description": "REST namespace prefix used in the URL path, e.g. 'myplugin'. Final route becomes /wp-json/{rest_namespace}/v{version}/{name}.",
+			"required": true
+		},
+		{
+			"key": "rest_version",
+			"description": "API version number, e.g. '1'.",
+			"default": "1"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/controller.php.mustache",
+			"dest": "{{base_path}}/{{class}}Controller.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Rest.php",
+			"anchor": "// scaffold:wp/rest:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}Controller::class,",
+			"description": "Add the controller to the Rest module so the framework Loader registers its routes on rest_api_init. If the Rest module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Rest --kind=rest`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}ControllerTest.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

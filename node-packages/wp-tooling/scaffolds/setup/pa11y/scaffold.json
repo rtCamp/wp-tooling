@@ -1,0 +1,28 @@
+{
+	"slug": "pa11y",
+	"category": "setup",
+	"name": "pa11y-ci",
+	"description": "Adds .pa11yci.json for WCAG2AA accessibility testing against a running WordPress environment.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/.pa11yci.json.mustache",
+			"dest": ".pa11yci.json"
+		}
+	],
+	"inputs": [
+		{
+			"key": "base_url",
+			"description": "Base URL of the WordPress environment to test against (e.g. http://localhost:8888).",
+			"required": true
+		}
+	],
+	"npm_dev_dependencies": {
+		"pa11y-ci": "^6.0.0"
+	},
+	"scripts": {
+		"npm": {
+			"test:a11y": "pa11y-ci"
+		}
+	}
+}

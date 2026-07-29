@@ -1,0 +1,24 @@
+{
+    "slug": "cli",
+    "category": "wp",
+    "name": "WP-CLI command",
+    "description": "Adds a WP-CLI command extending Abstract_CLI_Command.",
+    "source": "template",
+    "inputs": [
+        { "key": "namespace", "description": "PSR-4 namespace.", "default": "Inc" },
+        { "key": "base_path", "description": "PHP source base.", "default": "includes" },
+        { "key": "name", "description": "Slug for the command.", "required": true },
+        { "key": "class", "description": "Class name.", "discover_from": "input:name", "transform": "pascal-case" }
+    ],
+    "files": [
+        { "src": "templates/command.php.mustache", "dest": "{{base_path}}/Cli/{{class}}.php" }
+    ],
+    "wiring": [
+        {
+            "target_file": "{{base_path}}/Plugin.php",
+            "anchor": "// scaffold:cli-commands",
+            "snippet_template": "$this->boot('{{name}}', \\{{namespace}}\\Cli\\{{class}}::class);",
+            "description": "Register the new CLI command."
+        }
+    ]
+}

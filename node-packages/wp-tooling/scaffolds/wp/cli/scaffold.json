@@ -1,0 +1,72 @@
+{
+	"slug": "cli",
+	"category": "wp",
+	"name": "WP-CLI command",
+	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-framework. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the command class. Default 'Inc\\Cli' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\CLI') to override.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Cli"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the command file. Default 'includes/Cli'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Cli"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cli'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Cli"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Cli'.",
+			"default": "tests/Cli"
+		},
+		{
+			"key": "name",
+			"description": "Command slug, kebab- or snake-case, e.g. 'sync-feed'. Used as the WP-CLI command name.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "description",
+			"description": "One-line command description shown in `wp help`.",
+			"default": "TODO: describe what this command does."
+		}
+	],
+	"files": [
+		{
+			"src": "templates/command.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Cli.php",
+			"anchor": "// scaffold:wp/cli:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the command class to the Cli module. The module's register_hooks() should iterate get_classes() and call WP_CLI::add_command( $class::get_name(), $class::class ) when defined('WP_CLI'). If the Cli module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cli --kind=cli`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

@@ -1,0 +1,20 @@
+# Keep the published npm package small.
+# Anything listed here is NOT published to the registry.
+
+tests/
+coverage/
+.claude/
+.github/
+.editorconfig
+.eslintrc.js
+.gitattributes
+.gitignore
+jest.config.js
+CHANGELOG.md
+CLAUDE.md
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.log

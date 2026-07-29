@@ -1,0 +1,88 @@
+{
+	"slug": "admin-page",
+	"category": "wp",
+	"name": "Admin Page",
+	"description": "Adds a custom admin menu page extending AbstractAdminPage from rtcamp/wp-framework. Top-level by default; pass --parent_slug for a submenu.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the admin page class. Default 'Inc\\Admin' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Admin"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the admin page file. Default 'includes/Admin'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Admin"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Admin'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Admin"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Admin'.",
+			"default": "tests/Admin"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "slug",
+			"description": "Page slug, lowercase, kebab- or snake-case, e.g. 'my-plugin-dashboard'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "page_title",
+			"description": "Browser tab title, e.g. 'My Plugin Dashboard'.",
+			"required": true
+		},
+		{
+			"key": "menu_title",
+			"description": "Sidebar label, often shorter than page_title.",
+			"required": true
+		},
+		{
+			"key": "parent_slug",
+			"description": "Parent menu slug for a submenu (e.g. 'options-general.php'). Leave empty for a top-level menu.",
+			"default": ""
+		}
+	],
+	"files": [
+		{
+			"src": "templates/admin-page.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Admin.php",
+			"anchor": "// scaffold:wp/admin-page:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the page to the Admin module so the framework Loader registers it on admin_menu. If the Admin module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Admin --kind=admin-page`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

@@ -1,105 +1,21 @@
 {
-  "name": "@rtcamp/wp-tooling",
-  "description": "Shared build/dev tooling for rtCamp WordPress projects — a zero-dependency TTY UI kit and shared ESLint/Stylelint/Tailwind configs.",
-  "version": "0.1.0",
-  "author": "rtCamp",
-  "bugs": {
-    "url": "https://github.com/rtCamp/wp-tooling/issues"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "eslint-plugin-n": "^18.0.1",
-    "globals": "^17.6.0",
-    "jest": "^29.7.0"
-  },
-  "engines": {
-    "node": ">=22"
-  },
-  "exports": {
-    "./ui": "./src/ui/index.js",
-    "./scaffolds": "./src/scaffolds/index.js",
-    "./release": "./src/release/index.js",
-    "./hooks": "./src/hooks/index.js",
-    "./ci": "./src/ci/index.js",
-    "./version-monitor": "./src/version-monitor/index.js",
-    "./eslint-config": "./src/lint/eslint.js",
-    "./stylelint-config": "./src/lint/stylelint.js",
-    "./tailwind-config": "./src/tailwind/index.js",
-    "./tailwind-config/postcss": "./src/tailwind/postcss.js"
-  },
-  "files": [
-    "src",
-    "README.md",
-    "LICENSE"
-  ],
-  "homepage": "https://github.com/rtCamp/wp-tooling#readme",
-  "keywords": [
-    "cli",
-    "rtcamp",
-    "scaffolding",
-    "tooling",
-    "tty",
-    "wordpress"
-  ],
-  "license": "GPL-2.0-or-later",
-  "peerDependencies": {
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
-    "@wordpress/eslint-plugin": "^25.1.0",
-    "@wordpress/stylelint-config": "^23.37.0",
-    "eslint": "^10.0.0",
-    "eslint-plugin-jest": "^29.0.0",
-    "stylelint": "^16.8.2",
-    "stylelint-scss": "^6.4.0",
-    "@tailwindcss/postcss": "^4.3.0",
-    "tailwindcss": "^4.3.0"
-  },
-  "peerDependenciesMeta": {
-    "eslint-import-resolver-typescript": {
-      "optional": true
+    "name": "wp-tooling-monorepo",
+    "version": "0.0.0",
+    "description": "rtCamp WordPress tooling monorepo — Node packages (npm workspaces) + Composer packages (monorepo-builder + splitsh-lite).",
+    "license": "GPL-2.0-or-later",
+    "author": "rtCamp",
+    "private": true,
+    "engines": {
+        "node": ">=22"
     },
-    "@eslint-community/eslint-plugin-eslint-comments": {
-      "optional": true
-    },
-    "@wordpress/eslint-plugin": {
-      "optional": true
-    },
-    "@wordpress/stylelint-config": {
-      "optional": true
-    },
-    "eslint": {
-      "optional": true
-    },
-    "eslint-plugin-jest": {
-      "optional": true
-    },
-    "stylelint": {
-      "optional": true
-    },
-    "stylelint-scss": {
-      "optional": true
-    },
-    "@tailwindcss/postcss": {
-      "optional": true
-    },
-    "tailwindcss": {
-      "optional": true
+    "workspaces": [
+        "node-packages/*"
+    ],
+    "scripts": {
+        "lint": "npm run lint --workspaces --if-present",
+        "lint:fix": "npm run lint:fix --workspaces --if-present",
+        "test": "npm test --workspaces --if-present",
+        "test:coverage": "npm run test:coverage --workspaces --if-present",
+        "check": "npm run check --workspaces --if-present"
     }
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rtCamp/wp-tooling.git"
-  },
-  "scripts": {
-    "check": "npm run lint && npm test",
-    "lint": "eslint src tests",
-    "lint:fix": "eslint src tests --fix",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch"
-  }
 }

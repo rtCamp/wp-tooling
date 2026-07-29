@@ -1,0 +1,88 @@
+{
+	"slug": "cpt",
+	"category": "wp",
+	"name": "Custom Post Type",
+	"description": "Adds a CPT class extending AbstractPostType from rtcamp/wp-framework. One class per post type; the consumer's PostTypes module instantiates it via the Loader.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the post type class. Default 'Inc\\PostTypes' matches the rtCamp skeleton; pass the project's actual sub-namespace (e.g. 'Acme\\Blog\\PostTypes') to override.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\PostTypes"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the post type file. Default 'includes/PostTypes' matches the rtCamp skeleton; pass the project's actual sub-path to override.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/PostTypes"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\PostTypes'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\PostTypes"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/PostTypes'.",
+			"default": "tests/PostTypes"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain. Usually matches the plugin slug.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "slug",
+			"description": "Post type slug (kebab-case, used as the key in register_post_type(), e.g. 'product').",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "singular",
+			"description": "Singular human-readable label, e.g. 'Product'.",
+			"required": true
+		},
+		{
+			"key": "plural",
+			"description": "Plural human-readable label, e.g. 'Products'.",
+			"required": true
+		},
+		{
+			"key": "menu_icon",
+			"description": "Dashicon class or SVG URL for the admin sidebar.",
+			"default": "dashicons-admin-post"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/post-type.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/PostTypes.php",
+			"anchor": "// scaffold:wp/cpt:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the new CPT class to the PostTypes module's get_classes() array. The framework's Loader will instantiate it and call register_hooks() on init. If the PostTypes module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=PostTypes --kind=cpt`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

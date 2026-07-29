@@ -1,0 +1,82 @@
+<?php
+/**
+ * Admin page: {{page_title}} (slug: {{slug}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractAdminPage;
+
+/**
+ * Registers the {{page_title}} admin menu page.
+ */
+class {{class}} extends AbstractAdminPage {
+
+	/**
+	 * Get the menu slug (page identifier).
+	 *
+	 * @return string
+	 */
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	/**
+	 * Get the page title (shown in the browser tab).
+	 *
+	 * @return string
+	 */
+	public function get_page_title(): string {
+		return __( '{{page_title}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Get the menu title (shown in the admin sidebar).
+	 *
+	 * @return string
+	 */
+	public function get_menu_title(): string {
+		return __( '{{menu_title}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Parent menu slug. Return null for a top-level menu.
+	 *
+	 * @return string|null
+	 */
+	public function get_parent_slug(): ?string {
+		$parent = '{{parent_slug}}';
+		return '' === $parent ? null : $parent;
+	}
+
+	/**
+	 * Capability required to view the page.
+	 *
+	 * @return string
+	 */
+	public function get_capability(): string {
+		return 'manage_options';
+	}
+
+	/**
+	 * Render the page body. Replace with your markup.
+	 *
+	 * @return void
+	 */
+	public function render(): void {
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html( $this->get_page_title() ); ?></h1>
+			<p><?php esc_html_e( 'Page content goes here.', '{{text_domain}}' ); ?></p>
+		</div>
+		<?php
+	}
+}

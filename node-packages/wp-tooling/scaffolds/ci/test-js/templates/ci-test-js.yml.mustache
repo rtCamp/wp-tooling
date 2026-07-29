@@ -1,0 +1,23 @@
+name: CI / Test (JS)
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-test-js.yml from rtCamp/wp-shared-workflows.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-test-js.yml
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/*"
+
+permissions:
+  contents: read
+
+jobs:
+  test-js:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-js.yml@{{wsw_ref}}
+    with:
+      node-version: "{{node_version}}"
+      enable-cache: {{enable_cache}}

@@ -1,0 +1,36 @@
+{
+	"slug": "phpunit",
+	"category": "setup",
+	"name": "PHPUnit",
+	"description": "Adds phpunit.xml.dist and tests/bootstrap.php for WordPress plugin PHPUnit testing (PHPUnit ^12, polyfills compatible).",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/phpunit.xml.dist.mustache",
+			"dest": "phpunit.xml.dist"
+		},
+		{
+			"src": "templates/bootstrap.php.mustache",
+			"dest": "tests/bootstrap.php"
+		}
+	],
+	"inputs": [
+		{
+			"key": "source_dir",
+			"description": "Directory containing the PHP source to include in coverage (relative to project root, no trailing slash).",
+			"default": "includes"
+		}
+	],
+	"composer_dev_dependencies": {
+		"phpunit/phpunit": "^12.0",
+		"yoast/phpunit-polyfills": "^4.0",
+		"brain/monkey": "^2.6"
+	},
+	"scripts": {
+		"composer": {
+			"test": "phpunit",
+			"test:unit": "phpunit --testsuite Unit",
+			"test:integration": "phpunit --testsuite Integration"
+		}
+	}
+}

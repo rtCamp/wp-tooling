@@ -1,0 +1,67 @@
+{
+	"slug": "shortcode",
+	"category": "wp",
+	"name": "Shortcode",
+	"description": "Adds a shortcode class extending AbstractShortcode from rtcamp/wp-framework. One class per shortcode tag; the consumer's Shortcodes module instantiates it via the Loader.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the shortcode class. Default 'Inc\\Shortcodes' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Shortcodes"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the shortcode file. Default 'includes/Shortcodes'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Shortcodes"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Shortcodes'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Shortcodes"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Shortcodes'.",
+			"default": "tests/Shortcodes"
+		},
+		{
+			"key": "tag",
+			"description": "Shortcode tag, lowercase, no spaces, e.g. 'my_plugin_button'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from tag.",
+			"discover_from": "input:tag",
+			"transform": "pascal-case"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/shortcode.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Shortcodes.php",
+			"anchor": "// scaffold:wp/shortcode:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the new shortcode class to the Shortcodes module's get_classes() array. The framework's Loader will instantiate it and call register_hooks() on init. If the Shortcodes module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Shortcodes --kind=shortcode`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

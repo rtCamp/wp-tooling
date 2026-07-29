@@ -1,0 +1,25 @@
+{
+	"slug": "lint-css",
+	"category": "ci",
+	"name": "CI: Lint CSS (Stylelint)",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-css.yml. Runs Stylelint over changed files in a PR, or the whole project on push. EXPERIMENTAL: the upstream workflow is currently in rtCamp/wp-shared-workflows PR #2 and has not yet shipped on `v1`.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call. Workflow is in PR #2 at the time of writing; pin to `v1.0.0/task/ci-lint-workflows` or a commit SHA until the PR is merged.",
+			"default": "v1.0.0/task/ci-lint-workflows"
+		},
+		{
+			"key": "node_version",
+			"description": "Node.js version.",
+			"default": "22"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-lint-css.yml.mustache",
+			"dest": ".github/workflows/ci-lint-css.yml"
+		}
+	]
+}

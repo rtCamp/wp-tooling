@@ -6,5 +6,32 @@
 npm-debug.log*
 .idea/
 .vscode/settings.json
+.claude/settings.local.json
 .DS_Store
 Thumbs.db
+
+# Local skill-creator eval scratch (transcripts, snapshots, iteration outputs).
+# The shippable portion of evals lives at skills/<name>/evals/ and is committed.
+skill-workspace/
+skills/*-workspace/
+**/skills/*-workspace/
+
+# Composer
+vendor/
+# Per-package locks are not committed for libraries (root composer.lock is).
+/composer-packages/*/composer.lock
+
+# Static-analysis / test caches
+.phpstan-cache/
+.phpunit.cache/
+
+# PHP tooling caches
+.phpunit.cache/
+.phpcs.cache
+
+# Monorepo: nested workspace/build artefacts (npm hoists to root, but be defensive)
+node_modules/
+coverage/
+dist/
+build/
+!node-packages/wp-tooling/scaffolds/**/build/

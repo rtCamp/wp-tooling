@@ -1,0 +1,23 @@
+<?php
+/**
+ * PHPUnit bootstrap: loads Composer autoloader and optionally the
+ * WordPress test suite when WP_TESTS_DIR is set.
+ */
+
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+
+// Integration tests: load the WordPress test library.
+$wp_tests_dir = getenv( 'WP_TESTS_DIR' );
+if ( $wp_tests_dir ) {
+	require_once $wp_tests_dir . '/includes/functions.php';
+
+	tests_add_filter(
+		'muplugins_loaded',
+		static function () {
+			// Load the plugin under test here.
+			// require dirname( __DIR__ ) . '/plugin-name.php';
+		}
+	);
+
+	require $wp_tests_dir . '/includes/bootstrap.php';
+}

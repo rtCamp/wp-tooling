@@ -1,0 +1,20 @@
+{
+    "slug": "lint-only",
+    "category": "ci",
+    "name": "Lint-only CI workflow",
+    "description": "Adds a CI lint workflow with a declarative lint test entry.",
+    "source": "template",
+    "inputs": [
+        { "key": "slug", "description": "Job slug.", "required": true }
+    ],
+    "files": [
+        { "src": "templates/workflow.yml.mustache", "dest": ".github/workflows/{{slug}}.yml" }
+    ],
+    "tests": [
+        {
+            "src": "templates/workflow.yml.mustache",
+            "dest": ".github/workflows/{{slug}}.yml",
+            "framework": "actionlint"
+        }
+    ]
+}

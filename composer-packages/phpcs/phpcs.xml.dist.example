@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<ruleset
+	name="My Project Coding Standards"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
+>
+	<description>Sniffs for My Project — extends the shared rtCamp WordPress standard.</description>
+
+	<!-- ==========================================================
+	     What to scan. List the project's PHP entry points and folders.
+	     ========================================================== -->
+	<file>./includes/</file>
+	<file>./src/</file>
+	<file>./tests/</file>
+	<file>./my-plugin.php</file>
+
+	<!-- Excluded from the paths above. -->
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+
+	<!-- ==========================================================
+	     How to scan (so these need not be passed on the CLI).
+	     ========================================================== -->
+	<!-- Show sniff codes and progress. -->
+	<arg value="sp" />
+	<!-- Strip file paths down to the relevant bit. -->
+	<arg name="basepath" value="./" />
+	<!-- Colour the report. -->
+	<arg name="colors" />
+	<!-- Only lint PHP files. -->
+	<arg name="extensions" value="php" />
+	<!-- Cache results for faster re-runs. -->
+	<arg name="cache" value=".phpcs.cache" />
+	<!-- Run files in parallel. -->
+	<arg name="parallel" value="20" />
+
+	<!-- ==========================================================
+	     Project constraints — set these to match your project.
+	     ========================================================== -->
+	<!-- Lowest PHP version you support (used by PHPCompatibilityWP). -->
+	<config name="testVersion" value="8.2-" />
+	<!-- Lowest WordPress version you support. -->
+	<config name="minimum_wp_version" value="6.5" />
+
+	<!-- ==========================================================
+	     The shared rtCamp WordPress standard.
+
+	     rtCampWP        — full strict (recommended for new / public projects).
+	     rtCampWP-Basic  — WPCS + VIP + Docs + PHP compatibility, no strict typing
+	                       (recommended when adopting on an existing codebase).
+	     ========================================================== -->
+	<rule ref="rtCampWP" />
+
+	<!-- ==========================================================
+	     Project-specific configuration.
+	     ========================================================== -->
+
+	<!-- Global prefixes for functions, classes and constants. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="My_Project" />
+				<element value="my_project" />
+				<element value="MY_PROJECT" />
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Text domain(s) used by this project. -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="my-project" />
+			</property>
+		</properties>
+	</rule>
+
+	<!-- File naming. Pick the line that matches your project:
+	     - Themes: enforce the theme file hierarchy. -->
+	<!--
+	<rule ref="WordPress.Files.FileName">
+		<properties>
+			<property name="is_theme" value="true" />
+		</properties>
+	</rule>
+	-->
+	<!--   - PSR-4 autoloaded plugins (PascalCase filenames): disable the rule. -->
+	<!--
+	<rule ref="WordPress.Files.FileName">
+		<severity>0</severity>
+	</rule>
+	-->
+
+	<!-- Relax noisy rules in test files (optional). -->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.Files.FileName.InvalidClassFileName">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+
+</ruleset>

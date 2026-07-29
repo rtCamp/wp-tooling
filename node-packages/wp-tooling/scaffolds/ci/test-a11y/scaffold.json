@@ -1,0 +1,25 @@
+{
+	"slug": "test-a11y",
+	"category": "ci",
+	"name": "CI: Accessibility (pa11y)",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-a11y.yml. Runs pa11y-ci WCAG2AA scans against a wp-env-booted site. Stable (merged into release/v1.0.0).",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call.",
+			"default": "v1"
+		},
+		{
+			"key": "node_version",
+			"description": "Node.js version.",
+			"default": "22"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/ci-test-a11y.yml.mustache",
+			"dest": ".github/workflows/ci-test-a11y.yml"
+		}
+	]
+}
