@@ -1,0 +1,89 @@
+<?php
+/**
+ * Settings page: {{page_title}} (slug: {{slug}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractSettingsPage;
+
+/**
+ * Registers the {{page_title}} settings page via the Settings API.
+ */
+class {{class}} extends AbstractSettingsPage {
+
+	/**
+	 * Get the menu/page slug.
+	 *
+	 * @return string
+	 */
+	public static function get_slug(): string {
+		return '{{slug}}';
+	}
+
+	/**
+	 * Get the page title (shown in the browser tab).
+	 *
+	 * @return string
+	 */
+	public function get_page_title(): string {
+		return __( '{{page_title}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Get the menu title (shown in the admin sidebar).
+	 *
+	 * @return string
+	 */
+	public function get_menu_title(): string {
+		return __( '{{menu_title}}', '{{text_domain}}' );
+	}
+
+	/**
+	 * Options to register via the Settings API.
+	 *
+	 * Format: option_name => array of args for register_setting().
+	 * Add new options as additional keys.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	public function get_settings(): array {
+		return [
+			'{{option_name}}' => [
+				'type'              => 'string',
+				'description'       => __( 'Example setting.', '{{text_domain}}' ),
+				'sanitize_callback' => 'sanitize_text_field',
+				'show_in_rest'      => true,
+				'default'           => '',
+			],
+		];
+	}
+
+	/**
+	 * Render the page form. Uses Settings API helpers.
+	 *
+	 * @return void
+	 */
+	public function render(): void {
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html( $this->get_page_title() ); ?></h1>
+			<form method="post" action="options.php">
+				<?php
+				settings_fields( $this->get_option_group() );
+				do_settings_sections( static::get_slug() );
+				submit_button();
+				?>
+			</form>
+		</div>
+		<?php
+	}
+}

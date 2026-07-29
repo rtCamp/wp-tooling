@@ -1,0 +1,4 @@
+{
+	"name": "fixture",
+	"image": "php:8.1"
+}

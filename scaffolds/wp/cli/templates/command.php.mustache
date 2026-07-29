@@ -1,0 +1,61 @@
+<?php
+/**
+ * WP-CLI command: {{name}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
+use WP_CLI;
+
+/**
+ * Registers the {{name}} WP-CLI command.
+ */
+final class {{class}} implements CLICommand {
+
+	/**
+	 * Get the command name.
+	 *
+	 * @return string
+	 */
+	public static function get_name(): string {
+		return '{{name}}';
+	}
+
+	/**
+	 * Get the command description.
+	 *
+	 * @return string
+	 */
+	public static function get_description(): string {
+		return '{{description}}';
+	}
+
+	/**
+	 * Run the command.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Print what would happen without making changes.
+	 *
+	 * @param array<int,string>    $args       Positional arguments.
+	 * @param array<string,string> $assoc_args Named arguments.
+	 *
+	 * @return void
+	 */
+	public static function run( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+
+		// Replace with your command logic.
+		WP_CLI::success( $dry_run ? '{{name}} dry-run complete.' : '{{name}} complete.' );
+	}
+}

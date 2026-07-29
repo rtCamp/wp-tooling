@@ -1,0 +1,15 @@
+# PHPStan config — extends rtCamp's shared baseline (rtcamp/wp-phpstan).
+# Scaffolded by @rtcamp/wp-tooling. Add project-specific overrides under `parameters`.
+
+includes:
+    - vendor/rtcamp/wp-phpstan/phpstan.neon.dist
+
+parameters:
+    paths:
+        - src
+        - includes
+    excludePaths:
+        - vendor
+        - node_modules
+        - build
+        - tests

@@ -1,0 +1,88 @@
+{
+	"slug": "settings-page",
+	"category": "wp",
+	"name": "Settings Page",
+	"description": "Adds a Settings API page extending AbstractSettingsPage from rtcamp/wp-framework. Generates a page plus a worked example of register_setting() declarations.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the settings class. Default 'Inc\\Settings' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Settings"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the settings file. Default 'includes/Settings'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Settings"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Settings'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Settings"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Settings'.",
+			"default": "tests/Settings"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "slug",
+			"description": "Page slug, lowercase, kebab- or snake-case, e.g. 'my-plugin-settings'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "page_title",
+			"description": "Browser tab title.",
+			"required": true
+		},
+		{
+			"key": "menu_title",
+			"description": "Sidebar label.",
+			"required": true
+		},
+		{
+			"key": "option_name",
+			"description": "Sample option_name registered via register_setting(). Add more by editing get_settings().",
+			"required": true
+		}
+	],
+	"files": [
+		{
+			"src": "templates/settings-page.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Settings.php",
+			"anchor": "// scaffold:wp/settings-page:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the page to the Settings module so the framework Loader registers it on admin_menu and admin_init. If the Settings module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Settings --kind=settings-page`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

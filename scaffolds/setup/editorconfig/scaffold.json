@@ -1,0 +1,13 @@
+{
+	"slug": "editorconfig",
+	"category": "setup",
+	"name": "EditorConfig",
+	"description": "Adds a .editorconfig enforcing rtCamp baseline: UTF-8, LF, tabs (4-space width), YAML spaces, final newline.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/.editorconfig.mustache",
+			"dest": ".editorconfig"
+		}
+	]
+}

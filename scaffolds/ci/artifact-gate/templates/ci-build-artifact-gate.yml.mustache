@@ -1,0 +1,20 @@
+name: CI / Artifact gate
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-build-artifact-gate.yml from rtCamp/wp-shared-workflows.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-build-artifact-gate.yml
+#
+# Fails the PR check if committed files touch the gated path(s). Pair this with
+# ci/build so the team produces builds on merge, not by committing them.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-gate:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-build-artifact-gate.yml@{{wsw_ref}}
+    with:
+      gated-paths: "{{gated_paths}}"

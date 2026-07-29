@@ -1,0 +1,26 @@
+name: CI / Build
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Calls the reusable ci-build.yml from rtCamp/wp-shared-workflows.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/ci-build.yml
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-build.yml@{{wsw_ref}}
+    with:
+      install-node-deps: true
+      install-composer-deps: {{install_composer_deps}}
+      node-version: "{{node_version}}"
+      php-version: "{{php_version}}"
+      upload-artifact: {{upload_artifact}}

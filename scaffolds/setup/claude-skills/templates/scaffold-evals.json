@@ -1,0 +1,49 @@
+{
+  "skill_name": "scaffold",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need a WP-CLI command in my plugin that exports Query Monitor data as JSON. The plugin uses Acme\\Blog\\ -> src/ PSR-4 autoload. src/Plugin/Main.php has a register() method wiring commands via $this->commandRegistry->add(new \\Acme\\Blog\\CLI\\X()). Existing commands in src/CLI/ end with Command suffix (ImportCommand, PurgeCommand). Scaffold the qm-export command following these conventions.",
+      "expected_output": "A new PHP class under src/CLI/QmExportCommand.php with the project's Command suffix and Acme\\Blog\\CLI namespace, plus a PHPUnit test stub. Wiring inserted into src/Plugin/Main.php using the project's translated commandRegistry->add() pattern (not the canonical WP_CLI::add_command). No composer require executed.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp/cli scaffold (not a guess across multiple candidates).",
+        "The skill introspects the project before invoking the engine and reports the four facts: namespace Acme\\Blog, base path src, Command suffix, commandRegistry->add() registration pattern.",
+        "The engine invocation passes --class=QmExportCommand (project's Command suffix), not the canonical bare QmExport.",
+        "The engine invocation passes --namespace=Acme\\Blog\\CLI (the sub-namespace sampled from the project).",
+        "The engine writes the PHP class file and a PHPUnit test stub.",
+        "The wiring inserted into src/Plugin/Main.php uses the project's commandRegistry->add() pattern, NOT the canonical WP_CLI::add_command() snippet.",
+        "Wiring is shown with an explicit consent prompt before applying.",
+        "The skill does NOT run composer require, composer install, or npm install on the user's behalf."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Set up the GitHub Actions workflow that auto-deploys this WordPress plugin to wordpress.org SVN on each release. The plugin slug is acme-blog. The repo has package.json and composer.json but no .github/workflows directory yet.",
+      "expected_output": ".github/workflows/cd-wporg.yml written by the engine. The skill surfaces WPORG_USERNAME and WPORG_PASSWORD as a `gh secret set` checklist for the user. No secret values are invented or echoed. No `gh secret set` is executed automatically. actionlint (or yaml-parse) validation result reported.",
+      "files": [],
+      "expectations": [
+        "The skill picks the ci/cd-wporg scaffold.",
+        "The engine invocation passes --plugin-slug=acme-blog.",
+        "The engine writes .github/workflows/cd-wporg.yml (and the actionlint test entry references the same file).",
+        "Both WPORG_USERNAME and WPORG_PASSWORD are surfaced as a `gh secret set` checklist for the user to run themselves.",
+        "The skill does NOT invent secret VALUES (no fake passwords, no 'changeme' placeholders presented as if real).",
+        "The skill does NOT execute `gh secret set` itself.",
+        "The skill reports the actionlint (or yaml-parse fallback) validation result for the generated YAML."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add a dynamic Gutenberg block called pricing-table to my project. Blocks live at src/blocks/ and we use a vendor prefix of 'acme' for block.json names (existing blocks look like acme/hero, acme/cta).",
+      "expected_output": "src/blocks/pricing-table/ created with block.json (name: acme/pricing-table), edit.js, index.js, render.php. The vendor prefix 'acme' is detected from an existing block.json and applied. No npm install or wp-scripts build executed automatically.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp/block-dynamic scaffold.",
+        "The skill introspects an existing src/blocks/*/block.json to confirm the 'acme' vendor prefix and the src/blocks/ source directory.",
+        "The engine invocation passes a vendor/namespace input that produces 'acme/pricing-table' in the generated block.json (not 'wp-tooling/pricing-table' or unprefixed 'pricing-table').",
+        "The engine writes block.json, edit.js, index.js, and render.php under src/blocks/pricing-table/.",
+        "The skill does NOT run npm install or wp-scripts build."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+<?php
+/**
+ * REST controller: {{name}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare(strict_types=1);
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
+use WP_REST_Request;
+use WP_REST_Response;
+
+/**
+ * Registers REST routes for the {{name}} resource.
+ */
+class {{class}}Controller extends AbstractRESTController {
+
+	/**
+	 * REST route namespace (URL prefix before the version).
+	 *
+	 * @var string
+	 */
+	protected $namespace = '{{rest_namespace}}';
+
+	/**
+	 * REST API version segment.
+	 *
+	 * @var string
+	 */
+	protected string $version = '{{rest_version}}';
+
+	/**
+	 * The route segment after the namespace and version, e.g. 'images'.
+	 *
+	 * @var string
+	 */
+	protected $rest_base = '{{name}}';
+
+	/**
+	 * Register REST routes. Called by the framework on rest_api_init.
+	 *
+	 * @return void
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			"{$this->namespace}/v{$this->version}",
+			'/' . $this->rest_base,
+			[
+				[
+					'methods'             => 'GET',
+					'callback'            => [ $this, 'get_items' ],
+					'permission_callback' => [ $this, 'get_items_permissions_check' ],
+				],
+			]
+		);
+	}
+
+	/**
+	 * Return the collection of items.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_items( WP_REST_Request $request ): WP_REST_Response {
+		// Replace with your collection response.
+		return new WP_REST_Response( [], 200 );
+	}
+
+	/**
+	 * Permission check for the collection endpoint.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 *
+	 * @return bool
+	 */
+	public function get_items_permissions_check( WP_REST_Request $request ): bool {
+		return current_user_can( 'read' );
+	}
+}
