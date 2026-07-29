@@ -2,11 +2,16 @@ name: Release Composer Packages
 
 # Splits composer-packages/* out to their standalone mirror repos so Packagist
 # can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own repositories.
+# Fired by the tag that `vendor/bin/monorepo-builder release` pushes.
 #
-# Fired by the tag that `vendor/bin/monorepo-builder release <version>` pushes
-# (PushTagReleaseWorker). splitsh.json at the repo root is the single source of
-# truth for mirror-repo -> subdirectory; to add or remove a package, edit that
-# file, never this workflow.
+# splitsh.json is the single source of truth for mirror repo -> subdirectory;
+# to add or remove a package, edit that file, never this workflow.
+#
+# Each mirror is pushed with its own SSH deploy key (repo secret
+# SPLIT_KEY_<NAME>, "Allow write access" required) rather than a PAT bound to
+# one human account. `git subtree split` output is deterministic, so releases
+# fast-forward and a diverged mirror fails loudly instead of being silently
+# rewritten.
 
 on:
   push:
@@ -19,8 +24,13 @@ on:
         description: "Throwaway tag to push to the mirrors (e.g. v0.0.0-test)"
         required: true
         default: "v0.0.0-test"
+      force_push:
+        description: "Force-push the mirrors (bootstrap an empty mirror, or re-push the same test tag)"
+        type: boolean
+        required: false
+        default: false
 
-# Mirrors are force-pushed — never let two releases race each other.
+# Pushes to the mirrors must not race each other.
 concurrency:
   group: split-composer-packages
   cancel-in-progress: false
@@ -29,15 +39,188 @@ permissions:
   contents: read
 
 jobs:
+  build-matrix:
+    name: Build split matrix from config
+    runs-on: ubuntu-latest
+    env:
+      CONFIG_FILE: splitsh.json
+    outputs:
+      matrix: ${{ steps.parse.outputs.matrix }}
+      organization: ${{ steps.parse.outputs.organization }}
+      branch: ${{ steps.parse.outputs.branch }}
+      tag: ${{ steps.parse.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Parse config into a matrix
+        id: parse
+        shell: bash
+        env:
+          # workflow_dispatch runs from a branch, so the input has to win or the
+          # mirrors get tagged "main"; on a tag push ref_name *is* the tag.
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.test_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f "$CONFIG_FILE" ]]; then
+            echo "::error::Config file '$CONFIG_FILE' not found (path is relative to the repo root)."
+            exit 1
+          fi
+
+          if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
+            echo "::error::Config file '$CONFIG_FILE' is not valid JSON."
+            exit 1
+          fi
+
+          # Accepts both the shorthand string form ("composer-packages/foo") and
+          # the object form ({ "prefixes": [{ "from": "..." }] }), and derives
+          # the deploy-key secret: wp-phpcs -> SPLIT_KEY_PHPCS. A "secret" key
+          # on the object form replaces the derived suffix; the gsub keeps a
+          # future wp-foo-bar from producing an invalid secret name.
+          if ! matrix=$(jq -c '{
+            include: [
+              (.subtrees // {}) | to_entries[] | {
+                mirror_repo: .key,
+                package_directory: (
+                  if (.value | type) == "string" then .value
+                  elif ((.value | type) == "object")
+                       and ((.value.prefixes | type) == "array")
+                       and ((.value.prefixes | length) > 0)
+                       and ((.value.prefixes[0].from | type) == "string") then .value.prefixes[0].from
+                  else error("invalid subtrees entry for \"" + .key + "\": expected a string path or { prefixes: [{ from: \"...\" }] }")
+                  end
+                ),
+                secret_name: (
+                  "SPLIT_KEY_" + (
+                    (if (.value | type) == "object" then (.value.secret // empty) else empty end)
+                    // (.key | sub("^wp-"; "") | ascii_upcase | gsub("[^A-Z0-9]"; "_"))
+                  )
+                )
+              }
+            ]
+          }' "$CONFIG_FILE"); then
+            echo "::error::Invalid 'subtrees' entry in '$CONFIG_FILE' — each value must be a string path or { prefixes: [{ from: \"...\" }] } (see jq error above)."
+            exit 1
+          fi
+
+          count=$(jq -r '.include | length' <<<"$matrix")
+          if [[ "$count" -eq 0 ]]; then
+            echo "::error::No subtrees defined in '$CONFIG_FILE'. Nothing to split."
+            exit 1
+          fi
+
+          # Guards a dispatch with an emptied-out test_tag, which would otherwise
+          # fall through to a branch name and tag the mirrors with it.
+          if [[ "$TAG" != v* ]]; then
+            echo "::error::Refusing to push '$TAG' to the mirrors — the tag must start with 'v'."
+            exit 1
+          fi
+
+          # defaults.user_name / user_email are deliberately not required:
+          # git subtree split keeps each commit's original author, date and
+          # message, so there is no bot identity to configure.
+          organization=$(jq -r '.organization    // empty' "$CONFIG_FILE")
+          branch=$(jq       -r '.defaults.branch // empty' "$CONFIG_FILE")
+
+          if [[ -z "$organization" || -z "$branch" ]]; then
+            echo "::error::Missing required keys in '$CONFIG_FILE' — organization and defaults.branch must both be set."
+            exit 1
+          fi
+
+          {
+            echo "matrix=$matrix"
+            echo "organization=$organization"
+            echo "branch=$branch"
+            echo "tag=$TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Echo resolved matrix
+        env:
+          MATRIX: ${{ steps.parse.outputs.matrix }}
+        run: jq . <<<"$MATRIX"
+
   split:
-    # TODO: swap to @v1 once wp-shared-workflows merges release/v1.0.0 into main
-    # and cuts its version tags. That repo has no tags today and this workflow
-    # is not on its main branch, so release/v1.0.0 is the only ref that resolves.
-    uses: rtCamp/wp-shared-workflows/.github/workflows/cd-split-composer-packages.yml@release/v1.0.0
-    with:
-      # On workflow_dispatch github.ref_name is a *branch*, so the dispatch input
-      # must win — otherwise the mirrors get tagged "main". On a tag push
-      # github.event.inputs is null and ref_name is the pushed tag.
-      tag: ${{ github.event.inputs.test_tag || github.ref_name }}
-    secrets:
-      split-token: ${{ secrets.RTBOT_TOKEN }}
+    name: Split ${{ matrix.mirror_repo }}
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout monorepo (full history)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # the split walks every commit that touched the subtree
+          persist-credentials: false # this job pushes with a deploy key, nothing else
+
+      - name: Split ${{ matrix.package_directory }} → ${{ matrix.mirror_repo }}
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets[matrix.secret_name] }}
+          SECRET_NAME: ${{ matrix.secret_name }}
+          PKG_PATH: ${{ matrix.package_directory }}
+          ORG: ${{ needs.build-matrix.outputs.organization }}
+          REPO: ${{ matrix.mirror_repo }}
+          BRANCH: ${{ needs.build-matrix.outputs.branch }}
+          TAG: ${{ needs.build-matrix.outputs.tag }}
+          FORCE_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.force_push }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$SSH_KEY" ]]; then
+            echo "::error::No deploy key in $SECRET_NAME. Add the private half of ${ORG}/${REPO}'s write-enabled deploy key as that repository secret."
+            exit 1
+          fi
+
+          if [[ ! -x "$(git --exec-path)/git-subtree" ]]; then
+            echo "::error::git subtree is unavailable on this runner (looked in $(git --exec-path))."
+            exit 1
+          fi
+
+          if [[ ! -d "$PKG_PATH" ]]; then
+            echo "::error::Package directory '$PKG_PATH' does not exist at ${GITHUB_SHA}. Fix 'subtrees' in splitsh.json."
+            exit 1
+          fi
+
+          # The key stays in a 0600 file, never an env var git could echo.
+          # IdentitiesOnly ignores anything the runner's ssh-agent holds, so the
+          # wrong mirror's key can never be offered.
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/split_key"
+          chmod 600 "$HOME/.ssh/split_key"
+          ssh-keyscan -t ed25519 github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+          if ! grep -q '^github.com ' "$HOME/.ssh/known_hosts"; then
+            echo "::error::ssh-keyscan returned no host key for github.com; refusing to push without host verification."
+            exit 1
+          fi
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/split_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+
+          split_sha=$(git subtree split -q --prefix="$PKG_PATH" HEAD | tail -n 1)
+          if [[ ! "$split_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::git subtree split --prefix='$PKG_PATH' did not return a commit SHA (got '$split_sha')."
+            exit 1
+          fi
+          echo "Split '$PKG_PATH' at ${GITHUB_SHA} -> $split_sha"
+
+          # A release must fast-forward. force_push is dispatch-only: it
+          # bootstraps a mirror whose initial commit is not an ancestor of the
+          # split history, and re-pushes a throwaway smoke-test tag.
+          push=(git push)
+          if [[ "$FORCE_PUSH" == "true" ]]; then
+            push+=(--force)
+            echo "::warning::force_push is on — $ORG/$REPO will be rewritten to match this split."
+          fi
+
+          remote="git@github.com:$ORG/$REPO.git"
+          "${push[@]}" "$remote" "$split_sha:refs/heads/$BRANCH"
+          # Packagist versions a package from its tags, so this push is not optional.
+          "${push[@]}" "$remote" "$split_sha:refs/tags/$TAG"
+
+          echo "- **$ORG/$REPO** — \`$PKG_PATH\` → \`$split_sha\` on \`$BRANCH\`, tagged \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove deploy key
+        if: always()
+        run: rm -f "$HOME/.ssh/split_key"
