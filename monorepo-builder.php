@@ -51,7 +51,7 @@ return static function (MBConfig $mbConfig): void {
 
     // Lockstep release pipeline. Tags are pushed here; the actual subtree
     // split to satellite repos is driven by .github/workflows/release-php.yml
-    // (which calls the reusable workflow in rtCamp/wp-shared-workflow).
+    // (which calls the reusable workflow in rtCamp/wp-shared-workflows).
     $mbConfig->workers([
         // Pin every package to depend on the same version of its siblings.
         SetCurrentMutualDependenciesReleaseWorker::class,

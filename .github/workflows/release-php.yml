@@ -1,0 +1,43 @@
+name: Release Composer Packages
+
+# Splits composer-packages/* out to their standalone mirror repos so Packagist
+# can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own repositories.
+#
+# Fired by the tag that `vendor/bin/monorepo-builder release <version>` pushes
+# (PushTagReleaseWorker). splitsh.json at the repo root is the single source of
+# truth for mirror-repo -> subdirectory; to add or remove a package, edit that
+# file, never this workflow.
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Smoke-test the split without cutting a real release tag.
+  workflow_dispatch:
+    inputs:
+      test_tag:
+        description: "Throwaway tag to push to the mirrors (e.g. v0.0.0-test)"
+        required: true
+        default: "v0.0.0-test"
+
+# Mirrors are force-pushed — never let two releases race each other.
+concurrency:
+  group: split-composer-packages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  split:
+    # TODO: swap to @v1 once wp-shared-workflows merges release/v1.0.0 into main
+    # and cuts its version tags. That repo has no tags today and this workflow
+    # is not on its main branch, so release/v1.0.0 is the only ref that resolves.
+    uses: rtCamp/wp-shared-workflows/.github/workflows/cd-split-composer-packages.yml@release/v1.0.0
+    with:
+      # On workflow_dispatch github.ref_name is a *branch*, so the dispatch input
+      # must win — otherwise the mirrors get tagged "main". On a tag push
+      # github.event.inputs is null and ref_name is the pushed tag.
+      tag: ${{ github.event.inputs.test_tag || github.ref_name }}
+    secrets:
+      split-token: ${{ secrets.RTBOT_TOKEN }}
