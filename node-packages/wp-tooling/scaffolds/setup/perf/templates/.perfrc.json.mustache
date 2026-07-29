@@ -1,0 +1,12 @@
+{
+	"urls": [
+		"{{base_url}}/",
+		"{{base_url}}{{sample_page}}",
+		"{{base_url}}{{search_page}}"{{#extra_page}},
+		"{{base_url}}{{extra_page}}"{{/extra_page}}
+	],
+	"server": {
+		"enabled": {{#server_enabled}}true{{/server_enabled}}{{^server_enabled}}false{{/server_enabled}},
+		"command": ["npx", "wp-env", "run", "cli", "--env-cwd={{server_env_cwd}}", "--", "wp"]
+	}
+}

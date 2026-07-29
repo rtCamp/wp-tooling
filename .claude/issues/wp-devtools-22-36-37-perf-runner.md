@@ -1,0 +1,107 @@
+# Issue wp-devtools#22, #36, #37 — `wp-tooling perf` command + runner, setup/perf scaffold, and server xhprof normalization
+
+**Status:** in-review
+**Branch:** `v1.0.0/task/perf-runner`
+**PR:** #36
+**Assignee:** @Adi-ty
+
+---
+
+## Summary
+
+rtCamp/wp-devtools#22 asks for a `wp-tooling perf` command mirroring the shipped `a11y` runner: one normalised JSON report an agent (or CI) can act on. Per the (cross-repo) planning docs' two-layer model, Layer 1 is the *symptom* — lab Core Web Vitals via the `web-vitals` attribution build under headless Chromium, plus Lighthouse — and Layer 2 is the *cause* — server-side function hotspots via xhprof, run over WP-CLI through a consumer-installed `server-profile.php` shim.
+
+This single PR delivers #22 together with the two issues chained under it — **#36** (the `setup/perf` scaffold that installs the consumer-side wiring: dev deps, config, the bundled shim) and **#37** (folding the shim's xhprof JSON into a `server` section of the normalised report, with a CLI-context fidelity note) — both of which declare `Depends on #22` in their own issue bodies. The three are delivered together rather than split across PRs because they are one working system in practice: #22's runner cannot be verified end-to-end without #36's scaffold actually installing the shim it invokes, and #37's `server` section is exactly what `normalize.js` needed to shape the shim's output into the final report. Verified end-to-end on two consumers with real profiler data.
+
+---
+
+## Decisions made
+
+- [2026-07-14] The server-side profiler moved mid-task from `rtCamp\WPFramework\Utils\XHProf_Profiler` (wp-framework) to `rtCamp\WPDevTools\Support\XHProfProfiler` (wp-dev-tools) — wp-framework#51 was closed unmerged because profiling is dev tooling, not an architectural component; the reviewed class was ported to wp-dev-tools (PR #66) as a plain class outside the `RT_DEV_TOOLS_DEV_MODE` gate, installed by consumers as `composer require --dev rtcamp/wp-dev-tools`. This task consumes that class; it does not reimplement xhprof.
+- [2026-07-14] `server-profile.php`'s hardening (canonical-redirect hazard, `$_GET` query-string copy, output-buffer draining, STDERR route diagnostic, no `declare(strict_types)`) was designed and live-tested against `features-plugin-skeleton` before being adapted into the scaffold template — `redirect_canonical()` ends the request with `exit()`, which bypasses `finally`, so a canonical redirect would otherwise kill the process before the profiler's `stop()` runs or the JSON is echoed; the shim removes that hook, profiles with `start()`/`stop()` instead of `profile()`, and installs a `register_shutdown_function` fallback that drains open output buffers before emitting JSON.
+- [2026-07-14] Config file is `.perfrc.json` (analogous to `.pa11yci.json`), but unlike `a11y` it is OPTIONAL when `--url` is supplied — the perf issue explicitly adds a repeatable `--url` flag, and a project should be able to run a one-off perf check with zero setup. `--url` replaces the config's `urls[]` entirely; every other section (webVitals/lighthouse/server/thresholds) still comes from the file when one exists. A malformed config is always `EBADJSON`, even with `--url`.
+- [2026-07-14] Every per-URL layer failure downgrades independently rather than aborting the run: a page-load failure becomes a `scanError` (contributes to `summary.failedUrls`, final exit 1 — same semantics as `a11y`'s unreachable-URL handling); a Lighthouse or server-profile runtime failure degrades that URL's layer to `null`/empty + a note, with **no effect on the exit code** — the server layer especially is auxiliary cause-data, so a broken WP-CLI invocation must never take down the frontend result.
+- [2026-07-14] `server-profile.js` (the Node-side WP-CLI invoker) never throws — every failure mode (spawn error, non-zero exit, unparseable stdout) returns `{ data: null, error: <detail> }` instead, because a thrown error would need per-call try/catch discipline at every call site to preserve the degrade-not-abort policy; returning a tagged result makes that policy the only path.
+- [2026-07-14] INP is hardcoded to `null` in the normalised report regardless of what the frontend collector harvests — the collector never performs a user interaction, so a raw INP reading would be a fluke, not a measurement. Surfaced as an explicit `assessment` line rather than silently omitted.
+- [2026-07-14] `puppeteer` resolution for `run.js` goes through a new `requireModule()` helper in `resolve-module.js` (walk `node_modules`, then `require()` the resolved directory) rather than an inline dynamic `require()` in `run.js` itself — this keeps `run.js` mockable via `jest.mock('./resolve-module')` with zero real puppeteer install needed in CI, mirroring how `collect-vitals.js` takes the browser as a parameter instead of resolving it.
+- [2026-07-14] Housed in wp-tooling (`src/perf/`), distributed via a new `setup/perf` scaffold, matching the `a11y`/`setup/pa11y` precedent — issue #22 defers the scaffold to a later task, but end-to-end verification against a real consumer needs the consumer-side wiring (deps, config, shim) to exist, so it ships in this PR rather than a follow-up.
+- [2026-07-14] `npm run check` on the branch point (`release/v1.0.0`) had two pre-existing failures unrelated to this task (`no-shadow` on `cap` + prettier wrapping in `src/init/index.js` and `tests/ui/selects.test.js`) — the same issue already fixed on the (still-open) a11y branch but never merged. Fixed here with the identical minimal rename (`cap` → `entry`) so `npm run check` is verifiable; documented rather than silently folded in.
+- [2026-07-14] Live end-to-end testing surfaced a real bug: puppeteer 25.x's `executablePath()` returns a `Promise`, not a string (older versions returned it synchronously). `run.js` now `await`s it — safe either way, since `await` on a non-Promise value just returns it. Caught only because verification used a real, current puppeteer install rather than a mocked one.
+- [2026-07-15] `server-profile.js` was calling `new URL()` unguarded; a malformed URL (e.g. a scheme-less `base_url` typo) threw out of the per-URL loop and silently skipped every URL after it, contradicting the module's own "never throws" contract. Now wrapped, degrading that one result instead — re-verified live: a malformed `--url` alongside a working one now degrades just the bad one and still completes the good one, rather than aborting the run.
+- [2026-07-15] Lighthouse needs the same network reachability as puppeteer, so `collectOne` was still running a full Lighthouse pass (up to its 180 s timeout) against a URL that had already failed to load, then discarding the result. Now skipped whenever `scanError` is set; the server layer still runs regardless, since it profiles over WP-CLI, not the browser — re-verified live: an unreachable URL alongside a working one now skips Lighthouse for the unreachable one while its server-profile data still comes back complete.
+- [2026-07-15] A raw Lighthouse LHR (which can run multi-MB with the full audit tree) was being retained in `rawResults` for every URL until the whole run finished, only to be slimmed down at the very end. `collectOne` now calls `extractLighthouse` immediately after each successful run, so only the slim `{scores, audits}` shape is ever held; `normalizePerf` no longer re-extracts.
+- [2026-07-15] Text-mode output showed `server top: none` identically for "no hotspots captured" and "the WP-CLI invocation itself failed" — now prints the error line too when the invocation failed.
+- [2026-07-15] `runDryRun`'s server line called `.join(' ')` on `config.server.command` without checking it was an array — an uncaught crash on a malformed config, unlike the real run (which degrades). Guarded.
+- [2026-07-15] Cleanup: consolidated three near-identical `EBINMISSING` throws in `run.js` into one helper; derived the metric-name list from `THRESHOLDS` (`normalize.js`) instead of repeating it at four call sites across `normalize.js`/`collect-vitals.js`; dropped the unused `REGISTER_SNIPPET` export; de-flaked a dry-run test that asserted a raw total `execFileSync` call count (filters for the `--version` probe specifically instead, since the total isn't isolation-safe across test files sharing the auto-mocked `child_process` module).
+- [2026-07-15] Left as-is: the `MAX_BUFFER`/timeout constants duplicated across `lighthouse.js`/`server-profile.js`, and the empty-attribution literal repeated across `normalize.js`/`collect-vitals.js` — both match `a11y`'s own established convention and the project's "three similar lines beats a premature abstraction" rule. Also left the dynamic `require()` in `resolve-module.js` as-is — it has direct in-repo precedent (`src/cli/index.js`'s command auto-discovery), and reworking it to `require.resolve` + explicit `paths` would touch an already-verified module for a stylistic gain with no behaviour change.
+- [2026-07-15] Split the scaffold's single `server_env_cwd` input (empty string doing double duty as both "disabled" and "no path") into `server_enabled` (boolean-string) + `server_env_cwd` (now defaults to `.`), so profiling from the WordPress root — a legitimate choice, not just a leftover default — is expressible; before, an empty `server_env_cwd` could only mean "disabled". The rendered `.perfrc.json` also dropped every section that already matches `config.js`'s built-in defaults (`webVitals`, `lighthouse`, `thresholds`, `server.shim`, `server.top`) — `mergeConfig` fills them in identically at read time, so keeping them out of the template removes a drift risk (a future default change no longer silently diverges between freshly-scaffolded and config-less projects).
+- [2026-07-15] Renamed this file from tracking #22 alone to tracking #22, #36, and #37 together — #36 (`setup/perf` scaffold) and #37 (xhprof `server` section in `normalize.js`) were already fully implemented as part of shipping #22 end-to-end (see Summary), so the file should reflect what the PR actually closes rather than only its root issue.
+
+---
+
+## Files changed so far
+
+- `src/perf/errors.js` — new (`RunnerError`: `EBINMISSING` / `EBINFAIL` / `EBADJSON` / `ENOURLS`)
+- `src/perf/resolve-bin.js` — new (consumer binary resolution for `lighthouse`, mirrors `src/a11y/resolve-bin.js`)
+- `src/perf/resolve-module.js` — new (consumer module resolution for `puppeteer`/`web-vitals`; `requireModule` loader for testability)
+- `src/perf/config.js` — new (`.perfrc.json` resolution, section-merge over defaults, `--url` precedence)
+- `src/perf/collect-vitals.js` — new (headless web-vitals attribution collection; puppeteer/browser passed in as parameters)
+- `src/perf/lighthouse.js` — new (per-URL Lighthouse invocation, `CHROME_PATH` pin)
+- `src/perf/server-profile.js` — new (per-URL WP-CLI shim invocation; never throws, always degrades)
+- `src/perf/normalize.js` — new (pure two-layer normaliser: ratings, worst-metric pick, issue counting, Lighthouse/server extraction)
+- `src/perf/run.js` — new (`runPerf()` core + `runCli()` adapter; exit codes 0/1/2/3)
+- `src/perf/index.js` — new (barrel exposed as `@rtcamp/wp-tooling/perf`)
+- `src/cli/commands/perf.js` — new (dispatcher shim)
+- `package.json` — edited (`"./perf"` exports entry)
+- `tests/perf/*` — new (cli, config, collect-vitals, lighthouse, server-profile, normalize, resolve-module specs + fixtures)
+- `scaffolds/setup/perf/scaffold.json` — new
+- `scaffolds/setup/perf/templates/.perfrc.json.mustache` — new
+- `scaffolds/setup/perf/templates/server-profile.php` — new (raw copy, no Mustache rendering)
+- `tests/scaffolds/bundled-manifests.test.js` — edited (three `setup/perf rendered config` cases: default render, custom inputs + server enabled, raw-copy byte-equality)
+- `CHANGELOG.md` — edited (two Unreleased entries)
+- `src/init/index.js`, `tests/ui/selects.test.js` — edited (pre-existing lint-gate errors at `release/v1.0.0` HEAD: `no-shadow` on `cap`, prettier wrapping; `npm run check` fails without these fixes)
+
+---
+
+## Verification run
+
+```bash
+$ npm run check          # eslint src tests && jest
+# ESLint: clean
+# Tests: 763 passed, 57 suites
+```
+
+Tested live end-to-end on two independent WordPress installs running under wp-env (Alpine `cli` containers, xhprof pecl-installed fresh into each), each with `@rtcamp/wp-tooling` installed as a dev dependency and `rtcamp/wp-dev-tools` wired in via composer for the server layer:
+
+- `--dry-run` resolved the local `puppeteer` (25.3.0), the `web-vitals` attribution build, `lighthouse` (13.4.0), and the WP-CLI server command on both installs, with nothing reported `NOT FOUND`.
+- A full `--output json` run against three URLs (front page, a single post, a search page) on each install returned complete data for every result: real LCP/CLS/FCP/TTFB values with ratings (INP `null` throughout, as designed), real Lighthouse `performance` scores with audits, and real xhprof top-N function lists (wall-time descending, plausible WordPress call stacks) — `failedUrls: 0` on both, exits split across 0 (clean) and 3 (a forced Lighthouse-threshold breach) as expected.
+- Exercised against **two independently written `server-profile.php` variants** (each install's own pre-existing shim, left untouched rather than overwritten by the scaffold — the engine correctly skipped both): both returned identical-shaped, complete profiler output, confirming the Node-side `server-profile.js`/`normalize.js` handle real-world shim variance correctly.
+- Specifically proved the canonical-redirect hardening: switched one install to pretty permalinks (`wp rewrite structure '/%postname%/'`), confirmed via `curl` that the query-string URL now issues a real HTTP 301, then re-ran the shim against that exact URL — it still returned complete, valid JSON (no truncation from a mid-render `exit()`), then reverted the permalink structure.
+- Verified the config-less path (`--config <missing> --url <url>`, no `.perfrc.json` at all): frontend + Lighthouse layers still ran; `server: null` as designed (defaults to disabled without a config).
+- Verified `--url` overriding an *existing* config's `urls[]` while its other sections (server, thresholds) still applied.
+- Verified the scaffold never overwrites an existing `server-profile.php` (both installs already had one).
+- Found and fixed one real bug via this live testing: puppeteer 25.x's `executablePath()` returns a `Promise`, not a string — `run.js` was calling it synchronously. Fixed by awaiting it (safe for both sync and async puppeteer versions).
+
+Re-verified live after the `server-profile.js`/`collectOne` fixes above (fresh scaffold apply with the new `server_enabled`/`server_env_cwd` inputs, xhprof reinstalled after the container was recreated): the leaner `.perfrc.json` (just `urls` + `server`) still resolves every omitted section correctly via `config.js`'s defaults on `--dry-run`; an unreachable URL alongside a working one now skips Lighthouse for the unreachable one while its server-profile data still comes back complete (proving the server layer's independence from the frontend layer); a malformed `--url` value degrades that one result (`server.error: 'Invalid URL'`) and the run still completes the next URL with full two-layer data, instead of aborting.
+
+---
+
+## Open questions
+
+- _(none blocking)_
+
+---
+
+## Notes for the reviewer
+
+- This PR is in `wp-tooling`, but the issues it closes (#22, #36, #37) are in `wp-devtools` — GitHub's `Closes #<N>` keyword only auto-closes issues in the *same* repo as the PR, not cross-repo, so all three need closing by hand once this merges (the PR body should still name them for traceability).
+- The exit-code contract mirrors `a11y`: 0 clean · 1 run failure or unreachable URL · 2 usage/module-missing · 3 issues found. `failedUrls > 0` downgrades an otherwise-clean run to exit 1, same as `a11y`.
+- `puppeteer`, `web-vitals`, and `lighthouse` are never dependencies of `@rtcamp/wp-tooling` (zero-runtime-deps rule) — the runner resolves the consumer's install; Lighthouse falls back to `npx --no-install` and never fetches from the network.
+- The server layer's dependency (`rtcamp/wp-dev-tools`) is not on Packagist — consumers add it via a path or VCS composer repository. The scaffold description says so; the shim's `class_exists` guard keeps a project without it working (frontend layers only, `server: null`).
+- `wp-dev-tools` is itself mid-development (`XHProfProfiler` port on an open PR, not yet on its default branch) — this task tracks the class name/namespace it settled on, not a specific commit; if the class is renamed again before merge, only the scaffold's shim template and this file's decisions need updating, not the Node runner (it only shells out to WP-CLI, it never references the PHP class by name).
+
+---
+
+## Handoff log
+
+_(no rotations yet — delete this line when the first entry is added)_
