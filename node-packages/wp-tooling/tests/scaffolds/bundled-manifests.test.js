@@ -88,3 +88,49 @@ describe('wiring targetFile normalisation', () => {
 		expect(target).not.toContain('..');
 	});
 });
+
+describe('setup/pa11y rendered config', () => {
+	it('renders valid JSON with default page paths (extra_page omitted)', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{ base_url: 'http://localhost:8888' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.defaults.standard).toBe('WCAG2AA');
+		expect(config.defaults.runners).toEqual(['axe', 'htmlcs']);
+		expect(config.urls).toEqual([
+			'http://localhost:8888/',
+			'http://localhost:8888/?p=1',
+			'http://localhost:8888/?s=hello',
+		]);
+	});
+
+	it('renders custom page paths and appends extra_page when given', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{
+				base_url: 'http://localhost:8765',
+				sample_page: '/hello-world/',
+				search_page: '/?s=wordpress',
+				extra_page: '/about/',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8765/',
+			'http://localhost:8765/hello-world/',
+			'http://localhost:8765/?s=wordpress',
+			'http://localhost:8765/about/',
+		]);
+	});
+});
