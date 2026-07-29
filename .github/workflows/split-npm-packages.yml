@@ -1,0 +1,160 @@
+name: Split npm Packages
+
+# Publishes each node-packages/* workspace to a branch of THIS repo whose root is
+# the package itself, so consumers can install it with a plain git URL:
+#
+#   "@rtcamp/wp-tooling": "git+https://github.com/rtCamp/wp-tooling.git#npm/wp-tooling"
+#
+# Why branches rather than mirror repos (as composer-packages/* use):
+#   - npm has no Packagist-style one-repo-per-package rule; it only needs the
+#     package manifest at the clone root, which a subtree split provides.
+#   - No new repositories, so no name collision with this repo for the
+#     @rtcamp/wp-tooling package, and no per-target deploy keys.
+#   - This repo is public, so `npm install` works anonymously — which a private
+#     registry could not offer at any visibility.
+#
+# No tags are pushed. npm records the resolved commit SHA in package-lock.json, so
+# installs are reproducible from a branch ref; the branch is only re-read when a
+# consumer regenerates its lock. Tags would additionally pin the *spec*, but they
+# must not start with "v" — release-php.yml triggers on `v*`, and tags share one
+# repo-wide namespace with it.
+#
+# The branches are generated. Never commit to them by hand: the next run pushes a
+# fast-forward from the monorepo and a diverged branch fails the run instead of
+# being quietly rewritten.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'node-packages/**'
+      - '.github/workflows/split-npm-packages.yml'
+  workflow_dispatch:
+
+# Pushes branches to this repository; nothing else is needed.
+permissions:
+  contents: write
+
+# Branch pushes must not race each other.
+concurrency:
+  group: split-npm-packages
+  cancel-in-progress: false
+
+jobs:
+  build-matrix:
+    name: Build split matrix from workspaces
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.parse.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Derive the matrix from package.json workspaces
+        id: parse
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The root workspaces globs are already the source of truth for which
+          # directories are packages, so this needs no config of its own. Only
+          # single-level "dir/*" globs are supported, which is all this repo uses.
+          globs=$(jq -r '.workspaces[]? // empty' package.json)
+          if [[ -z "$globs" ]]; then
+            echo "::error::No workspaces defined in package.json. Nothing to split."
+            exit 1
+          fi
+
+          entries=()
+          while IFS= read -r glob; do
+            [[ -n "$glob" ]] || continue
+
+            case "$glob" in
+              */\*) ;;
+              *)
+                echo "::error::Unsupported workspace glob '$glob' — expected the form 'dir/*'."
+                exit 1
+                ;;
+            esac
+
+            for dir in $glob; do
+              [[ -f "$dir/package.json" ]] || continue
+
+              name=$(jq -r '.name // empty' "$dir/package.json")
+              if [[ -z "$name" ]]; then
+                echo "::error::$dir/package.json has no \"name\"."
+                exit 1
+              fi
+
+              # A private package is deliberately not consumable, so skip it
+              # rather than publishing a branch nobody may install from.
+              if [[ "$(jq -r '.private // false' "$dir/package.json")" == "true" ]]; then
+                echo "::notice::Skipping $name — marked private."
+                continue
+              fi
+
+              entries+=("$(jq -cn --arg d "$dir" --arg n "$name" --arg b "npm/$(basename "$dir")" \
+                '{package_directory:$d, package_name:$n, branch:$b}')")
+            done
+          done <<< "$globs"
+
+          if [[ ${#entries[@]} -eq 0 ]]; then
+            echo "::error::Workspace globs matched no installable packages."
+            exit 1
+          fi
+
+          matrix=$(printf '%s\n' "${entries[@]}" | jq -cs '{include: .}')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          jq . <<<"$matrix"
+
+  split:
+    name: Split ${{ matrix.package_name }}
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one bad package must not hide the others
+      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout monorepo (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the split walks every commit that touched the subtree
+
+      - name: Split ${{ matrix.package_directory }} → ${{ matrix.branch }}
+        shell: bash
+        env:
+          PKG_PATH: ${{ matrix.package_directory }}
+          PKG_NAME: ${{ matrix.package_name }}
+          BRANCH: ${{ matrix.branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! -x "$(git --exec-path)/git-subtree" ]]; then
+            echo "::error::git subtree is unavailable on this runner (looked in $(git --exec-path))."
+            exit 1
+          fi
+
+          if [[ ! -d "$PKG_PATH" ]]; then
+            echo "::error::Package directory '$PKG_PATH' does not exist at ${GITHUB_SHA}."
+            exit 1
+          fi
+
+          # Rewrites the subdirectory as its own root, keeping each commit's
+          # original author, date and message.
+          split_sha=$(git subtree split -q --prefix="$PKG_PATH" HEAD | tail -n 1)
+          if [[ ! "$split_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::git subtree split --prefix='$PKG_PATH' did not return a commit SHA (got '$split_sha')."
+            exit 1
+          fi
+
+          # Fast-forward only. The split is deterministic, so a rejection means the
+          # branch was written by something other than this workflow — surface that
+          # rather than force-pushing over it.
+          if ! git push origin "$split_sha:refs/heads/$BRANCH"; then
+            echo "::error::Could not fast-forward $BRANCH. It has diverged from the monorepo — inspect it before re-running; do not force-push without checking what is being discarded."
+            exit 1
+          fi
+
+          echo "- **$PKG_NAME** — \`$PKG_PATH\` → \`$split_sha\` on \`$BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
