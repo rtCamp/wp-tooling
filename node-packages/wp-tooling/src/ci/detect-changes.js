@@ -18,16 +18,16 @@ const fs = require('fs');
 /**
  * Default bucket regexes. A file is counted in a bucket if its path matches.
  *
- * `gha` spells the trailing path out as explicit segments rather than `.+`.
- * `.` also matches `/`, which makes `.+\.yml$` ambiguous — every position in a
- * long path is a candidate split, so a crafted path costs quadratic time.
- * `[^/]` cannot match the separator, so there is exactly one way to advance.
+ * `gha` avoids `.+\.yml$`, which was quadratic twice over: `.` also matches
+ * `/`, and an unbounded tail let every `/.github/actions/` in the path walk the
+ * remainder before `\.yml$` failed. `[^/]` and the count bound fix one each.
+ * Four segments is generous — workflows sit at depth 1, composite actions at 2.
  */
 const DEFAULT_PATTERNS = {
 	css: /\.s?css$|(?:^|\/)package(?:-lock)?\.json$/,
 	js: /\.(?:js|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
 	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
-	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+)*\.yml$/,
+	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+){0,3}\.yml$/,
 };
 
 /**

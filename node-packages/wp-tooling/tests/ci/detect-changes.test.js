@@ -177,9 +177,9 @@ describe('detectChanges', () => {
 	});
 
 	test('gha bucket classifies a pathological path in linear time', () => {
-		// Regression guard: the old `.+\.yml$` pattern was quadratic here
-		// because `.` also matches `/`.
-		const file = '/.github/actions/'.repeat(20000) + 'x';
+		// The `.yml` per segment defeats V8's literal prefilter — without it the
+		// guard passes even against a quadratic pattern; `/z` denies `\.yml$`.
+		const file = '/.github/actions/x.yml'.repeat(8000) + '/z';
 		const started = Date.now();
 		const r = detectChanges({ files: [file], ignore: null });
 		expect(r['gha-count']).toBe(0);
