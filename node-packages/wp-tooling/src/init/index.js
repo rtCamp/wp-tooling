@@ -22,6 +22,7 @@ const { execFileSync } = require('child_process');
 // Every UI primitive -- Wizard, prompts, spinner, styled status lines, table --
 // comes from the wp-tooling kit.
 const ui = require('../ui');
+const debug = require('../debug');
 
 const {
 	identityFromName,
@@ -35,17 +36,24 @@ const {
 	renameFiles,
 	applyVersion,
 } = require('./transform');
-const { writeIdentityFile, readIdentityFile } = require('./persist');
+const {
+	writeIdentityFile,
+	readIdentityFile,
+	IdentityFileError,
+} = require('./persist');
 const { initRepo, commitAll, installGitHooks } = require('./git');
 const { runCleanup } = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
 	detectMap,
+	safeDetectMap,
 	toggleFeatures,
 } = require('./features');
-const { manageFlow } = require('./manage');
+const { manageFlow, showStatus } = require('./manage');
 const { applyExamples } = require('./examples');
+const { listCapabilities, showCapabilities } = require('./capabilities');
+const { formatErrorPayload } = require('../scaffolds/errors');
 
 const DEFAULT_VERSION = '1.0.0';
 const GENERATED_BY = '@rtcamp/wp-tooling init';
@@ -90,12 +98,17 @@ Scaffold options (first run):
   prompt (by category); unchecking a capability removes it entirely.
 
 Manage options (after set up):
-  --list           Print feature status and exit.
   --features=a,b   Set the exact enabled feature set (empty = none).
   --enable=a,b     Enable features (delta).
   --disable=a,b    Disable features (delta).
   -y, --yes        Apply the flag selection without confirming.
 
+Query options (any time, before or after set up):
+  --list           List capabilities and optional features, then exit.
+  --json           With --list: emit one JSON line
+                   ({ mode, capabilities, features, warnings }).
+
+General:
   -c, --clean      Run cleanup only (remove scaffolding files).
   -h, --help       Show this help.
 `);
@@ -229,7 +242,15 @@ const composerDump = (root) => {
 const setupSteps = (config, root, flags) => {
 	const kind = config.kind || 'project';
 	const steps = config.steps || {};
-	const existing = readIdentityFile(root);
+	// Corrupt identity reads as absent here: run() already refused to enter
+	// setup on corruption without --reinit, so reaching this point means the
+	// file may be discarded.
+	let existing = null;
+	try {
+		existing = readIdentityFile(root);
+	} catch {
+		existing = null;
+	}
 
 	return [
 		{
@@ -347,7 +368,9 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) =>
 				c.cancelled ||
 				(!(config.features || []).length &&
-					!(config.examples && (config.examples.groups || []).length)),
+					!(
+						config.examples && (config.examples.groups || []).length
+					)),
 			async run(c) {
 				const features = config.features || [];
 				const groups =
@@ -387,18 +410,18 @@ const setupSteps = (config, root, flags) => {
 						];
 						const order = [];
 						const byCat = new Map();
-						for (const cap of caps) {
-							if (!byCat.has(cap.category)) {
-								byCat.set(cap.category, []);
-								order.push(cap.category);
+						for (const entry of caps) {
+							if (!byCat.has(entry.category)) {
+								byCat.set(entry.category, []);
+								order.push(entry.category);
 							}
-							byCat.get(cap.category).push(cap);
+							byCat.get(entry.category).push(entry);
 						}
 						const treeGroups = order.map((category) => ({
 							label: category,
-							items: byCat.get(category).map((cap) => ({
-								label: cap.label,
-								checked: cap.checked,
+							items: byCat.get(category).map((entry) => ({
+								label: entry.label,
+								checked: entry.checked,
 							})),
 						}));
 						const checked = new Set(
@@ -448,6 +471,11 @@ const setupSteps = (config, root, flags) => {
 				if (groups.length) {
 					applyExamples(config, root, ui, removeKeys);
 				}
+				// Record the selection: `--list` reconciles this intent against
+				// detected reality instead of re-deriving it from disk alone.
+				c.persistPayload.examples = {
+					removed: Array.from(removeKeys).sort(),
+				};
 				if (features.length) {
 					const result = await toggleFeatures(config, root, {
 						mode: 'scaffold',
@@ -597,6 +625,143 @@ const cleanFlow = async (config, root) => {
 };
 
 /**
+ * Emit one machine-readable error line on stderr -- the `--json` failure
+ * contract, shared with `wp-tooling add` via `formatErrorPayload`.
+ *
+ * @param {Error} err - The error to report.
+ * @return {void}
+ */
+const emitJsonError = (err) => {
+	process.stderr.write(`${JSON.stringify(formatErrorPayload(err))}\n`);
+};
+
+/**
+ * Build a usage error carrying the stable `EUSAGE` machine code.
+ *
+ * @param {string} message - Human-readable message.
+ * @return {Error} Coded error.
+ */
+const usageError = (message) =>
+	Object.assign(new Error(message), { code: 'EUSAGE' });
+
+/**
+ * `--list`: report the project's capabilities and optional features, in either
+ * mode, without mutating anything. Human tables by default; a single JSON line
+ * ({ mode, capabilities, features, warnings }) with `--json` -- the AI-facing
+ * contract, so orchestrators never read the scaffold config to enumerate them.
+ *
+ * Feature `on` means the EFFECTIVE state in both modes: detected reality in
+ * manage mode, `defaultOn || detected` (what a non-interactive setup would
+ * enable) in setup mode. Detect probes are guarded: a throwing probe degrades
+ * that feature to `on: null` plus a warning instead of breaking the contract.
+ *
+ * @param {Object}      config              - Per-project scaffold config.
+ * @param {string}      root                - Project root.
+ * @param {Object}      opts                - Options.
+ * @param {string}      opts.mode           - 'setup' | 'manage'.
+ * @param {boolean}     opts.json           - Emit machine-readable JSON.
+ * @param {Object|null} opts.identity       - Parsed .wp-scaffold.json (manage only).
+ * @param {string[]}    [opts.seedWarnings] - Warnings collected by the caller.
+ * @return {void}
+ */
+const listFlow = (config, root, { mode, json, identity, seedWarnings }) => {
+	const kind = config.kind || 'project';
+	const warnings = [...(seedWarnings || [])];
+	const manage = 'manage' === mode;
+
+	const capabilityRows = listCapabilities(
+		config,
+		root,
+		manage ? identity : null
+	);
+	if (
+		manage &&
+		capabilityRows.length &&
+		capabilityRows.every((r) => null === r.intent)
+	) {
+		warnings.push(
+			'capability selection was not recorded by this setup (older init); state is disk-detected only.'
+		);
+	}
+	const capabilities = capabilityRows.map((r) =>
+		manage
+			? {
+					key: r.key,
+					label: r.label,
+					category: r.category,
+					module: r.module,
+					present: r.present,
+					intent: r.intent,
+					drift: r.drift,
+				}
+			: {
+					key: r.key,
+					label: r.label,
+					category: r.category,
+					module: r.module,
+					present: r.present,
+				}
+	);
+
+	// Detection needs an identity on the api (probes read api.identity.*).
+	// Pre-setup, the starter's own placeholder identity IS the on-disk reality.
+	let apiIdentity = identity;
+	if (!manage) {
+		apiIdentity = config.source ? placeholderIdentity(config) : {};
+	}
+	const api = makeFeatureApi(root, apiIdentity, ui);
+	const { map, errors } = safeDetectMap(config, api);
+	errors.forEach(({ key, message }) =>
+		warnings.push(`${key}: feature detect failed: ${message}`)
+	);
+
+	const persisted = (manage && identity && identity.features) || {};
+	const features = (config.features || []).map((f) => {
+		const detected = map[f.key];
+		// Setup mode reports the non-interactive default: defaultOn || detected.
+		let on = detected;
+		if (!manage && f.defaultOn) {
+			on = true;
+		}
+		const row = {
+			key: f.key,
+			label: f.label,
+			description: f.description || '',
+			on,
+		};
+		if (manage) {
+			row.intent = Boolean(persisted[f.key]);
+			row.drift = null === detected ? false : detected !== row.intent;
+		}
+		return row;
+	});
+	if (manage) {
+		const known = new Set((config.features || []).map((f) => f.key));
+		Object.keys(persisted)
+			.filter((key) => !known.has(key))
+			.forEach((key) =>
+				warnings.push(
+					`${key}: recorded in .wp-scaffold.json but no longer declared.`
+				)
+			);
+	}
+
+	if (json) {
+		process.stdout.write(
+			`${JSON.stringify({ mode, capabilities, features, warnings })}\n`
+		);
+		return;
+	}
+
+	ui.heading(
+		`${cap(kind)} — ${manage ? 'status' : 'available capabilities'}`
+	);
+	showCapabilities(capabilityRows, ui, { mode });
+	showStatus(features, [], ui);
+	warnings.forEach((w) => ui.warn(w));
+};
+
+/**
  * Entry point. Called by each starter's `bin/init.js`.
  *
  * @param {Object}   config         - Per-project scaffold config.
@@ -619,61 +784,158 @@ const run = async (config, options = {}) => {
 		return;
 	}
 
+	// Diagnostic timing + output capture (opt-in via WP_TOOLING_DEBUG); inert
+	// when off. --help returns above, so it is intentionally not timed.
+	debug.start(`init ${argv.join(' ')}`.trim(), { kind, cwd: root });
+	let result = 'ok';
 	try {
-		// Cleanup works in either mode.
-		if (argv.includes('--clean') || argv.includes('-c')) {
-			const others = argv.filter(
-				(arg) => '--clean' !== arg && '-c' !== arg
-			);
-			if (others.length) {
-				ui.error('Invalid arguments.');
+		// --list / --json: the read-only machine-query contract. Intercepted ahead
+		// of every other flow so config and identity failures also answer in JSON
+		// when asked to: one stdout line on success, one stderr line on failure.
+		if (argv.includes('--list') || argv.includes('--json')) {
+			const wantJson = argv.includes('--json');
+			try {
+				if (!argv.includes('--list')) {
+					throw usageError('--json is only supported with --list');
+				}
+				// --manage is excluded: mode derives from identity/--reinit alone,
+				// so accepting it here would silently ignore it. --yes is accepted
+				// (and ignored) so scripted `--list --yes` calls keep working.
+				const allowed = new Set([
+					'--list',
+					'--json',
+					'--reinit',
+					'--yes',
+					'-y',
+				]);
+				const extra = argv.filter((arg) => !allowed.has(arg));
+				if (extra.length) {
+					throw usageError(
+						`--list cannot be combined with: ${extra.join(' ')}`
+					);
+				}
+				try {
+					validateFeatures(config);
+				} catch (err) {
+					err.code = 'ECONFIG';
+					throw err;
+				}
+				const seedWarnings = [];
+				let identity = null;
+				try {
+					identity = readIdentityFile(root);
+				} catch (err) {
+					if (!argv.includes('--reinit')) {
+						throw err;
+					}
+					// --reinit means "discard what's there": report setup mode.
+					seedWarnings.push(
+						'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
+					);
+				}
+				const mode =
+					identity && !argv.includes('--reinit') ? 'manage' : 'setup';
+				listFlow(config, root, {
+					mode,
+					json: wantJson,
+					identity: 'manage' === mode ? identity : null,
+					seedWarnings,
+				});
+			} catch (err) {
+				result = 'error';
+				if (wantJson) {
+					emitJsonError(err);
+				} else {
+					ui.error(err.message);
+				}
+				process.exitCode = 1;
+			}
+			return;
+		}
+
+		try {
+			// Cleanup works in either mode.
+			if (argv.includes('--clean') || argv.includes('-c')) {
+				const others = argv.filter(
+					(arg) => '--clean' !== arg && '-c' !== arg
+				);
+				if (others.length) {
+					ui.error('Invalid arguments.');
+					process.exitCode = 1;
+					return;
+				}
+				await cleanFlow(config, root);
+				return;
+			}
+
+			// Validate the feature manifest once, before touching disk, for both modes.
+			try {
+				validateFeatures(config);
+			} catch (err) {
+				ui.error(err.message);
 				process.exitCode = 1;
 				return;
 			}
-			await cleanFlow(config, root);
-			return;
-		}
 
-		// Validate the feature manifest once, before touching disk, for both modes.
-		try {
-			validateFeatures(config);
+			// A corrupt identity file must not silently re-enter setup mode (that
+			// would re-run destructive scaffold steps on an initialized project).
+			// Only an explicit --reinit may discard it.
+			let identity = null;
+			try {
+				identity = readIdentityFile(root);
+			} catch (err) {
+				if (!argv.includes('--reinit')) {
+					ui.error(err.message);
+					process.exitCode = 1;
+					return;
+				}
+				ui.warn(
+					'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
+				);
+			}
+
+			// Manage mode: already scaffolded (unless forced to re-scaffold with --reinit).
+			if (identity && !argv.includes('--reinit')) {
+				await manageFlow(config, root, argv, identity, ui, () =>
+					setupFlow(config, root, { yes: false })
+				);
+				return;
+			}
+
+			// Scaffold mode (no identity, or --reinit).
+			const setupArgv = argv.filter((arg) => '--reinit' !== arg);
+			const { flags, unknown } = parseFlags(setupArgv);
+			if (unknown.length) {
+				ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
+				process.exitCode = 1;
+				return;
+			}
+			if (flags.yes && !flags.name) {
+				ui.error('--yes requires --name=<name>.');
+				process.exitCode = 1;
+				return;
+			}
+
+			await setupFlow(config, root, flags);
 		} catch (err) {
-			ui.error(err.message);
-			process.exitCode = 1;
-			return;
+			if (err instanceof ui.CancelledError) {
+				result = 'cancelled';
+				ui.warn('\nCancelled.');
+				process.exitCode = 130;
+				return;
+			}
+			if (err instanceof IdentityFileError) {
+				// Mid-flow corruption (e.g. a manage re-read): report, don't crash.
+				result = 'error';
+				ui.error(err.message);
+				process.exitCode = 1;
+				return;
+			}
+			result = 'error';
+			throw err;
 		}
-
-		// Manage mode: already scaffolded (unless forced to re-scaffold with --reinit).
-		const identity = readIdentityFile(root);
-		if (identity && !argv.includes('--reinit')) {
-			await manageFlow(config, root, argv, identity, ui, () =>
-				setupFlow(config, root, { yes: false })
-			);
-			return;
-		}
-
-		// Scaffold mode (no identity, or --reinit).
-		const setupArgv = argv.filter((arg) => '--reinit' !== arg);
-		const { flags, unknown } = parseFlags(setupArgv);
-		if (unknown.length) {
-			ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
-			process.exitCode = 1;
-			return;
-		}
-		if (flags.yes && !flags.name) {
-			ui.error('--yes requires --name=<name>.');
-			process.exitCode = 1;
-			return;
-		}
-
-		await setupFlow(config, root, flags);
-	} catch (err) {
-		if (err instanceof ui.CancelledError) {
-			ui.warn('\nCancelled.');
-			process.exitCode = 130;
-			return;
-		}
-		throw err;
+	} finally {
+		debug.finish({ result });
 	}
 };
 
