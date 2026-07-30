@@ -14,9 +14,9 @@ Shared tooling for rtCamp WordPress projects. Consumed as an npm package by ever
 
 ## Development
 
-See [`CLAUDE.md`](./CLAUDE.md) for architecture rules, banned packages, testing, and git workflow.
-
-Per-issue progress lives in [`.claude/issues/`](./.claude/issues/). Claude skills live in [`.claude/commands/`](./.claude/commands/).
+See [`AGENTS.md`](../../AGENTS.md) at the monorepo root for architecture rules, coding
+standards, testing commands, and the release/subtree-split workflow. Contribution
+guidelines live in [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 ## Install (consumer side)
 
@@ -26,4 +26,8 @@ npm install @rtcamp/wp-tooling
 
 ## License
 
-GPL-2.0-or-later
+GPL-2.0-or-later. See [LICENSE](./LICENSE).
+
+<p align="center">
+  <a href="https://rtcamp.com"><img src="https://n8e0ka87m9.gdcdn.us/kfnbt046p8/GitHub_Banner.webp" alt="rtCamp" width="100%"></a>
+</p>
