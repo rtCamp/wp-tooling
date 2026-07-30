@@ -1,6 +1,6 @@
 {
   "name": "@rtcamp/eslint-config",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "rtCamp shareable ESLint flat config for WordPress projects — extends @wordpress/eslint-plugin.",
   "license": "GPL-2.0-or-later",
   "author": "rtCamp",
