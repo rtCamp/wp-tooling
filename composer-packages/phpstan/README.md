@@ -61,3 +61,11 @@ vendor/bin/phpstan analyse
 Anything you set under `parameters` *after* the includes wins, so a project can
 raise the level, add `paths`, or add `ignoreErrors` without forking this baseline.
 Per-project suppressions belong in your own neon — keep this shared file clean.
+
+## License
+
+GPL-2.0-or-later. See [LICENSE](./LICENSE).
+
+<p align="center">
+  <a href="https://rtcamp.com"><img src="https://n8e0ka87m9.gdcdn.us/kfnbt046p8/GitHub_Banner.webp" alt="rtCamp" width="100%"></a>
+</p>
