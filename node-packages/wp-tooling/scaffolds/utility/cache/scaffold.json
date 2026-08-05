@@ -2,7 +2,7 @@
 	"slug": "cache",
 	"category": "utility",
 	"name": "Cache utility",
-	"description": "Registers the framework Cache utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. Cache wraps the WordPress object cache with a per-plugin group namespace, group flushing, and the remember() / remember_swr() compute-once helpers.",
+	"description": "Wires up the framework Cache utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Cache wraps the WordPress object cache with a per-plugin group namespace, group flushing, and the remember() / remember_swr() compute-once helpers.",
 	"source": "package",
 	"module_class": "rtCamp\\WPFramework\\Utils\\Cache",
 	"files": [],

@@ -2,7 +2,7 @@
 	"slug": "transients",
 	"category": "utility",
 	"name": "Transients utility",
-	"description": "Registers the framework Transients utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. Transients wraps get_transient / set_transient / delete_transient behind a mandatory per-project key prefix.",
+	"description": "Wires up the framework Transients utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Transients wraps get_transient / set_transient / delete_transient behind a mandatory per-project key prefix.",
 	"source": "package",
 	"module_class": "rtCamp\\WPFramework\\Utils\\Transients",
 	"files": [],

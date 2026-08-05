@@ -2,7 +2,7 @@
 	"slug": "logger",
 	"category": "utility",
 	"name": "Logger utility",
-	"description": "Registers the framework Logger utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. Logger writes prefixed debug / info / warning / error lines and stays silent unless WP_DEBUG is on.",
+	"description": "Wires up the framework Logger utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Logger writes prefixed debug / info / warning / error lines and stays silent unless WP_DEBUG is on.",
 	"source": "package",
 	"module_class": "rtCamp\\WPFramework\\Utils\\Logger",
 	"files": [],
