@@ -1,0 +1,34 @@
+{
+	"slug": "feature-selector",
+	"category": "utility",
+	"name": "Feature selector utility",
+	"description": "Registers the framework FeatureSelector utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. FeatureSelector registers named feature flags and resolves each one from a PHP constant or a shared option through register / is_enabled / enable / disable, failing closed for anything unregistered.",
+	"source": "package",
+	"module_class": "rtCamp\\WPFramework\\Utils\\FeatureSelector",
+	"files": [],
+	"inputs": [
+		{
+			"key": "base_path",
+			"description": "Directory holding the PHP source, relative to the project root, without a trailing slash. Default 'includes' matches the rtCamp skeleton; pass 'inc' or 'src' for projects that differ.",
+			"default": "includes"
+		},
+		{
+			"key": "context_slug",
+			"description": "Context the flag registry is scoped to. It derives both the shared option key and the per-flag constant name, so it must stay stable across releases — changing it orphans every stored flag. Discovered from the composer package name and normalised to snake_case, so 'rtcamp/acme-blog' becomes 'rtcamp_acme_blog'. Pass an explicit value to override.",
+			"discover_from": "composer.json:name",
+			"transform": "snake-case",
+			"default": "my_plugin"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Helpers/Util.php",
+			"anchor": "// scaffold:utility/feature-selector",
+			"snippet_template": "/**\n * The project's shared framework FeatureSelector. One instance holds the whole\n * flag registry, so every caller sees the same registered features.\n *\n * @return \\rtCamp\\WPFramework\\Utils\\FeatureSelector Shared feature selector.\n */\npublic static function features(): \\rtCamp\\WPFramework\\Utils\\FeatureSelector {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPFramework\\Utils\\FeatureSelector( '{{context_slug}}' );\n\t}\n\n\treturn $instance;\n}",
+			"description": "Add a shared accessor for the framework FeatureSelector to the project's static helper class. The class is spelled FeatureSelector, not Feature_Selector. The snippet is self-contained: paste it inside the existing helper class body, register flags once during bootstrap with Util::features()->register( 'new-checkout' ), then read them with Util::features()->is_enabled( 'new-checkout' ). Sharing one instance is deliberate rather than incidental: the flag registry lives on the instance and unregistered flags fail closed, so a fresh instance per call would report every feature as disabled. Do not add the framework FeatureSelector to a Modules class or to Main::CLASSES — it implements neither Registrable nor Shareable, so the framework Loader would construct it with an empty context and derive the wrong option key. For an admin UI over these flags, subclass the framework FeatureSelectorSettingsPage and return this accessor from its get_selector(). Requires rtcamp/wp-framework to be installed first."
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

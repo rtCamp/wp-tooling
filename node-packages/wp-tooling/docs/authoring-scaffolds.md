@@ -196,6 +196,24 @@ Use sections inside `snippet_template` to vary the snippet by flag (e.g. the sin
 
 ---
 
+## Package scaffolds (`source: "package"`)
+
+A package scaffold wires up a class that already ships in `vendor/` rather than generating one. It
+declares `files: []`, the `composer_dependencies` entry that provides the class, and the `wiring[]`
+snippet that constructs it. `execute()` reports `scaffold.kind: "package"` and writes nothing.
+
+- `module_class`: the fully qualified PHP class the scaffold wires up (e.g.
+  `rtCamp\\WPFramework\\Utils\\Cache` — doubled backslashes, since this is JSON). Manifest metadata
+  documenting which vendor class the `wiring[]` snippet constructs. Optional, but set it on every
+  package scaffold.
+
+The `utility/*` scaffolds are the bundled examples. Note what a package scaffold **cannot** do: it
+cannot create the wrapper class its snippet might want, because `files[]` is empty. Keep the snippet
+self-sufficient against an existing file, and use `description` to spell out the alternatives the
+project may prefer.
+
+---
+
 ## Tests, secrets, scripts
 
 - `tests[]`: test stubs written alongside production output. Each entry has `src`, `dest`, `framework` (`phpunit`, `jest`, `playwright`, `pa11y`, `actionlint`, `yaml-parse`), and optional `command`.
@@ -366,6 +384,7 @@ Look at these existing scaffolds when authoring a new one:
 | Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |
+| `source: package` — zero files, a Composer dep plus one wiring snippet | `utility/cache`, `utility/timer` |
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
 | Block with `block.json` + framework class | `wp/block-dynamic` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
