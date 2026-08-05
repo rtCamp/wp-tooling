@@ -2,7 +2,7 @@
 	"slug": "timer",
 	"category": "utility",
 	"name": "Timer utility",
-	"description": "Registers the framework Timer utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. Timer measures elapsed time with start / stop / lap and reports through get / get_all, warning via _doing_it_wrong() on misuse rather than throwing.",
+	"description": "Wires up the framework Timer utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Timer measures elapsed time with start / stop / lap and reports through get / get_all, warning via _doing_it_wrong() on misuse rather than throwing.",
 	"source": "package",
 	"module_class": "rtCamp\\WPFramework\\Utils\\Timer",
 	"files": [],
