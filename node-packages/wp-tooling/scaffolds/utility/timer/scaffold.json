@@ -1,0 +1,34 @@
+{
+	"slug": "timer",
+	"category": "utility",
+	"name": "Timer utility",
+	"description": "Wires up the framework Timer utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Timer measures elapsed time with start / stop / lap and reports through get / get_all, warning via _doing_it_wrong() on misuse rather than throwing.",
+	"source": "package",
+	"module_class": "rtCamp\\WPFramework\\Utils\\Timer",
+	"files": [],
+	"inputs": [
+		{
+			"key": "base_path",
+			"description": "Directory holding the PHP source, relative to the project root, without a trailing slash. Default 'includes' matches the rtCamp skeleton; pass 'inc' or 'src' for projects that differ.",
+			"default": "includes"
+		},
+		{
+			"key": "context_slug",
+			"description": "Accepted but unused: the framework Timer takes no constructor arguments. Declared so one input map works across every utility scaffold. Discovered from the composer package name and normalised to snake_case.",
+			"discover_from": "composer.json:name",
+			"transform": "snake-case",
+			"default": "my_plugin"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Helpers/Util.php",
+			"anchor": "// scaffold:utility/timer",
+			"snippet_template": "/**\n * The project's shared framework Timer. One instance keeps every lap on a\n * single timeline, so callers in different classes can read each other's marks.\n *\n * @return \\rtCamp\\WPFramework\\Utils\\Timer Shared timer.\n */\npublic static function timer(): \\rtCamp\\WPFramework\\Utils\\Timer {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPFramework\\Utils\\Timer();\n\t}\n\n\treturn $instance;\n}",
+			"description": "Add a shared accessor for the framework Timer to the project's static helper class. The framework Timer takes no constructor arguments, so there is nothing to configure and the context slug is not used here. Sharing one instance is deliberate rather than incidental: labels and laps accumulate on the instance, so a fresh instance per call would lose every mark taken elsewhere. The snippet is self-contained: paste it inside the existing helper class body and Util::timer()->start( 'import' ) works with nothing further to wire. Do not add the framework Timer to a Modules class or to Main::CLASSES — it implements neither Registrable nor Shareable, so the framework Loader would construct an instance nothing can reach. If the project instead shares services through the framework Shareable contract (a Core class extending the framework class, listed in Main::CLASSES, the way the rtCamp skeleton does for Core\\Logger), translate the snippet to that pattern. Requires rtcamp/wp-framework to be installed first."
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}
