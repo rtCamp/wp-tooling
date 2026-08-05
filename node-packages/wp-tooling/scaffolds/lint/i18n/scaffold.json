@@ -1,0 +1,30 @@
+{
+	"slug": "i18n",
+	"category": "lint",
+	"name": "PHPCS - i18n",
+	"description": "Standalone PHP_CodeSniffer ruleset running only WordPress.WP.I18n, configured with the project's text domain, plus a `lint:i18n` composer script. Separate from the main phpcs.xml.dist because the text domain is project-specific and the engine never edits existing files.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/phpcs.i18n.xml.dist.mustache",
+			"dest": "phpcs.i18n.xml.dist"
+		}
+	],
+	"inputs": [
+		{
+			"key": "text_domain",
+			"description": "The project's text domain, exactly as it appears in the plugin header's `Text Domain:` (or the theme's style.css). The sniff cannot report a wrong domain without it, so it is required rather than guessed.",
+			"discover_from": "config:textDomain",
+			"required": true
+		}
+	],
+	"composer_dev_dependencies": {
+		"squizlabs/php_codesniffer": "^3.7",
+		"wp-coding-standards/wpcs": "^3.0"
+	},
+	"scripts": {
+		"composer": {
+			"lint:i18n": "phpcs --standard=phpcs.i18n.xml.dist"
+		}
+	}
+}
