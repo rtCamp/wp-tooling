@@ -1,0 +1,34 @@
+{
+	"slug": "transients",
+	"category": "utility",
+	"name": "Transients utility",
+	"description": "Registers the framework Transients utility from rtcamp/wp-framework as a shared service. Writes no files: reports the Composer dependency and one accessor snippet. Transients wraps get_transient / set_transient / delete_transient behind a mandatory per-project key prefix.",
+	"source": "package",
+	"module_class": "rtCamp\\WPFramework\\Utils\\Transients",
+	"files": [],
+	"inputs": [
+		{
+			"key": "base_path",
+			"description": "Directory holding the PHP source, relative to the project root, without a trailing slash. Default 'includes' matches the rtCamp skeleton; pass 'inc' or 'src' for projects that differ.",
+			"default": "includes"
+		},
+		{
+			"key": "context_slug",
+			"description": "Prefix every transient key is written under. The framework constructor requires it and holds it readonly, so it must never be empty. Discovered from the composer package name and normalised to snake_case, so 'rtcamp/acme-blog' becomes 'rtcamp_acme_blog'. Pass an explicit value to override, and keep it stable across releases — changing it orphans every stored transient.",
+			"discover_from": "composer.json:name",
+			"transform": "snake-case",
+			"default": "my_plugin"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Helpers/Util.php",
+			"anchor": "// scaffold:utility/transients",
+			"snippet_template": "/**\n * The project's shared framework Transients store, prefixed so its keys can\n * never collide with another consumer's.\n *\n * @return \\rtCamp\\WPFramework\\Utils\\Transients Shared transients store.\n */\npublic static function transients(): \\rtCamp\\WPFramework\\Utils\\Transients {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPFramework\\Utils\\Transients( '{{context_slug}}' );\n\t}\n\n\treturn $instance;\n}",
+			"description": "Add a shared accessor for the framework Transients store to the project's static helper class. The snippet is self-contained: paste it inside the existing helper class body and Util::transients()->get( 'key' ) works with nothing further to wire. The constructor prefix is mandatory and readonly — never pass an empty string. Do not add the framework Transients to a Modules class or to Main::CLASSES: it implements neither Registrable nor Shareable, so the framework Loader would try to construct it with no argument and fatal on the missing prefix. If the project instead shares services through the framework Shareable contract (a Core\\Transients class extending the framework class, listed in Main::CLASSES, the way the rtCamp skeleton does for Core\\Logger), translate the snippet to that pattern. If only one class needs transients, skip this wiring and construct it inline in that class's constructor. Requires rtcamp/wp-framework to be installed first."
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}
