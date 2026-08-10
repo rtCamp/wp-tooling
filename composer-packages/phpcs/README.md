@@ -101,3 +101,11 @@ Both standards are a starting point. Exclude or down-tune any sniff in your own
 `WordPress.NamingConventions.PrefixAllGlobals` prefixes, `WordPress.Files.FileName`
 (`is_theme` vs PSR-4), the `<file>` paths to scan, and per-path test excludes — these are
 project-specific and live in your `phpcs.xml.dist`, never here.
+
+## License
+
+GPL-2.0-or-later. See [LICENSE](./LICENSE).
+
+<p align="center">
+  <a href="https://rtcamp.com"><img src="https://n8e0ka87m9.gdcdn.us/kfnbt046p8/GitHub_Banner.webp" alt="rtCamp" width="100%"></a>
+</p>
