@@ -93,6 +93,7 @@ const detectIndent = (raw) => {
  */
 const makeFeatureApi = (root, identity, ui) => {
 	const journal = [];
+	const notes = [];
 	// Confine every api path to the project root so a feature hook can't read or
 	// write outside the project being initialized.
 	const join = (rel) => resolveWithin(root, rel);
@@ -102,6 +103,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		identity,
 		ui,
 		_journal: journal,
+		_notes: notes,
 		path: join,
 		exists: (rel) => fs.existsSync(join(rel)),
 		read: (rel) =>
@@ -147,18 +149,57 @@ const makeFeatureApi = (root, identity, ui) => {
 			fs.rmSync(abs, { force: true });
 		},
 
-		editPackageJson(mutator) {
-			const abs = join('package.json');
-			const raw = fs.readFileSync(abs, 'utf8');
-			const indent = detectIndent(raw);
-			const obj = JSON.parse(raw);
+		// Read-modify-write a JSON file, preserving its indentation. `create`
+		// starts from `{}` when absent, taking its indent from `indentFrom`.
+		editJson(rel, mutator, opts = {}) {
+			const abs = join(rel);
+			const existed = fs.existsSync(abs);
+			if (!existed && !opts.create) {
+				throw new Error(`editJson: ${rel} not found`);
+			}
+			const raw = existed ? fs.readFileSync(abs, 'utf8') : null;
+			const reference =
+				null !== raw
+					? raw
+					: (opts.indentFrom && this.read(opts.indentFrom)) || '';
+			const indent = detectIndent(reference);
+			let obj = {};
+			if (null !== raw) {
+				try {
+					obj = JSON.parse(raw);
+				} catch (err) {
+					// Name the file: a bare parse error says only "position 2".
+					throw new Error(
+						`editJson: ${rel} is not valid JSON -- ${err.message}`
+					);
+				}
+			}
 			mutator(obj);
-			journal.push({ undo: () => fs.writeFileSync(abs, raw, 'utf8') });
+			journal.push({
+				undo: () => {
+					if (existed) {
+						fs.writeFileSync(abs, raw, 'utf8');
+					} else {
+						fs.rmSync(abs, { force: true });
+					}
+				},
+			});
+			fs.mkdirSync(path.dirname(abs), { recursive: true });
 			fs.writeFileSync(
 				abs,
 				`${JSON.stringify(obj, null, indent)}\n`,
 				'utf8'
 			);
+		},
+
+		editPackageJson(mutator) {
+			this.editJson('package.json', mutator);
+		},
+
+		// Defer a "do this next" line. Hooks run inside an active spinner, so
+		// toggleFeatures flushes these once every transition has finished.
+		note(message) {
+			notes.push(message);
 		},
 
 		hasDep(name) {
@@ -279,6 +320,7 @@ const makeFeatureApi = (root, identity, ui) => {
  */
 const runJournaled = (api, fn) => {
 	const start = api._journal.length;
+	const notesStart = (api._notes || []).length;
 	try {
 		fn();
 		api._journal.length = start;
@@ -291,6 +333,10 @@ const runJournaled = (api, fn) => {
 			}
 		}
 		api._journal.length = start;
+		// Its writes were just undone, so its notes would point at nothing.
+		if (api._notes) {
+			api._notes.length = notesStart;
+		}
 		throw err;
 	}
 };
@@ -561,16 +607,15 @@ const safeDetectMap = (config, api) => {
 };
 
 /**
- * Whether a feature touches package.json (so we know to suggest npm install).
+ * Whether a feature changes installed packages (so we know to suggest npm
+ * install). Scripts alone don't qualify -- they need no install.
  *
  * @param {Object} feature - Feature definition.
- * @return {boolean} True if it has deps/scripts.
+ * @return {boolean} True if it has deps.
  */
 const touchesPackage = (feature) => {
 	const apply = feature.apply || {};
-	return Boolean(
-		apply.dependencies || apply.devDependencies || apply.scripts
-	);
+	return Boolean(apply.dependencies || apply.devDependencies);
 };
 
 /**
@@ -727,6 +772,12 @@ const toggleFeatures = async (config, root, opts) => {
 
 	if (depsChanged) {
 		ui.warn('Dependencies changed -- run `npm install` to sync.');
+	}
+	// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
+	const notes = api._notes || [];
+	if (notes.length) {
+		ui.heading('Next steps');
+		notes.splice(0).forEach((message) => ui.info(message));
 	}
 	if (!failed.length) {
 		ui.success('Features updated.');
