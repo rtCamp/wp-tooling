@@ -971,4 +971,4 @@ const run = async (config, options = {}) => {
 	}
 };
 
-module.exports = { run };
+module.exports = { run, makeFeatureApi };
