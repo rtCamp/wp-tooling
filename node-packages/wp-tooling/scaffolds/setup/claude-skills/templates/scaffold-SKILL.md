@@ -55,7 +55,7 @@ Read, in order:
 - Block scaffolds: sample one `block.json` for vendor prefix and source dir.
 - CI scaffolds: sample one `.github/workflows/*.yml` for filename and trigger style.
 
-Anchors (`// scaffold:<kind>:classes`) are hints, not ground truth. Sampled patterns win.
+Anchors (`// scaffold:<kind>:classes`, and `// scaffold:utility/<slug>` in `Helpers/Util.php`) are hints, not ground truth. Sampled patterns win.
 
 Confirm findings with the developer in one short message. Proceed on confirmation.
 
@@ -76,6 +76,8 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\Cli` |
 | `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
 | `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+
+`utility/*` is absent from the table on purpose: those are `source: package`, so they have no source dir, no test dir and no module. Each returns one accessor snippet for `<base_path>/Helpers/Util.php` under anchor `// scaffold:utility/<slug>`. Never add a framework `Utils\*` class to a module or to `Main::CLASSES` — they implement neither `Registrable` nor `Shareable`, so the Loader would construct them with the wrong (or a missing) constructor argument.
 
 **Modules host one kind each. No `Modules/<Feature>/...`.** A multi-kind feature (e.g. Testimonials = CPT + taxonomy + block + REST) spans the per-kind directories and wires into each kind's module.
 
@@ -163,6 +165,7 @@ Frameworks per kind:
 | `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
 | `block/interactive` | Jest + Playwright |
 | `ci/*` | actionlint + yaml-parse |
+| `utility/*` | none - no files written, so no stub to expand. Cover the calling code instead. |
 
 ### 8. Escalate when stuck - do not guess
 

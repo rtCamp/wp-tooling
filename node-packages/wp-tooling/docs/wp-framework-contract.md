@@ -183,6 +183,31 @@ interface CLICommand {
 
 ---
 
+## Utility classes (targeted by `scaffolds/utility/*`)
+
+All under `rtCamp\WPFramework\Utils\`. These are **plain classes with public constructors** — not
+`Registrable`, not `Shareable`, not singletons, and none needs the `Container`. That is why the
+`utility/*` scaffolds wire them through an accessor on the consumer's static helper
+(`<base_path>/Helpers/Util.php`) rather than adding them to an `AbstractModule` or `Main::CLASSES`:
+the `Loader` only calls `register_hooks()` / caches `Shareable`, so a listed `Utils\*` class would be
+constructed with no argument — silently wrong for `Cache`, `Logger` and `FeatureSelector`, and fatal
+for `Transients`.
+
+| Class | Constructor | Key methods |
+|---|---|---|
+| `Cache` | `__construct(string $context = '')` — prefixes every group as `context:group` | `get`, `set`, `delete`, `flush_group`, `remember`, `remember_swr` |
+| `Transients` | `__construct(string $prefix)` — **required**, `readonly` | `get`, `set`, `delete` |
+| `Logger` | `__construct(string $prefix = 'rtcamp')` | `log`, `debug`, `info`, `warning`, `error` — silent unless `WP_DEBUG` |
+| `Timer` | none — **takes no arguments** | `start`, `stop`, `lap`, `get`, `get_all` |
+| `FeatureSelector` | `__construct(string $context = '')` — derives the option key and constant name | `register`, `is_enabled`, `enable`, `disable`, `get_registered`, `shared_option_key` |
+
+Spelling is `FeatureSelector`, not `Feature_Selector`. `Timer` and `FeatureSelector` hold state on the
+instance (laps; the flag registry), so they must be shared rather than constructed per call.
+`FeatureSelectorSettingsPage` is an abstract admin UI over `FeatureSelector`, requiring a
+`get_selector(): FeatureSelector` implementation.
+
+---
+
 ## Optional helpers (not currently scaffolded)
 
 - `AssetLoaderTrait`: register scripts, styles, block manifests with versioning from a build's `.asset.php` file.
@@ -204,3 +229,12 @@ Marker pattern: `// scaffold:<scaffold-id>:classes`. Examples:
 - `// scaffold:wp/registrable:classes` inside `Modules/Services.php`
 
 Each `Modules/<Name>.php` file is itself produced by the `wp/module` scaffold, which accepts a `kind` input that selects which anchor to emit.
+
+The `utility/*` scaffolds are the exception, because they register no class with the `Loader`. Their
+marker takes no `:classes` suffix and sits in the consumer's static helper, not a module:
+
+- `// scaffold:utility/cache`, `utility/transients`, `utility/logger`, `utility/timer`,
+  `utility/feature-selector` — all inside `Helpers/Util.php`
+
+No scaffold emits these markers, so expect them to be absent; fall back to sampling the existing
+accessors in that file.
