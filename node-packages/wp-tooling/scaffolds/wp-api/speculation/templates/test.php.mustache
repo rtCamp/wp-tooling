@@ -1,0 +1,118 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
+	}
+
+	/**
+	 * register_hooks() is safe on any WordPress version.
+	 *
+	 * Before WP 6.8 there is no Speculation Rules API and it must no-op.
+	 */
+	public function test_register_hooks_runs_on_any_wp_version(): void {
+		( new {{class}}() )->register_hooks();
+
+		$this->addToAssertionCount( 1 );
+	}
+
+	/**
+	 * register_hooks() binds both speculation rules filters.
+	 */
+	public function test_register_hooks_binds_the_speculation_filters(): void {
+		$this->skip_without_speculation_api();
+
+		( new {{class}}() )->register_hooks();
+
+		$this->assertNotFalse( has_filter( 'wp_speculation_rules_configuration' ) );
+		$this->assertNotFalse( has_filter( 'wp_speculation_rules_href_exclude_paths' ) );
+	}
+
+	/**
+	 * The configuration filter pins the scaffolded mode and eagerness.
+	 */
+	public function test_configuration_is_pinned_to_the_scaffolded_values(): void {
+		$this->skip_without_speculation_api();
+
+		( new {{class}}() )->register_hooks();
+
+		$config = apply_filters(
+			'wp_speculation_rules_configuration',
+			[
+				'mode'      => 'auto',
+				'eagerness' => 'auto',
+			]
+		);
+
+		$this->assertSame(
+			[
+				'mode'      => {{class}}::MODE,
+				'eagerness' => {{class}}::EAGERNESS,
+			],
+			$config
+		);
+	}
+
+	/**
+	 * A null configuration means speculative loading is off, and stays off.
+	 */
+	public function test_configuration_stays_disabled_when_core_passes_null(): void {
+		$this->skip_without_speculation_api();
+
+		( new {{class}}() )->register_hooks();
+
+		$this->assertNull( apply_filters( 'wp_speculation_rules_configuration', null ) );
+	}
+
+	/**
+	 * The exclusion filter adds this project's paths without dropping others'.
+	 */
+	public function test_href_exclude_paths_keeps_paths_added_by_others(): void {
+		$this->skip_without_speculation_api();
+
+		( new {{class}}() )->register_hooks();
+
+		$paths = apply_filters( 'wp_speculation_rules_href_exclude_paths', [ '/existing/' ], {{class}}::MODE );
+
+		$this->assertContains( '/existing/', $paths );
+
+		foreach ( {{class}}::EXCLUDE_PATHS as $excluded ) {
+			$this->assertContains( $excluded, $paths );
+		}
+	}
+
+	/**
+	 * Skip a test that needs the Speculation Rules API (WP 6.8+).
+	 */
+	private function skip_without_speculation_api(): void {
+		if ( ! function_exists( 'wp_get_speculation_rules' ) ) {
+			$this->markTestSkipped( 'Requires the Speculation Rules API (WP 6.8+).' );
+		}
+	}
+}

@@ -1,0 +1,78 @@
+{
+	"slug": "speculation",
+	"category": "wp-api",
+	"name": "Speculative Loading",
+	"description": "Tunes WordPress core's Speculation Rules API (core since WP 6.8). Generates a Registrable that pins the prefetch/prerender mode and eagerness through the 'wp_speculation_rules_configuration' filter and excludes paths through 'wp_speculation_rules_href_exclude_paths', guarded so it no-ops on WP < 6.8.",
+	"source": "template",
+	"wizard_step": "wp-apis",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the service class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the service file. Default 'includes/Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "Logical service name. Normalised to a PascalCase class name, so 'speculative-loading' and 'SpeculativeLoading' both yield class SpeculativeLoading.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "mode",
+			"description": "Speculative loading mode written into the MODE constant. One of 'prefetch' (fetch the document early) or 'prerender' (render it in a hidden tab). 'auto' hands the choice back to core.",
+			"default": "prerender"
+		},
+		{
+			"key": "eagerness",
+			"description": "How keenly the browser acts on the rules, written into the EAGERNESS constant. One of 'conservative' (on pointer/touch down), 'moderate' (on hover, core's default) or 'eager' (as soon as the link is known). 'auto' hands the choice back to core.",
+			"default": "moderate"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/speculation.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Services.php",
+			"anchor": "// scaffold:wp/registrable:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the class to a Services (or performance-specific) module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Performance --kind=registrable`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

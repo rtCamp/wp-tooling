@@ -264,6 +264,8 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
 
+`wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8). Those pair with `"wizard_step": "wp-apis"`.
+
 ---
 
 ## Remote scaffolds via per-repo sources + an upstream index
@@ -363,6 +365,7 @@ Look at these existing scaffolds when authoring a new one:
 | Plain class implementing `CLICommand` with PHPUnit stub | `wp/cli` |
 | PHP class extending a framework abstract | `wp/cpt`, `wp/taxonomy`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role` |
 | Cron handler implementing `Registrable` directly | `wp/cron` |
+| Version-guarded customisation of a core WP API | `wp-api/speculation` |
 | Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |

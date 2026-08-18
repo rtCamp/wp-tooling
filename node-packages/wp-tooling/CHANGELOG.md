@@ -4,6 +4,13 @@ All notable changes to `@rtcamp/wp-tooling` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+
+- `wp-api/speculation` scaffold — generates a `Registrable` that customises WordPress core's Speculation Rules API (core since WP 6.8). Pins the prefetch/prerender `MODE` and `EAGERNESS` through the `wp_speculation_rules_configuration` filter (passing a `null` config straight through, so speculative loading that another filter disabled is never revived) and merges an `EXCLUDE_PATHS` constant into `wp_speculation_rules_href_exclude_paths`. `register_hooks()` no-ops when the API is absent, so the class is safe on WP < 6.8. Wires into the same module and anchor as `wp/registrable`.
+- New `wp-api` category for scaffolds that customise a modern WordPress core API, and the first scaffold to use the reserved `"wizard_step": "wp-apis"`.
+
 ## [1.0.0] - 2026-07-30
 
 ### Added

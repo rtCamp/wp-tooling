@@ -1,0 +1,97 @@
+<?php
+/**
+ * {{class}}: speculative loading rules (mode: {{mode}}, eagerness: {{eagerness}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://developer.wordpress.org/reference/functions/wp_get_speculation_rules/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Customises WordPress core's Speculation Rules API (core since WP 6.8).
+ *
+ * Core ships speculative loading in 'auto' mode. This class pins the mode and
+ * eagerness, and keeps state-changing or personalised URLs out of the rules.
+ * The three constants are the tunable surface; the filter bodies rarely change.
+ */
+final class {{class}} implements Registrable {
+
+	/**
+	 * Speculation mode: 'prefetch', 'prerender', or 'auto' to defer to core.
+	 */
+	public const MODE = '{{mode}}';
+
+	/**
+	 * Eagerness: 'conservative', 'moderate', 'eager', or 'auto' to defer to core.
+	 */
+	public const EAGERNESS = '{{eagerness}}';
+
+	/**
+	 * Paths never prefetched or prerendered, as URL path patterns.
+	 *
+	 * Prerendering executes the target page, so exclude anything that mutates
+	 * state or is personalised, for example:
+	 * [ '/cart/', '/checkout/', '/my-account/*' ].
+	 *
+	 * @var string[]
+	 */
+	public const EXCLUDE_PATHS = [];
+
+	/**
+	 * Bind the speculation rules filters. Called by the framework Loader.
+	 *
+	 * No-ops before WP 6.8, where the Speculation Rules API does not exist.
+	 */
+	public function register_hooks(): void {
+		if ( ! function_exists( 'wp_get_speculation_rules' ) ) {
+			return;
+		}
+
+		add_filter( 'wp_speculation_rules_configuration', [ $this, 'filter_configuration' ] );
+		add_filter( 'wp_speculation_rules_href_exclude_paths', [ $this, 'filter_href_exclude_paths' ] );
+	}
+
+	/**
+	 * Pin the speculation mode and eagerness.
+	 *
+	 * A non-array $config means speculative loading is switched off (core and
+	 * other filters pass null for that), so it is returned untouched rather
+	 * than revived.
+	 *
+	 * @param array<string, string>|null $config Core configuration, or null when disabled.
+	 * @return array<string, string>|null Filtered configuration.
+	 */
+	public function filter_configuration( $config ) {
+		if ( ! is_array( $config ) ) {
+			return $config;
+		}
+
+		return [
+			'mode'      => self::MODE,
+			'eagerness' => self::EAGERNESS,
+		];
+	}
+
+	/**
+	 * Add this project's paths to the href exclusion list.
+	 *
+	 * Core passes the current mode as a second argument; add it to the
+	 * signature (and bump add_filter()'s accepted_args) to vary the
+	 * exclusions between prefetch and prerender.
+	 *
+	 * @param string[] $paths Path patterns already excluded.
+	 * @return string[] Path patterns with this project's exclusions merged in.
+	 */
+	public function filter_href_exclude_paths( array $paths ): array {
+		return array_values( array_unique( array_merge( $paths, self::EXCLUDE_PATHS ) ) );
+	}
+}
