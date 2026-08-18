@@ -1,6 +1,7 @@
 /**
  * Tests for the file-based `discover_from` resolvers added to registry.js:
- *   - composer.json:autoload.psr-4  -> root namespace (non-path inputs only)
+ *   - composer.json:autoload.psr-4  -> root namespace, or root directory for
+ *                                      path inputs (both grafted onto the default)
  *   - composer.json:<dot.path>      -> string value
  *   - package.json:<dot.path>       -> string value
  *   - config:<key>                  -> value from .wp-tooling.json
@@ -56,6 +57,12 @@ const SCAFFOLD = {
 			default: 'Inc',
 		},
 		{
+			key: 'root_dir',
+			description: 'Bare-root directory (no sub-directory in default)',
+			discover_from: 'composer.json:autoload.psr-4',
+			default: 'includes',
+		},
+		{
 			key: 'tests_namespace',
 			description: 'Deep default, grafted onto the discovered root',
 			discover_from: 'composer.json:autoload.psr-4',
@@ -68,7 +75,7 @@ const SCAFFOLD = {
 		{
 			target_file: 'wire.php',
 			snippet_template:
-				'{{namespace}}::{{text_domain}}::{{root_ns}}::{{tests_namespace}}',
+				'{{namespace}}::{{text_domain}}::{{root_ns}}::{{tests_namespace}}::{{root_dir}}',
 		},
 	],
 };
@@ -88,12 +95,12 @@ async function run(targetDir, supplied = { name: 'demo' }) {
 		dryRun: true,
 		cwd: targetDir,
 	});
-	// snippet is "{{namespace}}::{{text_domain}}::{{root_ns}}::{{tests_namespace}}"
-	const [namespace, textDomain, rootNs, testsNamespace] =
+	// snippet is "{{namespace}}::{{text_domain}}::{{root_ns}}::{{tests_namespace}}::{{root_dir}}"
+	const [namespace, textDomain, rootNs, testsNamespace, rootDir] =
 		result.ai.wiring[0].snippet.split('::');
 	const basePath = result.engine.wrote[0].replace(/\/demo\.php$/, '');
 	fs.rmSync(projectDir, { recursive: true, force: true });
-	return { namespace, textDomain, rootNs, testsNamespace, basePath };
+	return { namespace, textDomain, rootNs, testsNamespace, rootDir, basePath };
 }
 
 describe('discover_from: composer.json:autoload.psr-4', () => {
@@ -116,7 +123,7 @@ describe('discover_from: composer.json:autoload.psr-4', () => {
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it('does NOT override a path input (base_path keeps its default)', async () => {
+	it('grafts a path input onto the PSR-4 directory, keeping its sub-directory', async () => {
 		const target = makeTmpDir();
 		fs.writeFileSync(
 			path.join(target, 'composer.json'),
@@ -124,8 +131,39 @@ describe('discover_from: composer.json:autoload.psr-4', () => {
 				autoload: { 'psr-4': { 'rtCamp\\Theme\\MyTheme\\': 'inc/' } },
 			})
 		);
+		const { basePath, rootDir } = await run(target);
+		// `inc/` is the autoload root here, so the default `includes/Cli` must
+		// become `inc/Cli`; a class written to `includes/Cli` would carry the
+		// grafted namespace but sit outside the autoload root and never load.
+		expect(basePath).toBe('inc/Cli');
+		// A default with no sub-directory resolves to the root directory itself.
+		expect(rootDir).toBe('inc');
+		fs.rmSync(target, { recursive: true, force: true });
+	});
+
+	it('grafts from the first entry of a list-valued PSR-4 target', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'composer.json'),
+			JSON.stringify({
+				autoload: { 'psr-4': { 'Acme\\Blog\\': ['src/', 'lib/'] } },
+			})
+		);
 		const { basePath } = await run(target);
-		expect(basePath).toBe('includes/Cli'); // default, not 'inc' from psr-4
+		expect(basePath).toBe('src/Cli');
+		fs.rmSync(target, { recursive: true, force: true });
+	});
+
+	it('uses the sub-directory alone when PSR-4 maps to the project root', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'composer.json'),
+			JSON.stringify({ autoload: { 'psr-4': { 'Acme\\Blog\\': './' } } })
+		);
+		const { basePath, rootDir } = await run(target);
+		expect(basePath).toBe('Cli');
+		// Nothing to graft onto for a bare default: fall back to it.
+		expect(rootDir).toBe('includes');
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
@@ -153,11 +191,13 @@ describe('discover_from: composer.json:autoload.psr-4', () => {
 				autoload: { 'psr-4': { 'rtCamp\\Theme\\MyTheme\\': 'inc/' } },
 			})
 		);
-		const { namespace } = await run(target, {
+		const { namespace, basePath } = await run(target, {
 			name: 'demo',
 			namespace: 'Acme\\Custom',
+			base_path: 'custom/dir',
 		});
 		expect(namespace).toBe('Acme\\Custom');
+		expect(basePath).toBe('custom/dir');
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 });

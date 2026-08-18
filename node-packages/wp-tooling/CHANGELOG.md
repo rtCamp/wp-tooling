@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `wp-api/speculation` scaffold — generates a `Registrable` that customises WordPress core's Speculation Rules API (core since WP 6.8). Pins the prefetch/prerender `MODE` and `EAGERNESS` through the `wp_speculation_rules_configuration` filter (passing a `null` config straight through, so speculative loading that another filter disabled is never revived) and merges an `EXCLUDE_PATHS` constant into `wp_speculation_rules_href_exclude_paths`. `register_hooks()` no-ops when the API is absent, so the class is safe on WP < 6.8. Wires into the same module and anchor as `wp/registrable`.
 - New `wp-api` category for scaffolds that customise a modern WordPress core API, and the first scaffold to use the reserved `"wizard_step": "wp-apis"`.
 
+### Fixed
+
+- `discover_from: composer.json:autoload.psr-4` now resolves **path** inputs (`base_path`, `*_path`, `*_dir`) from the map entry's directory instead of skipping them, grafted the same way namespaces already were — with a root of `Acme\Blog\` → `inc/`, a `base_path` default of `includes/Services` resolves to `inc/Services`. Previously the namespace was grafted but the directory kept the manifest default, so any project not laid out under `includes/` got a correctly-namespaced class written outside its autoload root, where it never loaded. Affects the 12 bundled scaffolds that declare PSR-4 discovery on `base_path`. Projects already using `includes/`, projects without a `composer.json`, and callers that pass `--base_path` explicitly are unaffected.
+
 ## [1.0.0] - 2026-07-30
 
 ### Added
