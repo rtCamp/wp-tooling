@@ -842,10 +842,11 @@ async function loadDiscovery(cwd) {
  *
  * Supported sources:
  *   - `composer.json:<dot.path>` / `package.json:<dot.path>` — dotted lookup of
- *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0` yields
- *     the root **namespace** (first map key, trailing `\\` stripped) — but only
- *     for non-path inputs, since the PSR-4 root directory is rarely a scaffold's
- *     target sub-path; path inputs (e.g. `base_path`) keep their default.
+ *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0` reads the
+ *     first map entry — its **namespace** (key, trailing `\\` stripped) for
+ *     ordinary inputs, its **directory** (value) for path inputs — and grafts
+ *     that root onto the input's `default`, keeping the default's sub-namespace
+ *     or sub-directory.
  *   - `config:<dot.path>` — string value from `.wp-tooling.json`.
  *
  * Unknown sources (e.g. `plugin-header:`, `input:` handled by the caller)
@@ -870,9 +871,6 @@ function discoverFromSource(decl, discovery) {
 		}
 		const selector = spec.slice(colon + 1);
 		if (selector === 'autoload.psr-4' || selector === 'autoload.psr-0') {
-			if (isPathInput(decl.key)) {
-				return undefined; // dir inputs keep their (more specific) default
-			}
 			const map = getByPath(obj, selector);
 			const firstKey =
 				map && typeof map === 'object' && !Array.isArray(map)
@@ -880,6 +878,11 @@ function discoverFromSource(decl, discovery) {
 					: undefined;
 			if (!firstKey) {
 				return undefined;
+			}
+			if (isPathInput(decl.key)) {
+				const def =
+					typeof decl.default === 'string' ? decl.default : '';
+				return graftPath(map[firstKey], def);
 			}
 			const root = firstKey.replace(/\\+$/, '');
 			// Graft the discovered root onto the default's sub-namespace: a
@@ -905,6 +908,33 @@ function discoverFromSource(decl, discovery) {
 // Heuristic: does this input key name a filesystem path/dir rather than a namespace?
 function isPathInput(key) {
 	return /(^|_)(path|dir)$/.test(key) || key === 'base_path';
+}
+
+// The directory counterpart of the namespace graft in discoverFromSource(): a
+// PSR-4 map's *value* is the autoload root directory, so a default of
+// `includes/Cli` means "root dir + `/Cli`". Grafting keeps the scaffold's
+// sub-directory while following the project's own layout — without it, a project
+// mapping its root to `inc/` or `src/` gets a correctly-namespaced class written
+// outside the autoload root, where it never loads.
+function graftPath(value, def) {
+	// A PSR-4 target may be a list of directories; the first is the canonical one.
+	const raw = Array.isArray(value) ? value[0] : value;
+	if (typeof raw !== 'string') {
+		return undefined;
+	}
+	let dir = raw.trim().replace(/\/+$/, '');
+	if (dir === '.') {
+		dir = '';
+	} else if (dir.startsWith('./')) {
+		dir = dir.slice(2);
+	}
+	const slash = def.indexOf('/');
+	const tail = slash === -1 ? '' : def.slice(slash + 1);
+	if (!dir) {
+		// Root-level autoload: the sub-directory alone is the whole path.
+		return tail || undefined;
+	}
+	return tail ? `${dir}/${tail}` : dir;
 }
 
 // Resolve a dotted path (`a.b.c`) within a plain object; undefined if absent.

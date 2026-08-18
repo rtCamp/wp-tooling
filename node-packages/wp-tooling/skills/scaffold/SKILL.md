@@ -76,6 +76,7 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\Cli` |
 | `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
 | `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `wp-api/speculation` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 
 **Modules host one kind each. No `Modules/<Feature>/...`.** A multi-kind feature (e.g. Testimonials = CPT + taxonomy + block + REST) spans the per-kind directories and wires into each kind's module.
 
@@ -95,6 +96,7 @@ Write a test-case checklist covering:
   - `wp/block-dynamic`: block name, `register_hooks` action, `render()` markup with `WP_Query` fixture, empty state, count cap, attribute filters.
   - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
   - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
+  - `wp-api/speculation`: both filters bound, the `MODE`/`EAGERNESS` constants hold values core accepts, `wp_speculation_rules_configuration` returns the scaffolded mode/eagerness, a `null` config stays `null`, exclusions merge without dropping other callers' paths, and `register_hooks()` no-ops on WP < 6.8.
 
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 
@@ -159,7 +161,7 @@ Frameworks per kind:
 
 | Kind | Framework |
 |---|---|
-| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable` | PHPUnit |
+| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation` | PHPUnit |
 | `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
 | `block/interactive` | Jest + Playwright |
 | `ci/*` | actionlint + yaml-parse |

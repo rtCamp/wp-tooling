@@ -137,7 +137,7 @@ or key is absent the input falls through to its `default` (so a project without 
 exactly as if `discover_from` were not set).
 
 - `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
-- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** (first map key, trailing `\` stripped) — but only for non-path inputs; inputs whose key looks like a path (`base_path`, `*_path`, `*_dir`) keep their own `default`, since the PSR-4 root directory is rarely a scaffold's target sub-path.
+- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** for ordinary inputs (first map key, trailing `\` stripped) and the **root directory** for path inputs (that same entry's value; the first element if it is a list). Either way the discovered root replaces only the *first segment* of the input's `default`, keeping the scaffold's sub-namespace or sub-directory: with a map of `Acme\Blog\` → `inc/`, a `namespace` default of `Inc\Cli` yields `Acme\Blog\Cli` and a `base_path` default of `includes/Cli` yields `inc/Cli`. Both come from the same map entry, so a class is never namespaced into the autoload root while being written outside it. A path input whose `default` has no sub-directory resolves to the root directory itself, and a PSR-4 target of `./` leaves just the sub-directory.
 - `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
 
 Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
@@ -264,6 +264,8 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
 
+`wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8). Those pair with `"wizard_step": "wp-apis"`.
+
 ---
 
 ## Remote scaffolds via per-repo sources + an upstream index
@@ -363,6 +365,7 @@ Look at these existing scaffolds when authoring a new one:
 | Plain class implementing `CLICommand` with PHPUnit stub | `wp/cli` |
 | PHP class extending a framework abstract | `wp/cpt`, `wp/taxonomy`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role` |
 | Cron handler implementing `Registrable` directly | `wp/cron` |
+| Version-guarded customisation of a core WP API | `wp-api/speculation` |
 | Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |
