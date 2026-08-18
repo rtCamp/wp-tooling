@@ -42,12 +42,12 @@
 		},
 		{
 			"key": "mode",
-			"description": "Speculative loading mode written into the MODE constant. One of 'prefetch' (fetch the document early) or 'prerender' (render it in a hidden tab). 'auto' hands the choice back to core.",
+			"description": "Speculative loading mode written into the MODE constant. One of 'prefetch' (fetch the document early) or 'prerender' (render it in a hidden tab). 'auto' hands the choice back to core, which resolves it to 'prefetch'.",
 			"default": "prerender"
 		},
 		{
 			"key": "eagerness",
-			"description": "How keenly the browser acts on the rules, written into the EAGERNESS constant. One of 'conservative' (on pointer/touch down), 'moderate' (on hover, core's default) or 'eager' (as soon as the link is known). 'auto' hands the choice back to core.",
+			"description": "How keenly the browser acts on the rules, written into the EAGERNESS constant. One of 'conservative' (on pointer/touch down), 'moderate' (on hover, this scaffold's default) or 'eager' (as soon as the link is known). 'auto' hands the choice back to core, which resolves it to 'conservative'.",
 			"default": "moderate"
 		}
 	],
@@ -62,7 +62,7 @@
 			"target_file": "{{base_path}}/../Modules/Services.php",
 			"anchor": "// scaffold:wp/registrable:classes",
 			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
-			"description": "Add the class to a Services (or performance-specific) module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Performance --kind=registrable`."
+			"description": "Add the class to a Services (or performance-specific) module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
 		}
 	],
 	"tests": [

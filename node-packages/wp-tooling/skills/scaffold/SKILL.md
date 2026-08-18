@@ -96,7 +96,7 @@ Write a test-case checklist covering:
   - `wp/block-dynamic`: block name, `register_hooks` action, `render()` markup with `WP_Query` fixture, empty state, count cap, attribute filters.
   - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
   - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
-  - `wp-api/speculation`: both filters bound, `wp_speculation_rules_configuration` returns the scaffolded mode/eagerness, a `null` config stays `null`, exclusions merge without dropping other callers' paths, and `register_hooks()` no-ops on WP < 6.8.
+  - `wp-api/speculation`: both filters bound, the `MODE`/`EAGERNESS` constants hold values core accepts, `wp_speculation_rules_configuration` returns the scaffolded mode/eagerness, a `null` config stays `null`, exclusions merge without dropping other callers' paths, and `register_hooks()` no-ops on WP < 6.8.
 
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 

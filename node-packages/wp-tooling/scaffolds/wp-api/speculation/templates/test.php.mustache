@@ -40,10 +40,27 @@ final class {{class}}Test extends WP_UnitTestCase {
 	public function test_register_hooks_binds_the_filters_only_when_the_api_exists(): void {
 		( new {{class}}() )->register_hooks();
 
-		$api_exists = function_exists( 'wp_get_speculation_rules' );
+		$api_exists      = function_exists( 'wp_get_speculation_rules' );
+		$config_bound    = false !== has_filter( 'wp_speculation_rules_configuration' );
+		$exclusion_bound = false !== has_filter( 'wp_speculation_rules_href_exclude_paths' );
 
-		$this->assertSame( $api_exists, false !== has_filter( 'wp_speculation_rules_configuration' ) );
-		$this->assertSame( $api_exists, false !== has_filter( 'wp_speculation_rules_href_exclude_paths' ) );
+		$this->assertSame( $api_exists, $config_bound );
+		$this->assertSame( $api_exists, $exclusion_bound );
+	}
+
+	/**
+	 * The scaffolded constants are values core actually accepts.
+	 *
+	 * Core silently replaces an unknown mode or eagerness with its own default,
+	 * so a typo would pin nothing at all. 'immediate' is left out on purpose:
+	 * core rejects it for document-level rules.
+	 */
+	public function test_constants_are_valid_core_values(): void {
+		$this->assertContains( {{class}}::MODE, [ 'auto', 'prefetch', 'prerender' ] );
+		$this->assertContains(
+			{{class}}::EAGERNESS,
+			[ 'auto', 'conservative', 'moderate', 'eager' ]
+		);
 	}
 
 	/**

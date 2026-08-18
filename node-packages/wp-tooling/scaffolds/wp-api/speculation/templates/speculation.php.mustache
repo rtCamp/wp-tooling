@@ -19,9 +19,10 @@ use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 /**
  * Customises WordPress core's Speculation Rules API (core since WP 6.8).
  *
- * Core ships speculative loading in 'auto' mode. This class pins the mode and
- * eagerness, and keeps state-changing or personalised URLs out of the rules.
- * The three constants are the tunable surface; the filter bodies rarely change.
+ * Core defaults both settings to 'auto', which it resolves to prefetch with
+ * conservative eagerness. This class pins them instead, and keeps state-changing
+ * or personalised URLs out of the rules. The three constants are the tunable
+ * surface; the filter bodies rarely change.
  */
 final class {{class}} implements Registrable {
 
@@ -63,9 +64,9 @@ final class {{class}} implements Registrable {
 	/**
 	 * Pin the speculation mode and eagerness.
 	 *
-	 * A non-array $config means speculative loading is switched off (core and
-	 * other filters pass null for that), so it is returned untouched rather
-	 * than revived.
+	 * A null $config means another filter switched speculative loading off, so it
+	 * is returned untouched rather than revived. Any other non-array value falls
+	 * outside the filter's contract and is likewise left alone.
 	 *
 	 * @param array<string, string>|null $config Core configuration, or null when disabled.
 	 * @return array<string, string>|null Filtered configuration.
