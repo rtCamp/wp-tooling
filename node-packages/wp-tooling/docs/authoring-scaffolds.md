@@ -127,6 +127,7 @@ The `inputs[]` array is the authoritative declaration. For each input the engine
 2. `discover_from` (see below).
 3. `default`.
 4. Error `EMISSINGINPUT` if the field is `required: true`.
+5. Error `EINVALIDINPUT` if the resolved value falls outside a declared `enum`.
 
 An explicit value always wins over discovery, so AI/CLI callers are never overridden.
 
@@ -165,9 +166,27 @@ Available via `transform`:
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
 
+### Constraining values with `enum`
+
+When an input only makes sense as one of a fixed set, declare `enum`. The engine checks the
+**resolved** value (after any `transform`) and throws `EINVALIDINPUT` naming the allowed set, so a
+typo fails at `add` time instead of rendering code that silently does nothing:
+
+```json
+{
+    "key": "mode",
+    "description": "Speculative loading mode.",
+    "enum": ["auto", "prefetch", "prerender"],
+    "default": "prerender"
+}
+```
+
+`validate` additionally rejects a `default` that is not one of its own `enum` members, since that
+combination would fail on every run. See `wp-api/speculation` for a live example.
+
 ### Boolean inputs
 
-There is no `boolean` type in the schema. Use a string input with `"true"` / `"false"` values and a `default`, and check it in templates with `{{#key}}...{{/key}}` or `{{^key}}...{{/key}}`.
+There is no `boolean` type in the schema. Use a string input with `"true"` / `"false"` values and a `default`, and check it in templates with `{{#key}}...{{/key}}` or `{{^key}}...{{/key}}`. Add `"enum": ["true", "false"]` to reject anything else.
 
 Example (from `wp/cli`):
 
@@ -264,7 +283,9 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
 
-`wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8). Those pair with `"wizard_step": "wp-apis"`.
+`wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8; `wp-api/block-bindings` and `wp-api/script-module`, both WP 6.5). Those pair with `"wizard_step": "wp-apis"`.
+
+A block stays in `wp` even when its behaviour comes from a modern core API: `wp/block-interactive` uses the Interactivity API, but what it generates is a block directory, so it sits beside `wp/block-dynamic` and shares its wiring anchor rather than opening a `block` category.
 
 ---
 
@@ -366,11 +387,14 @@ Look at these existing scaffolds when authoring a new one:
 | PHP class extending a framework abstract | `wp/cpt`, `wp/taxonomy`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role` |
 | Cron handler implementing `Registrable` directly | `wp/cron` |
 | Version-guarded customisation of a core WP API | `wp-api/speculation` |
+| Registering something into a core registry on `init` | `wp-api/block-bindings` |
+| PHP class paired with a JS asset the build compiles | `wp-api/script-module` |
 | Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
 | Block with `block.json` + framework class | `wp/block-dynamic` |
+| Block with `render.php` + a `viewScriptModule` store | `wp/block-interactive` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
 | Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 

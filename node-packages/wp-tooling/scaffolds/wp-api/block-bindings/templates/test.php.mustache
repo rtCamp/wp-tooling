@@ -1,0 +1,129 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_Block;
+use WP_Block_Bindings_Registry;
+use WP_Block_Type_Registry;
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * Throwaway block type used to prove context reaches get_value().
+	 */
+	private const CONTEXT_BLOCK = 'scaffold-test/bound-block';
+
+	/**
+	 * Leave the global bindings registry and block registry as we found them.
+	 */
+	public function tear_down(): void {
+		if ( WP_Block_Type_Registry::get_instance()->is_registered( self::CONTEXT_BLOCK ) ) {
+			unregister_block_type( self::CONTEXT_BLOCK );
+		}
+
+		if (
+			function_exists( 'unregister_block_bindings_source' )
+			&& WP_Block_Bindings_Registry::get_instance()->is_registered( {{class}}::SOURCE_NAME )
+		) {
+			unregister_block_bindings_source( {{class}}::SOURCE_NAME );
+		}
+
+		parent::tear_down();
+	}
+
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
+	}
+
+	/**
+	 * The source is registered on init if, and only if, the API exists.
+	 */
+	public function test_register_hooks_defers_to_init_only_when_the_api_exists(): void {
+		$instance = new {{class}}();
+		$instance->register_hooks();
+
+		$api_exists = function_exists( 'register_block_bindings_source' );
+		$is_bound   = false !== has_action( 'init', [ $instance, 'register_source' ] );
+
+		$this->assertSame( $api_exists, $is_bound );
+	}
+
+	/**
+	 * The source name is one core accepts: a namespace prefix, and only
+	 * lowercase alphanumerics, dashes and the separating slash.
+	 */
+	public function test_source_name_is_a_valid_core_source_name(): void {
+		$this->assertMatchesRegularExpression( '#^[a-z0-9-]+/[a-z0-9-]+$#', {{class}}::SOURCE_NAME );
+	}
+
+	/**
+	 * Registration actually lands in core's registry.
+	 */
+	public function test_register_source_registers_with_core(): void {
+		if ( ! function_exists( 'register_block_bindings_source' ) ) {
+			$this->markTestSkipped( 'Block Bindings API requires WordPress 6.5.' );
+		}
+
+		( new {{class}}() )->register_source();
+
+		$this->assertTrue(
+			WP_Block_Bindings_Registry::get_instance()->is_registered( {{class}}::SOURCE_NAME )
+		);
+	}
+
+	/**
+	 * A binding with no usable args keeps the block's own value (null), rather
+	 * than blanking it (an empty string) or dropping the attribute (false).
+	 */
+	public function test_get_value_returns_null_when_there_is_nothing_to_resolve(): void {
+		$block = new WP_Block( [ 'blockName' => 'core/paragraph' ] );
+
+		$this->assertNull( ( new {{class}}() )->get_value( [], $block, 'content' ) );
+	}
+
+	/**
+	 * The happy path: a key plus the postId context resolves to the meta value.
+	 *
+	 * WP_Block only exposes the context keys the rendered block type declares in
+	 * uses_context -- declaring them is exactly what USES_CONTEXT does once core
+	 * registers this source -- so the test registers a block type that does.
+	 */
+	public function test_get_value_resolves_meta_for_the_post_in_context(): void {
+		$post_id = self::factory()->post->create();
+		update_post_meta( $post_id, 'scaffold_test_key', 'resolved value' );
+
+		register_block_type( self::CONTEXT_BLOCK, [ 'uses_context' => {{class}}::USES_CONTEXT ] );
+
+		$block = new WP_Block(
+			[ 'blockName' => self::CONTEXT_BLOCK ],
+			[ 'postId' => $post_id ]
+		);
+
+		$this->assertSame(
+			'resolved value',
+			( new {{class}}() )->get_value( [ 'key' => 'scaffold_test_key' ], $block, 'content' )
+		);
+	}
+}

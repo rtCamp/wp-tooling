@@ -1026,7 +1026,8 @@ function resolveDeclared(declared, supplied, discovery) {
  * discovery.
  *
  * Throws EMISSINGINPUT (with `missingDetails`) when required inputs are
- * not supplied (after `default` is applied).
+ * not supplied (after `default` is applied), then EINVALIDINPUT (with
+ * `invalid`) when a resolved value falls outside its declared `enum`.
  *
  * @param {Object}                scaffold  - The scaffold record being executed.
  * @param {Object<string,string>} supplied  - Caller-supplied input values.
@@ -1073,6 +1074,34 @@ function resolveInputs(scaffold, supplied, discovery = {}) {
 			'EMISSINGINPUT',
 			`Missing required inputs: ${missing.join(', ')}`,
 			{ scaffold: makeId(scaffold), missing, missingDetails }
+		);
+	}
+
+	// Constrained inputs are checked post-transform, i.e. on the value that
+	// actually reaches the templates.
+	const invalid = [];
+	for (const decl of declared || []) {
+		if (!Array.isArray(decl.enum) || !(decl.key in resolved)) {
+			continue;
+		}
+		if (!decl.enum.includes(resolved[decl.key])) {
+			invalid.push({
+				key: decl.key,
+				value: resolved[decl.key],
+				allowed: decl.enum,
+			});
+		}
+	}
+	if (invalid.length) {
+		throw new ScaffoldError(
+			'EINVALIDINPUT',
+			`Invalid input values: ${invalid
+				.map(
+					(i) =>
+						`${i.key}='${i.value}' (allowed: ${i.allowed.join(', ')})`
+				)
+				.join('; ')}`,
+			{ scaffold: makeId(scaffold), invalid }
 		);
 	}
 	return resolved;

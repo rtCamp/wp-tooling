@@ -252,6 +252,27 @@ function validateInputs(inputs) {
 				`${fieldPath}.transform: must be one of ${ALLOWED_INPUT_TRANSFORMS.join(', ')}`
 			);
 		}
+		if (entry.enum !== undefined) {
+			if (
+				!Array.isArray(entry.enum) ||
+				entry.enum.length === 0 ||
+				entry.enum.some((v) => typeof v !== 'string' || v.length === 0)
+			) {
+				errors.push(
+					`${fieldPath}.enum: must be a non-empty array of non-empty strings`
+				);
+			} else if (new Set(entry.enum).size !== entry.enum.length) {
+				errors.push(`${fieldPath}.enum: must not contain duplicates`);
+			} else if (
+				typeof entry.default === 'string' &&
+				!entry.enum.includes(entry.default)
+			) {
+				// A default outside its own enum would fail every run.
+				errors.push(
+					`${fieldPath}.default: '${entry.default}' must be one of ${entry.enum.join(', ')}`
+				);
+			}
+		}
 		for (const k of Object.keys(entry)) {
 			if (
 				![
@@ -261,6 +282,7 @@ function validateInputs(inputs) {
 					'default',
 					'required',
 					'transform',
+					'enum',
 				].includes(k)
 			) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
