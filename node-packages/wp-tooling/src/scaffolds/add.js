@@ -114,6 +114,7 @@ function formatErrorPayload(err) {
 			'available',
 			'missing',
 			'missingDetails',
+			'invalid',
 			'path',
 			'errno',
 			'placeholder',

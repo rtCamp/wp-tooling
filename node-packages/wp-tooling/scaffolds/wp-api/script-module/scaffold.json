@@ -1,0 +1,100 @@
+{
+	"slug": "script-module",
+	"category": "wp-api",
+	"name": "Script Module",
+	"description": "Adds a Script Module (core since WP 6.5): a native ES module WordPress loads with type=\"module\" and lists in its import map, so it can import '@wordpress/interactivity' and other registered modules by bare specifier without a bundler. Generates the module source plus a Registrable that registers it from the build output with dependencies and a version read from the build's .asset.php, and no-ops on WP < 6.5.",
+	"source": "template",
+	"wizard_step": "wp-apis",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the registration class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the registration class. Default 'includes/Services'. The class derives the plugin root by walking two levels up from itself, so keep it two levels deep or adjust the dirname() depth it documents.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "Logical module name, e.g. 'lightbox'. Normalised to a PascalCase class name and a kebab-case module slug.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "module_slug",
+			"description": "Slug half of the module id and the JS filename, derived from name.",
+			"discover_from": "input:name",
+			"transform": "kebab-case"
+		},
+		{
+			"key": "modules_dir",
+			"description": "Source directory for the module (the input to @wordpress/scripts). Default 'src/js/modules', which the rtCamp skeleton's webpack config already discovers automatically.",
+			"default": "src/js/modules"
+		},
+		{
+			"key": "build_dir",
+			"description": "Compiled-output directory holding the built module and its generated .asset.php. Default 'build/js/modules'. Override to the project's real build path (the rtCamp skeleton uses 'assets/build/js/modules').",
+			"default": "build/js/modules"
+		},
+		{
+			"key": "enqueue_hook",
+			"description": "Hook the module is enqueued on: 'wp_enqueue_scripts' for front-end requests, 'enqueue_block_assets' to cover the editor as well.",
+			"default": "wp_enqueue_scripts",
+			"enum": ["wp_enqueue_scripts", "enqueue_block_assets"]
+		},
+		{
+			"key": "text_domain",
+			"description": "Vendor half of the module id, conventionally the project text domain, producing '@my-plugin/lightbox'. The engine cannot read a plugin header, so pass it explicitly when it is not 'my-plugin'.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/script-module.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		},
+		{
+			"src": "templates/module.js.mustache",
+			"dest": "{{modules_dir}}/{{module_slug}}.js"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Services.php",
+			"anchor": "// scaffold:wp/registrable:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the class to a Services module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

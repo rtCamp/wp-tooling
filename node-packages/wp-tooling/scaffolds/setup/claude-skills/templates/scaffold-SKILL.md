@@ -77,6 +77,9 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
 | `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 | `wp-api/speculation` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `wp-api/block-bindings` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `wp-api/script-module` | `includes/Services/` + `src/js/modules/` + `build/js/modules/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `wp/block-interactive` | `includes/Blocks/` + `src/blocks/<slug>/` + `build/blocks/<slug>/` | `<Root>\Blocks` | `tests/Blocks/` | `<Root>\Tests\Blocks` | `<Root>\Modules\Blocks` |
 
 **Modules host one kind each. No `Modules/<Feature>/...`.** A multi-kind feature (e.g. Testimonials = CPT + taxonomy + block + REST) spans the per-kind directories and wires into each kind's module.
 
@@ -97,6 +100,9 @@ Write a test-case checklist covering:
   - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
   - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
   - `wp-api/speculation`: both filters bound, the `MODE`/`EAGERNESS` constants hold values core accepts, `wp_speculation_rules_configuration` returns the scaffolded mode/eagerness, a `null` config stays `null`, exclusions merge without dropping other callers' paths, and `register_hooks()` no-ops on WP < 6.8.
+  - `wp/block-interactive`: `register_hooks()` defers to `init`, the block dir points at the build output (never the source tree), and registration no-ops before WP 6.5 or before a build. Do **not** assert the block is registered - the build output is gitignored, so that fails on a clean checkout. Also confirm `block.json` still declares `supports.interactivity`: without it core never processes the `data-wp-*` directives and the block silently does nothing.
+  - `wp-api/block-bindings`: the source registers on `init` only when the API exists, `SOURCE_NAME` is a name core accepts (namespace prefix, lowercase alphanumerics and dashes), `WP_Block_Bindings_Registry` reports it registered, and `get_value()` returns `null` - not an empty string - when there is nothing to resolve. Context-dependent cases need a block type declaring the source's `uses_context`, since `WP_Block` exposes nothing else.
+  - `wp-api/script-module`: both hooks bound only when the API exists, `MODULE_ID` follows core's `@vendor/name` import-map convention, string dependencies normalise to `[ 'id' => ... ]` form, and the enqueued module prints with a URL inside the build directory.
 
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 
@@ -161,9 +167,9 @@ Frameworks per kind:
 
 | Kind | Framework |
 |---|---|
-| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation` | PHPUnit |
+| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation`, `wp-api/block-bindings`, `wp-api/script-module` | PHPUnit |
 | `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
-| `block/interactive` | Jest + Playwright |
+| `wp/block-interactive` | PHPUnit (registrar). The `view.js` store is not unit-tested: `@wordpress/interactivity` ships ESM only, which the `@wordpress/jest-preset-default` CJS setup cannot resolve. |
 | `ci/*` | actionlint + yaml-parse |
 
 ### 8. Escalate when stuck - do not guess

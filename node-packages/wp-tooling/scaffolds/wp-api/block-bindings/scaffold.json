@@ -1,0 +1,90 @@
+{
+	"slug": "block-bindings",
+	"category": "wp-api",
+	"name": "Block Bindings source",
+	"description": "Adds a Block Bindings source (core since WP 6.5) so editors can point block attributes at project data instead of typed values. Generates a Registrable that registers the source through 'register_block_bindings_source' on init with a get_value callback carrying core's exact signature, declares the block context it needs, and no-ops on WP < 6.5.",
+	"source": "template",
+	"wizard_step": "wp-apis",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the source class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the source file. Default 'includes/Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "Logical source name, e.g. 'product-price'. Normalised to a PascalCase class name and a kebab-case source slug.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "source_slug",
+			"description": "Slug half of the registered source name, derived from name. Core allows only lowercase alphanumerics and dashes here.",
+			"discover_from": "input:name",
+			"transform": "kebab-case"
+		},
+		{
+			"key": "vendor",
+			"description": "Namespace half of the registered source name, e.g. 'rtcamp' produces 'rtcamp/product-price'. Core requires the prefix.",
+			"default": "rtcamp"
+		},
+		{
+			"key": "label",
+			"description": "Human-readable source label shown in the editor's bindings UI.",
+			"required": true
+		},
+		{
+			"key": "text_domain",
+			"description": "Text domain for the label string. The engine cannot read a plugin header, so pass it explicitly when it is not 'my-plugin'.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/block-bindings.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Services.php",
+			"anchor": "// scaffold:wp/registrable:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the class to a Services module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

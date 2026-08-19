@@ -1,0 +1,62 @@
+<?php
+/**
+ * Server-rendered markup for the {{vendor}}/{{slug}} block.
+ *
+ * Exposed by WordPress when this file is used as block.json's `render`:
+ *     $attributes (array)    Block attributes.
+ *     $content    (string)   Inner blocks' rendered output.
+ *     $block      (WP_Block) The block instance.
+ *
+ * Do NOT call wp_interactivity_process_directives() here. Core processes the
+ * directives once, at the outermost interactive block, and only for blocks
+ * whose block.json declares `supports.interactivity` — without that support
+ * key every data-wp-* attribute below is inert.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://developer.wordpress.org/block-editor/reference-guides/interactivity-api/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+/*
+ * Shared across every instance of this block and readable as `state` in
+ * view.js. Anything a data-wp-text or data-wp-bind directive reads must exist
+ * here, not only in the client store: core evaluates the directives while
+ * rendering, so a value the server cannot resolve is rendered as empty.
+ */
+$toggle_label = __( 'Toggle details', '{{vendor}}-{{slug}}' );
+
+wp_interactivity_state(
+	'{{vendor}}/{{slug}}',
+	[
+		'toggleLabel' => $toggle_label,
+	]
+);
+
+$wrapper_id = wp_unique_id( '{{slug}}-' );
+?>
+<div
+	<?php echo get_block_wrapper_attributes(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core returns escaped attributes. ?>
+	data-wp-interactive="{{vendor}}/{{slug}}"
+	<?php echo wp_interactivity_data_wp_context( [ 'isOpen' => false ] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core returns escaped attributes. ?>
+>
+	<button
+		type="button"
+		aria-controls="<?php echo esc_attr( $wrapper_id ); ?>"
+		data-wp-on--click="actions.toggle"
+		data-wp-bind--aria-expanded="context.isOpen"
+		data-wp-text="state.toggleLabel"
+	>
+		<?php echo esc_html( $toggle_label ); ?>
+	</button>
+
+	<div
+		id="<?php echo esc_attr( $wrapper_id ); ?>"
+		data-wp-bind--hidden="!context.isOpen"
+	>
+		<?php echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Inner blocks are already rendered and escaped. ?>
+	</div>
+</div>
