@@ -80,17 +80,22 @@ final class {{class}}Test extends WP_UnitTestCase {
 
 	/**
 	 * Registration actually lands in core's registry.
+	 *
+	 * An equivalence rather than a skip, so the case still means something
+	 * below WP 6.5: there the API does not exist, register_source() must not
+	 * be called at all, and nothing may end up registered.
 	 */
 	public function test_register_source_registers_with_core(): void {
-		if ( ! function_exists( 'register_block_bindings_source' ) ) {
-			$this->markTestSkipped( 'Block Bindings API requires WordPress 6.5.' );
+		$api_exists = function_exists( 'register_block_bindings_source' );
+		$registered = false;
+
+		if ( $api_exists ) {
+			( new {{class}}() )->register_source();
+
+			$registered = WP_Block_Bindings_Registry::get_instance()->is_registered( {{class}}::SOURCE_NAME );
 		}
 
-		( new {{class}}() )->register_source();
-
-		$this->assertTrue(
-			WP_Block_Bindings_Registry::get_instance()->is_registered( {{class}}::SOURCE_NAME )
-		);
+		$this->assertSame( $api_exists, $registered );
 	}
 
 	/**

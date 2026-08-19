@@ -75,6 +75,22 @@
         "The wiring snippet targets the Services module on the // scaffold:wp/registrable:classes anchor.",
         "The skill does NOT run npm install, composer install or a build."
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "Our editors keep pasting the product price into paragraph blocks by hand and it goes stale. I want a binding source, labelled \"Product price\", that lets a paragraph or heading pull its text straight from the post's meta instead. It belongs with the rest of the services.",
+      "expected_output": "wp-api/block-bindings scaffolds a ProductPrice registrable under the project's Services namespace plus a PHPUnit test. The vendor prefix is sampled from the project's existing block.json names, so SOURCE_NAME renders acme/product-price rather than the rtcamp default, and the label is translated with the plugin's own text domain. Core's get_value_callback signature and the USES_CONTEXT declaration are left as core requires them. Any test that touches the Block Bindings API keeps its WP 6.5 guard.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp-api/block-bindings scaffold rather than hand-writing register_block_bindings_source() or reaching for a render_block filter.",
+        "The vendor prefix is sampled from the project's existing block.json names, so SOURCE_NAME renders acme/product-price and not the rtcamp manifest default.",
+        "The class lands under inc/Services/ and the test under the project's tests path, both read from the PSR-4 roots rather than the includes/ default.",
+        "The required label input is passed and rendered through the plugin's own text domain, not the my-plugin default.",
+        "The rendered get_value() keeps core's exact callback signature (array $source_args, WP_Block $block_instance, string $attribute_name) and the USES_CONTEXT declaration that makes the bound block's context reachable.",
+        "Every test that calls register_source() or touches WP_Block_Bindings_Registry keeps a WP 6.5 guard, whether it came from the stub or the skill added it; the API is core since 6.5 and an unguarded call fatals below that.",
+        "The wiring snippet targets the Services module on the // scaffold:wp/registrable:classes anchor.",
+        "The skill does NOT run composer install, composer require or npm install."
+      ]
     }
   ]
 }
