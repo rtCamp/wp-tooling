@@ -77,6 +77,31 @@ const FILE_KEYS = keysOf(FILE_ENTRY);
 const TEST_KEYS = keysOf(TEST_ENTRY);
 const SECRET_KEYS = keysOf(SECRET_ENTRY);
 
+// Source prefixes `discover_from` can actually resolve. Kept in step with the
+// branches in registry.js `discoverFromSource()` (plus `input:`, which the
+// caller resolves); tests/scaffolds/discover-sources.test.js pins the pairing.
+const DISCOVER_SOURCES = [
+	'composer.json',
+	'package.json',
+	'plugin-header',
+	'config',
+	'input',
+];
+
+/**
+ * Does a `discover_from` spec name a source the engine can resolve?
+ *
+ * @param {string} spec - The declared spec, e.g. `composer.json:autoload.psr-4`.
+ * @return {boolean} True when the prefix is supported and a selector follows.
+ */
+function isResolvableSource(spec) {
+	const colon = spec.indexOf(':');
+	if (colon === -1 || colon === spec.length - 1) {
+		return false;
+	}
+	return DISCOVER_SOURCES.includes(spec.slice(0, colon));
+}
+
 /**
  * Validate a parsed scaffold.json object.
  *
@@ -240,11 +265,17 @@ function validateInputs(inputs) {
 		) {
 			errors.push(`${fieldPath}.description: must be a non-empty string`);
 		}
-		if (
-			entry.discover_from !== undefined &&
-			typeof entry.discover_from !== 'string'
-		) {
-			errors.push(`${fieldPath}.discover_from: must be a string`);
+		if (entry.discover_from !== undefined) {
+			if (typeof entry.discover_from !== 'string') {
+				errors.push(`${fieldPath}.discover_from: must be a string`);
+			} else if (!isResolvableSource(entry.discover_from)) {
+				// An unrecognised prefix used to resolve to `undefined` at run
+				// time and fall back to the default, silently — a manifest could
+				// declare discovery that never happened and nothing said so.
+				errors.push(
+					`${fieldPath}.discover_from: unknown source in "${entry.discover_from}" (supported: ${DISCOVER_SOURCES.join(', ')})`
+				);
+			}
 		}
 		if (entry.default !== undefined && typeof entry.default !== 'string') {
 			errors.push(`${fieldPath}.default: must be a string`);

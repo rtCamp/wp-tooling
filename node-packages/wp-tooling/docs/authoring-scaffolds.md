@@ -139,7 +139,13 @@ exactly as if `discover_from` were not set).
 
 - `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
 - `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** for ordinary inputs (first map key, trailing `\` stripped) and the **root directory** for path inputs (that same entry's value; the first element if it is a list). Either way the discovered root replaces only the *first segment* of the input's `default`, keeping the scaffold's sub-namespace or sub-directory: with a map of `Acme\Blog\` → `inc/`, a `namespace` default of `Inc\Cli` yields `Acme\Blog\Cli` and a `base_path` default of `includes/Cli` yields `inc/Cli`. Both come from the same map entry, so a class is never namespaced into the autoload root while being written outside it. A path input whose `default` has no sub-directory resolves to the root directory itself, and a PSR-4 target of `./` leaves just the sub-directory.
+- `composer.json:autoload-dev.psr-4` — the same graft against the **dev** autoload map, which is where a project declares its test tree. Use it for `tests_path`: a dev map of `Acme\Blog\Tests\` → `tests/php/` turns a default of `tests/Cli` into `tests/php/Cli`, so the generated test lands where the project's PHPUnit testsuite actually looks. Without it a test is written to the manifest default and is silently never collected.
+- `plugin-header:<header-name>` — a value from the project's WordPress entry header, named lowercased with spaces hyphenated: `plugin-header:text-domain` reads `Text Domain:`. The engine looks for a root-level `*.php` carrying `Plugin Name:` and falls back to a theme's `style.css` carrying `Theme Name:`, so this resolves for plugins and themes alike. Only the header comment is scanned, so a `Foo: bar` in the code below is never mistaken for a header.
 - `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
+
+`validate` rejects a `discover_from` whose prefix is not one of the above. An unrecognised
+source used to resolve to nothing and fall through to the `default` in silence, which is how
+seven scaffolds shipped for months declaring a text-domain lookup that never ran.
 
 Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
 

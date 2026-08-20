@@ -5,10 +5,11 @@
  *
  *   - `package.json` (required)
  *   - `composer.json` (optional)
- *   - The WordPress plugin entry file (a `*.php` at the package root
- *     carrying a `Plugin Name:` header)
+ *   - The WordPress entry file: a `*.php` at the package root carrying a
+ *     `Plugin Name:` header, or a theme's `style.css` carrying `Theme Name:`
  *   - The current version (taken from `package.json`)
- *   - The plugin slug (basename of the entry file, used for the zip name)
+ *   - The slug used for the zip name — the entry file's basename for a plugin,
+ *     the directory name for a theme, which is what WordPress keys a theme on
  *
  * Lives as a separate module so bump / changelog / zip don't each re-walk
  * the directory or re-parse the same headers.
@@ -29,16 +30,22 @@ const path = require('path');
 const HEADER_SCAN_BYTES = 8192;
 
 /**
- * Walk `cwd` (root only -- no recursion) looking for a `.php` file whose
- * leading bytes contain a `Plugin Name:` header. WordPress' own
- * convention is exactly one such file per plugin; this helper enforces
- * that, throwing a clear error if zero or more than one is found.
+ * Find the project's WordPress entry file.
  *
- * @param {string} cwd Project root.
- * @return {string} Absolute path to the entry file.
- * @throws {Error} When no entry file, or more than one, exists at `cwd`.
+ * Walks `cwd` (root only -- no recursion) for a `.php` file whose leading bytes
+ * carry a `Plugin Name:` header. WordPress' own convention is exactly one such
+ * file per plugin, so zero or more than one is an error. When none is found,
+ * falls back to a theme's `style.css` with a `Theme Name:` header before giving
+ * up, so the release commands work for themes as well as plugins.
+ *
+ * @param {string}  cwd                  Project root.
+ * @param {Object}  [options]            Options.
+ * @param {boolean} [options.pluginOnly] Skip the theme fallback and report the
+ *                                       plugin-only error. Used by {@link findPluginEntry}.
+ * @return {{ entry: string, kind: 'plugin'|'theme' }} Entry path and what it is.
+ * @throws {Error} When no matching entry exists at `cwd`.
  */
-function findPluginEntry(cwd) {
+function findEntry(cwd, { pluginOnly = false } = {}) {
 	let entries;
 	try {
 		entries = fs.readdirSync(cwd, { withFileTypes: true });
@@ -60,11 +67,6 @@ function findPluginEntry(cwd) {
 		}
 	}
 
-	if (matches.length === 0) {
-		throw new Error(
-			`release: no plugin entry file found at "${cwd}" (expected a *.php with a "Plugin Name:" header)`
-		);
-	}
 	if (matches.length > 1) {
 		throw new Error(
 			`release: multiple plugin entry files found at "${cwd}": ${matches
@@ -72,15 +74,49 @@ function findPluginEntry(cwd) {
 				.join(', ')}`
 		);
 	}
-	return matches[0];
+	if (matches.length === 1) {
+		return { entry: matches[0], kind: 'plugin' };
+	}
+
+	if (pluginOnly) {
+		throw new Error(
+			`release: no plugin entry file found at "${cwd}" (expected a *.php with a "Plugin Name:" header)`
+		);
+	}
+
+	const styleCss = path.join(cwd, 'style.css');
+	if (
+		fs.existsSync(styleCss) &&
+		/^[ \t*/#]*\s*Theme Name:\s*\S/m.test(readHeader(styleCss))
+	) {
+		return { entry: styleCss, kind: 'theme' };
+	}
+
+	throw new Error(
+		`release: no plugin or theme entry file found at "${cwd}" (expected a *.php with a "Plugin Name:" header, or a style.css with a "Theme Name:" header)`
+	);
+}
+
+/**
+ * The plugin-only half of {@link findEntry}, kept as the original public API.
+ *
+ * Returns the entry path as a string and never falls back to a theme, so
+ * callers that predate theme support keep their exact contract.
+ *
+ * @param {string} cwd Project root.
+ * @return {string} Absolute path to the plugin entry file.
+ * @throws {Error} When no plugin entry file, or more than one, exists at `cwd`.
+ */
+function findPluginEntry(cwd) {
+	return findEntry(cwd, { pluginOnly: true }).entry;
 }
 
 /**
  * Read project state for the release CLIs.
  *
  * @param {string} cwd Project root (typically `process.cwd()`).
- * @return {Object} Project state with packageJson, packageJsonPath, composerJson, composerJsonPath, pluginEntry, pluginSlug and currentVersion.
- * @throws {Error} When `package.json` is missing, malformed, lacks a `version`, or the plugin entry file cannot be found.
+ * @return {Object} Project state with packageJson, packageJsonPath, composerJson, composerJsonPath, pluginEntry, pluginSlug, kind and currentVersion.
+ * @throws {Error} When `package.json` is missing, malformed, lacks a `version`, or no plugin/theme entry file can be found.
  */
 function loadContext(cwd) {
 	const packageJsonPath = path.join(cwd, 'package.json');
@@ -117,8 +153,13 @@ function loadContext(cwd) {
 		}
 	}
 
-	const pluginEntry = findPluginEntry(cwd);
-	const pluginSlug = path.basename(pluginEntry, '.php');
+	const { entry: pluginEntry, kind } = findEntry(cwd);
+	// A theme has no entry-file basename to key on -- WordPress identifies it by
+	// its directory -- so the slug comes from the folder instead.
+	const pluginSlug =
+		kind === 'theme'
+			? path.basename(path.resolve(cwd))
+			: path.basename(pluginEntry, '.php');
 
 	return {
 		packageJson,
@@ -127,6 +168,7 @@ function loadContext(cwd) {
 		composerJsonPath: composerJson ? composerJsonPath : null,
 		pluginEntry,
 		pluginSlug,
+		kind,
 		currentVersion: packageJson.version,
 	};
 }
@@ -156,5 +198,6 @@ function readHeader(file) {
 
 module.exports = {
 	loadContext,
+	findEntry,
 	findPluginEntry,
 };
