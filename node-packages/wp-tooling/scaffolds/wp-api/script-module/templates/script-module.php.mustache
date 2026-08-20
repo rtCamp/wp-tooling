@@ -139,7 +139,7 @@ final class {{class}} implements Registrable {
 	 *
 	 * @param array<int,mixed> $dependencies Raw dependency list.
 	 *
-	 * @return array<int,array<string,string>>
+	 * @return array<int,array{id:string,import?:string}>
 	 */
 	private function normalise_dependencies( array $dependencies ): array {
 		$normalised = [];
@@ -150,9 +150,19 @@ final class {{class}} implements Registrable {
 				continue;
 			}
 
-			if ( is_array( $dependency ) && isset( $dependency['id'] ) && is_string( $dependency['id'] ) ) {
-				$normalised[] = $dependency;
+			if ( ! is_array( $dependency ) || ! isset( $dependency['id'] ) || ! is_string( $dependency['id'] ) ) {
+				continue;
 			}
+
+			// Rebuilt key by key rather than passed through, so the result is
+			// exactly the shape core documents -- anything else it would ignore.
+			$entry = [ 'id' => $dependency['id'] ];
+
+			if ( isset( $dependency['import'] ) && is_string( $dependency['import'] ) ) {
+				$entry['import'] = $dependency['import'];
+			}
+
+			$normalised[] = $entry;
 		}
 
 		return $normalised;

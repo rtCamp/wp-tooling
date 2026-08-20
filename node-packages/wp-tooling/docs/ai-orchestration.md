@@ -265,6 +265,20 @@ Fall through these in order:
 3. **No anchor and no clear pattern neighbourhood.** The bootstrap method exists (from §6) but there are no prior examples of this scaffold type. Insert at a sensible position in the bootstrap method (typically just before the closing brace), and explicitly tell the developer this is a best-effort placement.
 4. **No bootstrap method either.** Skip wiring, surface the snippet as a manual instruction in the report, let the developer place it.
 
+Levels 2 and 3 place the snippet relative to code that may not survive. rtCamp
+skeletons wrap each optional capability in `// wp:example:<key>` … `//
+wp:example:<key>:end` markers, and `wp-tooling init` deletes a marked region
+**including its body** when the developer drops that capability
+(`src/init/examples.js`). The last sampled occurrence of a pattern is very often
+the last line inside such a region, so appending after it puts the newly wired
+class inside a block that later disappears — silently, and long after the run
+that placed it.
+
+**Never place the snippet between a `// wp:example:<key>` opener and its
+`:end`.** Insert after the last occurrence that sits outside every region
+instead, and say which line you chose and why. This holds at level 1 too: an
+anchor can itself sit inside a region.
+
 At every level the skill **shows the developer the snippet, the target file, the chosen line range, and the reason for the choice** before applying. The developer can apply, redirect to a different location, edit the snippet, or skip.
 
 ### Anchor restoration (optional, never automatic)

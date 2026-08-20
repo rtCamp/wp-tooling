@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,17 +17,29 @@ use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * The tag is the one authors type in content.
+	 */
 	public function test_tag_matches_manifest(): void {
 		$this->assertSame( '{{tag}}', {{class}}::get_tag() );
 	}
 
+	/**
+	 * The tag lands in core's shortcode registry.
+	 *
+	 * Calls the registration callback directly. Firing do_action( 'init' ) would
+	 * re-run every other listener on that hook -- in a real project that means
+	 * duplicate block registrations and _doing_it_wrong notices, which
+	 * WP_UnitTestCase fails on.
+	 */
 	public function test_register_hooks_registers_shortcode(): void {
-		( new {{class}}() )->register_hooks();
-		do_action( 'init' );
+		( new {{class}}() )->register_shortcode();
 		$this->assertTrue( shortcode_exists( '{{tag}}' ) );
 	}
 }

@@ -206,8 +206,8 @@ The engine never edits existing files. When a scaffold needs to register itself 
 
 Each entry:
 
-- `target_file`: path to the file. Placeholders allowed.
-- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling.
+- `target_file`: path to the file, relative to the project root. Placeholders allowed. The engine normalises the rendered path, so `{{base_path}}/../Modules/Cli.php` reaches the AI as `includes/Modules/Cli.php` — write the `..` form rather than duplicating a path input. An entry whose path still resolves outside the project after normalising is dropped with a warning.
+- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling. Either way it refuses to insert inside a `// wp:example:<key>` … `:end` region, since `wp-tooling init` deletes those body and all.
 - `snippet_template`: the snippet to insert. Mustache placeholders are rendered before the snippet is emitted.
 - `description`: explains intent. The AI uses this when asking the developer for consent.
 

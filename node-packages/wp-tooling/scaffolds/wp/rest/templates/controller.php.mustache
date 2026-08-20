@@ -9,13 +9,12 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
-use WP_REST_Request;
 use WP_REST_Response;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
 
 /**
  * Registers REST routes for the {{name}} resource.
@@ -45,8 +44,6 @@ class {{class}}Controller extends AbstractRESTController {
 
 	/**
 	 * Register REST routes. Called by the framework on rest_api_init.
-	 *
-	 * @return void
 	 */
 	public function register_routes(): void {
 		register_rest_route(
@@ -65,11 +62,14 @@ class {{class}}Controller extends AbstractRESTController {
 	/**
 	 * Return the collection of items.
 	 *
-	 * @param WP_REST_Request $request The REST request.
+	 * WP_REST_Controller declares $request untyped, so this signature cannot
+	 * narrow it to WP_REST_Request -- PHP rejects that as incompatible and
+	 * fatals when the class loads. `mixed` matches the parent; the annotation
+	 * has to match the native hint, so the real type is stated in prose.
 	 *
-	 * @return WP_REST_Response
+	 * @param mixed $request The REST request, always a WP_REST_Request at runtime.
 	 */
-	public function get_items( WP_REST_Request $request ): WP_REST_Response {
+	public function get_items( mixed $request ): WP_REST_Response {
 		// Replace with your collection response.
 		return new WP_REST_Response( [], 200 );
 	}
@@ -77,11 +77,14 @@ class {{class}}Controller extends AbstractRESTController {
 	/**
 	 * Permission check for the collection endpoint.
 	 *
-	 * @param WP_REST_Request $request The REST request.
+	 * Typed `mixed` for the same reason as get_items(). The explicit @return
+	 * documents this override's own contract: the inherited one is `true|WP_Error`,
+	 * which a plain bool does not satisfy.
 	 *
-	 * @return bool
+	 * @param mixed $request The REST request, always a WP_REST_Request at runtime.
+	 * @return bool True when the current user may read the collection.
 	 */
-	public function get_items_permissions_check( WP_REST_Request $request ): bool {
+	public function get_items_permissions_check( mixed $request ): bool {
 		return current_user_can( 'read' );
 	}
 }

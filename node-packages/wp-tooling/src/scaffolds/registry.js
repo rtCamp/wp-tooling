@@ -393,12 +393,30 @@ class ScaffoldRegistry {
 		// `target_file` templates often build on a path input (e.g.
 		// `{{base_path}}/../Modules/Cli.php`); normalise so the caller gets
 		// `includes/Modules/Cli.php`, not a `..` segment to clean up.
-		const aiWiring = (scaffold.wiring || []).map((w) => ({
-			targetFile: path.posix.normalize(render(w.target_file, resolved)),
-			anchor: w.anchor,
-			snippet: render(w.snippet_template, resolved),
-			description: w.description || '',
-		}));
+		//
+		// Normalising collapses interior `..` but keeps a leading one, so a
+		// short enough path input (`--base_path=.`) still resolves outside the
+		// project. Drop those instead of handing the AI a file to edit above
+		// the project root. Warn rather than throw: this runs after the files
+		// are on disk, and aborting here would leave a half-applied scaffold.
+		const aiWiring = [];
+		for (const w of scaffold.wiring || []) {
+			const targetFile = path.posix.normalize(
+				render(w.target_file, resolved)
+			);
+			if (targetFile.startsWith('../') || path.isAbsolute(targetFile)) {
+				warnings.push(
+					`wiring target resolves outside the project, skipped: ${targetFile}`
+				);
+				continue;
+			}
+			aiWiring.push({
+				targetFile,
+				anchor: w.anchor,
+				snippet: render(w.snippet_template, resolved),
+				description: w.description || '',
+			});
+		}
 
 		// Declarative tests (lint-only entries like actionlint on the YAML the
 		// files-loop just wrote) reuse a files[].dest. Track those so we don't

@@ -9,12 +9,12 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
 use WP_CLI;
+use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
 
 /**
  * Registers the {{name}} WP-CLI command.
@@ -23,8 +23,6 @@ final class {{class}} implements CLICommand {
 
 	/**
 	 * Get the command name.
-	 *
-	 * @return string
 	 */
 	public static function get_name(): string {
 		return '{{name}}';
@@ -32,8 +30,6 @@ final class {{class}} implements CLICommand {
 
 	/**
 	 * Get the command description.
-	 *
-	 * @return string
 	 */
 	public static function get_description(): string {
 		return '{{description}}';
@@ -49,8 +45,6 @@ final class {{class}} implements CLICommand {
 	 *
 	 * @param array<int,string>    $args       Positional arguments.
 	 * @param array<string,string> $assoc_args Named arguments.
-	 *
-	 * @return void
 	 */
 	public static function run( array $args, array $assoc_args ): void {
 		$dry_run = isset( $assoc_args['dry-run'] );

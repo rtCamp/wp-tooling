@@ -55,7 +55,7 @@ Read, in order:
 - Block scaffolds: sample one `block.json` for vendor prefix and source dir.
 - CI scaffolds: sample one `.github/workflows/*.yml` for filename and trigger style.
 
-Anchors (`// scaffold:<kind>:classes`) are hints, not ground truth. Sampled patterns win.
+Anchors (`// scaffold:<kind>:classes`) settle *where* a snippet goes, not *how* it is written - sampled patterns win on snippet shape. Note any `// wp:example:<key>` ... `:end` regions in the files you sample; §6a will not insert inside one.
 
 Confirm findings with the developer in one short message. Proceed on confirmation.
 
@@ -143,7 +143,7 @@ Result shape: `{ scaffold, engine, developer, ai, warnings }`.
 For each `{ targetFile, anchor, snippet, description }`:
 
 1. **Snippet** - use canonical if it matches the sampled project pattern; else translate using the sampled shape with the new class substituted. Show both. If patterns conflict or no samples exist, ask.
-2. **Location** - anchor present → after it; else after the last sampled occurrence of the pattern; else best-effort in bootstrap method (say so); else skip and print as manual instruction.
+2. **Location** - anchor present → after it; else after the last sampled occurrence of the pattern; else best-effort in bootstrap method (say so); else skip and print as manual instruction. Never land between a `// wp:example:<key>` opener and its `:end`, anchors included: `wp-tooling init` deletes those regions body and all when the capability is dropped, taking the wired class with them. Fall back to the last occurrence outside every region and say so.
 3. **Consent** - show targetFile + line range + description + rendered snippet. Ask `[apply / different location / edit snippet / skip]`. Never apply without consent.
 4. **Idempotent** - search first, do not re-insert.
 
@@ -206,6 +206,7 @@ Escalation report format: **what you tried, what you observed, what's blocking, 
 - Never edit branch protection, repo settings, webhooks, or any GitHub admin surface.
 - Never commit, push, open PRs, or comment on issues without explicit consent.
 - Never apply wiring without showing the diff and getting consent.
+- Never place a wiring snippet inside a `// wp:example:<key>` ... `:end` region.
 - Never invent a third registration pattern when canonical and sampled disagree - ask.
 - Never restore scaffold anchor comments without explicit consent.
 - Never modify `composer.json`, `package.json`, or any lockfile beyond what the engine wrote.

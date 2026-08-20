@@ -19,6 +19,13 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+	SCAFFOLD_SCHEMA,
+	INPUT_ENTRY,
+	WIRING_ENTRY,
+	FILE_ENTRY,
+	TEST_ENTRY,
+	SECRET_ENTRY,
+	FEATURE_BLOCK,
 	REQUIRED_FIELDS,
 	ALLOWED_SOURCES,
 	ALLOWED_WIZARD_STEPS,
@@ -48,23 +55,27 @@ const CATEGORY_RE = new RegExp(CATEGORY_PATTERN);
 const INPUT_KEY_RE = new RegExp(INPUT_KEY_PATTERN);
 const SECRET_KEY_RE = new RegExp(SECRET_KEY_PATTERN);
 
-const TOP_LEVEL_KEYS = new Set([
-	'slug',
-	'category',
-	'name',
-	'description',
-	'source',
-	'wizard_step',
-	'module_class',
-	'files',
-	'inputs',
-	'wiring',
-	'tests',
-	'secrets',
-	'scripts',
-	'feature',
-	...DEPENDENCY_MAPS,
-]);
+/**
+ * The keys a schema shape allows.
+ *
+ * @param {{properties: Object}} shape - A schema object with a properties map.
+ * @return {string[]} Allowed key names.
+ */
+function keysOf(shape) {
+	return Object.keys(shape.properties);
+}
+
+// Allow-lists are read off the schema rather than restated here. `schema.js`
+// already closes each of these shapes with `additionalProperties: false`, and a
+// second copy in this file is how a key ends up accepted by the schema and
+// rejected by the validator that actually runs (or the reverse). Deriving keeps
+// adding a key to one edit; tests/scaffolds/schema-parity.test.js pins it.
+const TOP_LEVEL_KEYS = new Set(keysOf(SCAFFOLD_SCHEMA));
+const INPUT_KEYS = keysOf(INPUT_ENTRY);
+const WIRING_KEYS = keysOf(WIRING_ENTRY);
+const FILE_KEYS = keysOf(FILE_ENTRY);
+const TEST_KEYS = keysOf(TEST_ENTRY);
+const SECRET_KEYS = keysOf(SECRET_ENTRY);
 
 /**
  * Validate a parsed scaffold.json object.
@@ -189,7 +200,7 @@ function validateFiles(files) {
 			errors.push(`${fieldPath}.raw: must be a boolean`);
 		}
 		for (const k of Object.keys(entry)) {
-			if (k !== 'src' && k !== 'dest' && k !== 'raw') {
+			if (!FILE_KEYS.includes(k)) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}
@@ -274,17 +285,7 @@ function validateInputs(inputs) {
 			}
 		}
 		for (const k of Object.keys(entry)) {
-			if (
-				![
-					'key',
-					'description',
-					'discover_from',
-					'default',
-					'required',
-					'transform',
-					'enum',
-				].includes(k)
-			) {
+			if (!INPUT_KEYS.includes(k)) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}
@@ -333,14 +334,7 @@ function validateWiring(wiring) {
 			errors.push(`${fieldPath}.description: must be a string`);
 		}
 		for (const k of Object.keys(entry)) {
-			if (
-				![
-					'target_file',
-					'anchor',
-					'snippet_template',
-					'description',
-				].includes(k)
-			) {
+			if (!WIRING_KEYS.includes(k)) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}
@@ -379,7 +373,7 @@ function validateTests(tests) {
 			errors.push(`${fieldPath}.command: must be a string`);
 		}
 		for (const k of Object.keys(entry)) {
-			if (!['src', 'dest', 'framework', 'command'].includes(k)) {
+			if (!TEST_KEYS.includes(k)) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}
@@ -426,7 +420,7 @@ function validateSecrets(secrets) {
 			errors.push(`${fieldPath}.required: must be a boolean`);
 		}
 		for (const k of Object.keys(entry)) {
-			if (!['key', 'scope', 'description', 'required'].includes(k)) {
+			if (!SECRET_KEYS.includes(k)) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
 			}
 		}
@@ -479,8 +473,10 @@ function validateScripts(scripts) {
 	return errors;
 }
 
-const FEATURE_LIST_KEYS = ['owned_files', 'confirm_remove', 'gitignore'];
-const FEATURE_KEYS = new Set(['config_key', ...FEATURE_LIST_KEYS]);
+const FEATURE_KEYS = new Set(keysOf(FEATURE_BLOCK));
+const FEATURE_LIST_KEYS = keysOf(FEATURE_BLOCK).filter(
+	(k) => FEATURE_BLOCK.properties[k].type === 'array'
+);
 
 function validateFeature(feature) {
 	if (

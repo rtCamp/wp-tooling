@@ -5,7 +5,8 @@
  *     (json-escape derived input)
  *   - wp/cli namespace + tests_namespace discovery grafts the project's
  *     PSR-4 root onto the kind sub-namespace
- *   - wiring targetFile paths are normalised (no `..` segments)
+ *   - wiring targetFile paths are normalised (no `..` segments), and a
+ *     target that still escapes the project is dropped with a warning
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
  *     rejects an out-of-enum mode/eagerness
@@ -92,6 +93,22 @@ describe('wiring targetFile normalisation', () => {
 		const target = result.ai.wiring[0].targetFile;
 		expect(target).toBe('includes/Modules/Cli.php');
 		expect(target).not.toContain('..');
+	});
+
+	it('drops a wiring target that normalises outside the project', async () => {
+		const r = registry;
+		// `wp/cli` wires into `{{base_path}}/../Modules/Cli.php`. A single
+		// path segment leaves nothing for the `..` to consume, so the target
+		// would escape the project the AI was pointed at.
+		const result = await r.execute(
+			'wp/cli',
+			{ name: 'export-things', base_path: '.' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring).toEqual([]);
+		expect(result.warnings).toEqual([
+			'wiring target resolves outside the project, skipped: ../Modules/Cli.php',
+		]);
 	});
 });
 
