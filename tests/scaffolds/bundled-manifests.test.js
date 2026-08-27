@@ -88,3 +88,28 @@ describe('wiring targetFile normalisation', () => {
 		expect(target).not.toContain('..');
 	});
 });
+
+describe('ci/test-measure rendering', () => {
+	it('omits run-a11y by default and includes it when run_a11y is true', async () => {
+		const r = registry;
+		const off = makeTmpDir();
+		await r.execute('ci/test-measure', {}, { dryRun: false, cwd: off });
+		const offYaml = fs.readFileSync(
+			path.join(off, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(offYaml).not.toContain('run-a11y:');
+
+		const on = makeTmpDir();
+		await r.execute(
+			'ci/test-measure',
+			{ run_a11y: 'true' },
+			{ dryRun: false, cwd: on }
+		);
+		const onYaml = fs.readFileSync(
+			path.join(on, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(onYaml).toContain('run-a11y: true');
+	});
+});

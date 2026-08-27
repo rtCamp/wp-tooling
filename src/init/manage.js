@@ -42,14 +42,12 @@ const splitList = (value) =>
  * @return {{flags: Object, unknown: string[]}} Parsed.
  */
 const parseManageFlags = (argv) => {
-	const flags = { yes: false, list: false };
+	const flags = { yes: false };
 	const unknown = [];
 
 	argv.forEach((arg) => {
 		if ('--yes' === arg || '-y' === arg) {
 			flags.yes = true;
-		} else if ('--list' === arg) {
-			flags.list = true;
 		} else if ('--manage' === arg) {
 			// Explicit manage marker; already in manage mode, no-op.
 		} else if (arg.startsWith('--features=')) {
@@ -64,6 +62,19 @@ const parseManageFlags = (argv) => {
 	});
 
 	return { flags, unknown };
+};
+
+/**
+ * Human label for a feature's effective state (null = probe failed).
+ *
+ * @param {boolean|null} on - Detected state.
+ * @return {string} 'enabled' | 'disabled' | 'unknown'.
+ */
+const stateLabel = (on) => {
+	if (null === on) {
+		return 'unknown';
+	}
+	return on ? 'enabled' : 'disabled';
 };
 
 /**
@@ -82,7 +93,7 @@ const showStatus = (rows, unknown, ui) => {
 	ui.table(
 		rows.map((r) => [
 			r.label,
-			`${r.on ? 'enabled' : 'disabled'}${r.drift ? '  (drift)' : ''}`,
+			`${stateLabel(r.on)}${r.drift ? '  (drift)' : ''}`,
 		]),
 		{ title: 'Feature status' }
 	);
@@ -118,19 +129,27 @@ const reqReadFeatures = (root) => readFeatures(root);
 const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 	const { flags, unknown } = parseManageFlags(argv);
 	if (unknown.length) {
+		// Scaffold-only flags (advertised in the pre-setup help) do not apply once
+		// the project is set up. Explain the mode instead of a bare error, so a
+		// caller (including an AI agent) does not treat it as a failure and investigate.
+		const scaffoldOnly = unknown.filter((arg) =>
+			/^--(name|version|remove-examples|keep-examples)(=|$)/.test(arg)
+		);
+		if (scaffoldOnly.length === unknown.length) {
+			ui.info(
+				`${scaffoldOnly.join(
+					', '
+				)} apply only during first-time setup and are ignored now: this project is already set up (.wp-scaffold.json exists), so 'npm run init' is in MANAGE mode. To edit the name or version, run 'npm run init' with no flags and use the interactive editor. Run 'npm run init -- --help' to see the manage options, or 'npm run init -- --reinit' to re-run first-time setup.`
+			);
+			process.exitCode = 1;
+			return;
+		}
 		ui.error(`Unknown argument(s): ${unknown.join(' ')}`);
 		process.exitCode = 1;
 		return;
 	}
 	if (flags.features && (flags.enable || flags.disable)) {
 		ui.error('--features cannot be combined with --enable/--disable.');
-		process.exitCode = 1;
-		return;
-	}
-	if (flags.list && (flags.features || flags.enable || flags.disable)) {
-		ui.error(
-			'--list cannot be combined with --features/--enable/--disable.'
-		);
 		process.exitCode = 1;
 		return;
 	}
@@ -142,11 +161,6 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 		identity.features || {},
 		api
 	);
-
-	if (flags.list) {
-		showStatus(rows, retired, ui);
-		return;
-	}
 
 	const validKeys = new Set(features.map((f) => f.key));
 	const requested = [

@@ -460,6 +460,24 @@ const disableFeature = (feature, api, survivors = []) => {
 };
 
 /**
+ * Keys present in a persisted features map that `config.features` no longer
+ * declares (e.g. a feature retired from the starter after it shipped).
+ * Shared by `reconcile()` (manage-mode toggling) and `listFlow` (`--list`) --
+ * the only piece of their bookkeeping that is genuinely identical rather
+ * than mode-specific.
+ *
+ * @param {Object} config    - Per-project scaffold config.
+ * @param {Object} persisted - Persisted features map ({ key: bool }).
+ * @return {string[]} Retired keys.
+ */
+const retiredKeys = (config, persisted) => {
+	const known = new Set(
+		(config.features || []).map((feature) => feature.key)
+	);
+	return Object.keys(persisted || {}).filter((key) => !known.has(key));
+};
+
+/**
  * Reconcile persisted intent against detected reality.
  *
  * @param {Object} config    - Per-project scaffold config.
@@ -485,10 +503,7 @@ const reconcile = (config, persisted, api) => {
 		};
 	});
 
-	const known = new Set(features.map((feature) => feature.key));
-	const unknown = Object.keys(map).filter((key) => !known.has(key));
-
-	return { rows, unknown };
+	return { rows, unknown: retiredKeys(config, map) };
 };
 
 /**
@@ -516,6 +531,33 @@ const detectMap = (config, api) => {
 		map[feature.key] = detectFeature(feature, api);
 	});
 	return map;
+};
+
+/**
+ * Guarded variant of `detectMap` for read-only reporting (`--list`): a
+ * throwing config-supplied `detect` probe must degrade to "unknown" instead of
+ * crashing the machine contract. Toggle flows keep the loud `detectMap`.
+ *
+ * @param {Object} config - Per-project scaffold config.
+ * @param {Object} api    - FeatureApi.
+ * @return {{map: Object, errors: Array<{key: string, message: string}>}}
+ *         `map[key]` is boolean, or null when that feature's probe threw.
+ */
+const safeDetectMap = (config, api) => {
+	const map = {};
+	const errors = [];
+	(config.features || []).forEach((feature) => {
+		try {
+			map[feature.key] = detectFeature(feature, api);
+		} catch (err) {
+			map[feature.key] = null;
+			errors.push({
+				key: feature.key,
+				message: err && err.message ? err.message : String(err),
+			});
+		}
+	});
+	return { map, errors };
 };
 
 /**
@@ -699,8 +741,10 @@ module.exports = {
 	detectFeature,
 	enableFeature,
 	disableFeature,
+	retiredKeys,
 	reconcile,
 	computeDiff,
 	detectMap,
+	safeDetectMap,
 	toggleFeatures,
 };

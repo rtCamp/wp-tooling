@@ -209,6 +209,46 @@ describe('add command non-interactive flow', () => {
 	});
 });
 
+describe('add debug logging does not leak raw argument values', () => {
+	let logPath;
+
+	beforeEach(() => {
+		logPath = path.join(makeTmpDir(), 'debug.log');
+		process.env.WP_TOOLING_DEBUG = '1';
+		process.env.WP_TOOLING_DEBUG_LOG = logPath;
+		jest.resetModules();
+	});
+
+	afterEach(() => {
+		delete process.env.WP_TOOLING_DEBUG;
+		delete process.env.WP_TOOLING_DEBUG_LOG;
+		jest.resetModules();
+	});
+
+	it('logs a sanitized command + context, never the raw --input=value argv', async () => {
+		const freshAdd = require('../../src/scaffolds/add');
+		const cwd = makeTmpDir();
+		await buildProjectWithScaffold(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		process.stdout.write = () => true;
+		try {
+			await freshAdd.runCli([
+				'test/echo',
+				'--non-interactive',
+				'--cwd',
+				cwd,
+				'--value=super-secret-token',
+			]);
+		} finally {
+			process.stdout.write = originalOut;
+		}
+		const report = fssync.readFileSync(logPath, 'utf8');
+		expect(report).not.toContain('super-secret-token');
+		expect(report).not.toContain('--value=');
+		expect(report).toMatch(/^command: add$/m);
+	});
+});
+
 describe('engine core is not coupled to TTY UI', () => {
 	it('non-interactive code path does not require the TTY UI kit', async () => {
 		// If `src/cli/commands/add.js` eagerly loaded TTY UI at top-level, this test would still

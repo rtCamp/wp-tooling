@@ -41,7 +41,7 @@
 		},
 		{
 			"key": "rest_namespace",
-			"description": "REST namespace prefix used in the URL path, e.g. 'myplugin'. Final route becomes /wp-json/{rest_namespace}/v{version}/{name}.",
+			"description": "REST namespace prefix used in the URL path, base only and WITHOUT the version segment, e.g. 'myplugin' (NOT 'myplugin/v1'). The version is added separately from rest_version, so the final route is /wp-json/{rest_namespace}/v{rest_version}/{name}. Passing a version here produces a doubled '/v1/v1'.",
 			"required": true
 		},
 		{

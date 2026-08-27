@@ -1,0 +1,57 @@
+{
+	"slug": "test-measure",
+	"category": "ci",
+	"name": "CI: Test and Measure (consolidated)",
+	"description": "One caller workflow delegating lint (CSS/JS/PHP), JS tests, a PHP test matrix, build, the build-artifact gate, and optional a11y to the wp-ci.yml orchestrator in rtCamp/wp-shared-workflows. Jobs are gated on detected changes. Use this instead of the per-check ci/* callers; unlike them it supports a PHP x WP matrix.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "wsw_ref",
+			"description": "Git ref of rtCamp/wp-shared-workflows to pin (tag, branch, or SHA).",
+			"default": "release/v1.0.0"
+		},
+		{
+			"key": "project_type",
+			"description": "Project shape the orchestrator presets on: plugin | theme | package.",
+			"default": "plugin"
+		},
+		{
+			"key": "default_branch",
+			"description": "Branch the push trigger watches (pull requests always trigger).",
+			"default": "main"
+		},
+		{
+			"key": "php_versions",
+			"description": "JSON array of PHP versions for the test-php matrix, crossed with wp_versions.",
+			"default": "[\"8.2\", \"8.3\", \"8.4\"]"
+		},
+		{
+			"key": "wp_versions",
+			"description": "JSON array of WordPress core versions for the test-php matrix, crossed with php_versions.",
+			"default": "[\"6.7\", \"6.8\", \"6.9\", \"7.0\"]"
+		},
+		{
+			"key": "test_php_exclude",
+			"description": "JSON array of {php, wp} cells to drop from the matrix, e.g. [{\"php\": \"8.4\", \"wp\": \"6.5\"}].",
+			"default": "[]"
+		},
+		{
+			"key": "run_a11y",
+			"description": "Set to true to run the (slow) pa11y accessibility job on every run.",
+			"default": "false"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/test-measure.yml.mustache",
+			"dest": ".github/workflows/test-measure.yml"
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test-measure.yml.mustache",
+			"dest": ".github/workflows/test-measure.yml",
+			"framework": "actionlint"
+		}
+	]
+}
