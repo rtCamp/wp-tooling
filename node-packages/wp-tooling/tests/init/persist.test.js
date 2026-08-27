@@ -53,6 +53,26 @@ describe('readIdentityFile', () => {
 		expect(caught.path).toBe(path.join(root, IDENTITY_FILE));
 		expect(caught.message).toMatch(/--reinit/);
 	});
+
+	it.each([
+		['null', 'null'],
+		['an array', '[]'],
+		['a string', '"a string"'],
+		['a number', '42'],
+	])(
+		'throws EIDENTITYCORRUPT (not null) when the file parses to %s',
+		(_label, raw) => {
+			fs.writeFileSync(path.join(root, IDENTITY_FILE), raw);
+			let caught;
+			try {
+				readIdentityFile(root);
+			} catch (err) {
+				caught = err;
+			}
+			expect(caught).toBeInstanceOf(IdentityFileError);
+			expect(caught.code).toBe('EIDENTITYCORRUPT');
+		}
+	);
 });
 
 describe('writeFeatures', () => {

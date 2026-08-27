@@ -2,13 +2,13 @@
 	"slug": "test-measure",
 	"category": "ci",
 	"name": "CI: Test and Measure (consolidated)",
-	"description": "One caller workflow delegating lint (CSS/JS/PHP), JS tests, a PHP test matrix, build, the build-artifact gate, and optional a11y to the wp-ci.yml orchestrator in rtCamp/wp-shared-workflows. Jobs are gated on detected changes. Use this instead of the per-check ci/* callers; unlike them it supports a PHP x WP matrix and forwards private-repo tokens.",
+	"description": "One caller workflow delegating lint (CSS/JS/PHP), JS tests, a PHP test matrix, build, the build-artifact gate, and optional a11y to the wp-ci.yml orchestrator in rtCamp/wp-shared-workflows. Jobs are gated on detected changes. Use this instead of the per-check ci/* callers; unlike them it supports a PHP x WP matrix.",
 	"source": "template",
 	"inputs": [
 		{
 			"key": "wsw_ref",
 			"description": "Git ref of rtCamp/wp-shared-workflows to pin (tag, branch, or SHA).",
-			"default": "v1"
+			"default": "release/v1.0.0"
 		},
 		{
 			"key": "project_type",
@@ -45,20 +45,6 @@
 		{
 			"src": "templates/test-measure.yml.mustache",
 			"dest": ".github/workflows/test-measure.yml"
-		}
-	],
-	"secrets": [
-		{
-			"key": "WP_TOOLING_TOKEN",
-			"scope": "github-actions",
-			"description": "Token with read access to the private rtCamp/wp-tooling repo (change detection installs the interim CLI). Needed only while that repo is private; one token may serve both secrets.",
-			"required": false
-		},
-		{
-			"key": "PACKAGES_TOKEN",
-			"scope": "github-actions",
-			"description": "Token with read access to private Composer source repos (e.g. rtCamp/wp-framework) for `composer install` in lint-php/test-php. Omit for projects with only public deps.",
-			"required": false
 		}
 	],
 	"tests": [

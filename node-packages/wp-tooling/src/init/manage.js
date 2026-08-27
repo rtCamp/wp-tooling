@@ -135,7 +135,7 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 		const scaffoldOnly = unknown.filter((arg) =>
 			/^--(name|version|remove-examples|keep-examples)(=|$)/.test(arg)
 		);
-		if (scaffoldOnly.length) {
+		if (scaffoldOnly.length === unknown.length) {
 			ui.info(
 				`${scaffoldOnly.join(
 					', '

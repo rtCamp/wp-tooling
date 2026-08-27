@@ -402,8 +402,21 @@ class ScaffoldRegistry {
 		// Collapse that accidental double so the emitted wiring target is the
 		// real module file in either layout. This only fires when the double
 		// actually occurs, so the flat layout is unaffected.
+		// Only collapse when the resolved `base_path` itself nests inside a
+		// `Modules` directory -- the one condition that produces the doubled
+		// segment. Pattern-matching the rendered output alone would also mangle
+		// an unrelated manifest whose real target happens to contain the same
+		// substring.
+		const basePathValue = resolved.base_path || '';
+		const baseNestedInModules =
+			'Modules' ===
+			path.posix.basename(
+				path.posix.dirname(path.posix.normalize(basePathValue))
+			);
 		const collapseModules = (p) =>
-			p.replace('/Modules/Modules/', '/Modules/');
+			baseNestedInModules
+				? p.replace('/Modules/Modules/', '/Modules/')
+				: p;
 		const aiWiring = (scaffold.wiring || []).map((w) => ({
 			targetFile: collapseModules(
 				path.posix.normalize(render(w.target_file, resolved))

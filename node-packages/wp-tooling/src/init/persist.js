@@ -64,7 +64,15 @@ const readIdentityFile = (root) => {
 		return null;
 	}
 	try {
-		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+		const identity = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+		if (
+			!identity ||
+			'object' !== typeof identity ||
+			Array.isArray(identity)
+		) {
+			throw new Error('identity root must be a JSON object');
+		}
+		return identity;
 	} catch (err) {
 		throw new IdentityFileError(
 			`${IDENTITY_FILE} exists but is not valid JSON (${err.message}). ` +

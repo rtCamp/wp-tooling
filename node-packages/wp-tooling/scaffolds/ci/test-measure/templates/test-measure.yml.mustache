@@ -34,6 +34,3 @@ jobs:
       wp-versions: '{{wp_versions}}'
       test-php-exclude: '{{test_php_exclude}}'{{#run_a11y}}
       run-a11y: true{{/run_a11y}}
-    secrets:
-      wp-tooling-token: ${{ secrets.WP_TOOLING_TOKEN }}
-      packages-token: ${{ secrets.PACKAGES_TOKEN }}
