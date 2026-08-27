@@ -249,7 +249,10 @@ const setupSteps = (config, root, flags) => {
 	let existing = null;
 	try {
 		existing = readIdentityFile(root);
-	} catch {
+	} catch (err) {
+		if (!(err instanceof IdentityFileError)) {
+			throw err;
+		}
 		existing = null;
 	}
 
@@ -448,6 +451,20 @@ const setupSteps = (config, root, flags) => {
 					if (true === flags.removeExamples) {
 						removeKeys = new Set(groups.map((g) => g.key));
 					} else if (Array.isArray(flags.removeExamples)) {
+						const validKeys = new Set(groups.map((g) => g.key));
+						const unknownKeys = flags.removeExamples.filter(
+							(k) => !validKeys.has(k)
+						);
+						if (unknownKeys.length) {
+							throw usageError(
+								`Unknown --remove-examples key(s): ${unknownKeys.join(
+									', '
+								)}. Valid keys: ${
+									[...validKeys].sort().join(', ') ||
+									'(none declared)'
+								}`
+							);
+						}
 						removeKeys = new Set(flags.removeExamples);
 					} else {
 						removeKeys = new Set(); // --keep-examples / --yes default
@@ -784,7 +801,10 @@ const run = async (config, options = {}) => {
 
 	// Diagnostic timing + output capture (opt-in via WP_TOOLING_DEBUG); inert
 	// when off. --help returns above, so it is intentionally not timed.
-	debug.start(`init ${argv.join(' ')}`.trim(), { kind, cwd: root });
+	// Flag values (e.g. --name=<value>) are caller-supplied and may be
+	// sensitive, so only the fixed command name + structured context are
+	// logged -- never raw argv (matches src/scaffolds/add.js).
+	debug.start('init', { kind, cwd: root });
 	let result = 'ok';
 	try {
 		// --list / --json: the read-only machine-query contract. Intercepted ahead
@@ -945,7 +965,9 @@ const run = async (config, options = {}) => {
 			throw err;
 		}
 	} finally {
-		debug.finish({ result });
+		debug.finish({
+			result: 'ok' === result && process.exitCode ? 'error' : result,
+		});
 	}
 };
 

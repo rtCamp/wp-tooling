@@ -380,6 +380,34 @@ describe('run --list (JSON contract)', () => {
 			)
 		).toBe(true);
 	});
+
+	it('a detect probe throwing a non-Error value degrades to on:null + warning, exit 0', async () => {
+		const throwConfig = {
+			...CONFIG,
+			features: [
+				...CONFIG.features,
+				{
+					key: 'exploding-null',
+					label: 'Exploding Null',
+					detect: () => {
+						throw null;
+					},
+				},
+			],
+		};
+		const { stdout, stderr } = await capture(() =>
+			run(throwConfig, { root, argv: ['--list', '--json'] })
+		);
+		expect(process.exitCode || 0).toBe(0);
+		expect(stderr).toBe('');
+		const payload = JSON.parse(stdout.trim());
+		expect(byKey(payload.features)['exploding-null'].on).toBeNull();
+		expect(
+			payload.warnings.some((w) =>
+				/exploding-null: feature detect failed: null/.test(w)
+			)
+		).toBe(true);
+	});
 });
 
 describe('run --list (usage + failure contract)', () => {
@@ -573,6 +601,36 @@ describe('run (non-list) corrupt identity', () => {
 			features: {},
 		});
 	});
+
+	it('a filesystem read error on the setup-flow re-read is not swallowed as "no existing project"', async () => {
+		writeIdentity(root, { name: 'X', features: {} });
+		const identityPath = path.join(root, IDENTITY_FILE);
+		const original = fs.readFileSync.bind(fs);
+		let identityReads = 0;
+		const spy = jest
+			.spyOn(fs, 'readFileSync')
+			.mockImplementation((filePath, ...rest) => {
+				if (filePath === identityPath) {
+					identityReads += 1;
+					// Let run()'s own outer read (the first) succeed; only the
+					// second read -- setupSteps' redundant re-read, done just to
+					// show the "already initialized" confirm warning -- fails.
+					if (identityReads > 1) {
+						const err = new Error('EACCES: permission denied');
+						err.code = 'EACCES';
+						throw err;
+					}
+				}
+				return original(filePath, ...rest);
+			});
+		try {
+			await expect(
+				run(CONFIG, { root, argv: ['--reinit'] })
+			).rejects.toThrow(/EACCES/);
+		} finally {
+			spy.mockRestore();
+		}
+	});
 });
 
 describe('setup records the capability selection', () => {
@@ -611,5 +669,64 @@ describe('setup records the capability selection', () => {
 			intent: true,
 			drift: false,
 		});
+	});
+
+	it('rejects an unknown --remove-examples key without persisting anything', async () => {
+		await expect(
+			run(FULL_CONFIG, {
+				root,
+				argv: [
+					'--yes',
+					'--name=Acme Blog',
+					'--remove-examples=cron,not-a-real-group',
+				],
+			})
+		).rejects.toThrow(/Unknown --remove-examples key.*not-a-real-group/);
+		expect(fs.existsSync(path.join(root, IDENTITY_FILE))).toBe(false);
+	});
+});
+
+describe('init debug logging', () => {
+	const DEBUG_CONFIG = { ...CONFIG, source: { name: 'Project Name' } };
+	let logPath;
+
+	beforeEach(() => {
+		logPath = path.join(makeRoot('init-debug-log-'), 'debug.log');
+		process.env.WP_TOOLING_DEBUG = '1';
+		process.env.WP_TOOLING_DEBUG_LOG = logPath;
+		jest.resetModules();
+	});
+
+	afterEach(() => {
+		delete process.env.WP_TOOLING_DEBUG;
+		delete process.env.WP_TOOLING_DEBUG_LOG;
+		jest.resetModules();
+	});
+
+	it('logs a sanitized command + context, never the raw --name value', async () => {
+		const freshRun = require('../../src/init/index').run;
+		await capture(() =>
+			freshRun(DEBUG_CONFIG, {
+				root,
+				argv: ['--yes', '--name=super-secret-token'],
+			})
+		);
+		const report = fs.readFileSync(logPath, 'utf8');
+		expect(report).not.toContain('super-secret-token');
+		expect(report).not.toContain('--name=');
+		expect(report).toMatch(/^command: init$/m);
+	});
+
+	it('reports result: error (not ok) when the run exits with a non-zero code', async () => {
+		const freshRun = require('../../src/init/index').run;
+		await capture(() =>
+			freshRun(DEBUG_CONFIG, {
+				root,
+				argv: ['--yes', '--name=Acme', '--totally-unknown-flag'],
+			})
+		);
+		expect(process.exitCode).toBe(1);
+		const report = fs.readFileSync(logPath, 'utf8');
+		expect(report).toMatch(/^result: error$/m);
 	});
 });

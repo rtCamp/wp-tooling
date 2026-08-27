@@ -551,7 +551,10 @@ const safeDetectMap = (config, api) => {
 			map[feature.key] = detectFeature(feature, api);
 		} catch (err) {
 			map[feature.key] = null;
-			errors.push({ key: feature.key, message: err.message });
+			errors.push({
+				key: feature.key,
+				message: err && err.message ? err.message : String(err),
+			});
 		}
 	});
 	return { map, errors };
