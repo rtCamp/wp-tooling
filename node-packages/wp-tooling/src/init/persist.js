@@ -76,7 +76,7 @@ const readIdentityFile = (root) => {
 		return identity;
 	} catch (err) {
 		throw new IdentityFileError(
-			`${IDENTITY_FILE} exists but is not valid JSON (${err.message}). ` +
+			`${IDENTITY_FILE} exists but does not contain a valid identity object (${err.message}). ` +
 				'Fix or delete the file, or pass --reinit to discard it.',
 			{ path: filePath }
 		);

@@ -469,7 +469,7 @@ describe('run --list (usage + failure contract)', () => {
 			run(CONFIG, { root, argv: ['--list'] })
 		);
 		expect(stderr).toBe('');
-		expect(stdout).toMatch(/not valid JSON/);
+		expect(stdout).toMatch(/does not contain a valid identity object/);
 		expect(process.exitCode).toBe(1);
 	});
 
@@ -534,7 +534,7 @@ describe('run (non-list) corrupt identity', () => {
 	it('refuses to fall through to setup mode', async () => {
 		fs.writeFileSync(path.join(root, IDENTITY_FILE), '{broken');
 		const { stdout } = await capture(() => run(CONFIG, { root, argv: [] }));
-		expect(stdout).toMatch(/not valid JSON/);
+		expect(stdout).toMatch(/does not contain a valid identity object/);
 		expect(process.exitCode).toBe(1);
 		// Nothing rewrote the file: setup never ran.
 		expect(fs.readFileSync(path.join(root, IDENTITY_FILE), 'utf8')).toBe(

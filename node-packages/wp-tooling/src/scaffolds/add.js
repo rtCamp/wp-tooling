@@ -384,7 +384,7 @@ async function runCli(argv) {
 	} else if (opts.nonInteractive) {
 		mode = 'non-interactive';
 	}
-	debug.start(`add ${argv.join(' ')}`.trim(), {
+	debug.start('add', {
 		id: opts.id,
 		mode: mode + (opts.dryRun ? '+dry-run' : ''),
 		cwd: opts.cwd,

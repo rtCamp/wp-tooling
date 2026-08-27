@@ -71,6 +71,9 @@ describe('readIdentityFile', () => {
 			}
 			expect(caught).toBeInstanceOf(IdentityFileError);
 			expect(caught.code).toBe('EIDENTITYCORRUPT');
+			expect(caught.message).toMatch(
+				/does not contain a valid identity object/
+			);
 		}
 	);
 
