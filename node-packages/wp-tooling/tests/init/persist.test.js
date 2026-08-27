@@ -73,6 +73,27 @@ describe('readIdentityFile', () => {
 			expect(caught.code).toBe('EIDENTITYCORRUPT');
 		}
 	);
+
+	it('propagates a filesystem read error unchanged, not wrapped as EIDENTITYCORRUPT', () => {
+		writeIdentityFile(root, { name: 'X' });
+		const spy = jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
+			const err = new Error('EACCES: permission denied, open ...');
+			err.code = 'EACCES';
+			throw err;
+		});
+		try {
+			let caught;
+			try {
+				readIdentityFile(root);
+			} catch (err) {
+				caught = err;
+			}
+			expect(caught).not.toBeInstanceOf(IdentityFileError);
+			expect(caught.code).toBe('EACCES');
+		} finally {
+			spy.mockRestore();
+		}
+	});
 });
 
 describe('writeFeatures', () => {

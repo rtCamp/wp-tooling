@@ -63,8 +63,9 @@ const readIdentityFile = (root) => {
 	if (!fs.existsSync(filePath)) {
 		return null;
 	}
+	const raw = fs.readFileSync(filePath, 'utf8');
 	try {
-		const identity = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+		const identity = JSON.parse(raw);
 		if (
 			!identity ||
 			'object' !== typeof identity ||

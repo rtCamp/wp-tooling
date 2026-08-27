@@ -450,6 +450,16 @@ describe('wiring target_file Modules-collapse gating', () => {
 		);
 		expect(result.ai.wiring[0].targetFile).toBe('inc/Modules/X.php');
 	});
+
+	it('collapses the doubled segment when base_path nests directly under a top-level Modules dir (no leading slash before the double)', async () => {
+		const registry = await scanFixture('Modules/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('Modules/X.php');
+	});
 });
 
 describe('execute() error paths', () => {

@@ -48,6 +48,7 @@ const {
 	makeFeatureApi,
 	detectMap,
 	safeDetectMap,
+	retiredKeys,
 	toggleFeatures,
 } = require('./features');
 const { manageFlow, showStatus } = require('./manage');
@@ -736,14 +737,11 @@ const listFlow = (config, root, { mode, json, identity, seedWarnings }) => {
 		return row;
 	});
 	if (manage) {
-		const known = new Set((config.features || []).map((f) => f.key));
-		Object.keys(persisted)
-			.filter((key) => !known.has(key))
-			.forEach((key) =>
-				warnings.push(
-					`${key}: recorded in .wp-scaffold.json but no longer declared.`
-				)
-			);
+		retiredKeys(config, persisted).forEach((key) =>
+			warnings.push(
+				`${key}: recorded in .wp-scaffold.json but no longer declared.`
+			)
+		);
 	}
 
 	if (json) {
@@ -825,7 +823,13 @@ const run = async (config, options = {}) => {
 				try {
 					identity = readIdentityFile(root);
 				} catch (err) {
-					if (!argv.includes('--reinit')) {
+					// Only an actual corrupt-identity error is discardable via
+					// --reinit; a filesystem error (EACCES, EIO, ...) must not be
+					// treated as "no identity, safe to overwrite".
+					if (
+						!(err instanceof IdentityFileError) ||
+						!argv.includes('--reinit')
+					) {
 						throw err;
 					}
 					// --reinit means "discard what's there": report setup mode.
@@ -884,7 +888,13 @@ const run = async (config, options = {}) => {
 			try {
 				identity = readIdentityFile(root);
 			} catch (err) {
-				if (!argv.includes('--reinit')) {
+				// Only an actual corrupt-identity error is discardable via
+				// --reinit; a filesystem error (EACCES, EIO, ...) must not be
+				// treated as "no identity, safe to overwrite".
+				if (
+					!(err instanceof IdentityFileError) ||
+					!argv.includes('--reinit')
+				) {
 					ui.error(err.message);
 					process.exitCode = 1;
 					return;

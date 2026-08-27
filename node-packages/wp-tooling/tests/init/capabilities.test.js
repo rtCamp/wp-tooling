@@ -486,6 +486,34 @@ describe('run --list (usage + failure contract)', () => {
 		).toBe(true);
 		expect(process.exitCode || 0).toBe(0);
 	});
+
+	it('a filesystem read error (not corruption) + --list --reinit is not discarded', async () => {
+		writeIdentity(root, { name: 'X', features: {} });
+		const identityPath = path.join(root, IDENTITY_FILE);
+		const original = fs.readFileSync.bind(fs);
+		const spy = jest
+			.spyOn(fs, 'readFileSync')
+			.mockImplementation((filePath, ...rest) => {
+				if (filePath === identityPath) {
+					const err = new Error('EACCES: permission denied');
+					err.code = 'EACCES';
+					throw err;
+				}
+				return original(filePath, ...rest);
+			});
+		let stdout, stderr;
+		try {
+			({ stdout, stderr } = await capture(() =>
+				run(CONFIG, { root, argv: ['--list', '--json', '--reinit'] })
+			));
+		} finally {
+			spy.mockRestore();
+		}
+		expect(stdout).toBe('');
+		const err = JSON.parse(stderr.trim());
+		expect(err.code).toBe('EACCES');
+		expect(process.exitCode).toBe(1);
+	});
 });
 
 describe('run --list (human output)', () => {
@@ -512,6 +540,38 @@ describe('run (non-list) corrupt identity', () => {
 		expect(fs.readFileSync(path.join(root, IDENTITY_FILE), 'utf8')).toBe(
 			'{broken'
 		);
+	});
+
+	it('a filesystem read error (not corruption) + --reinit is not discarded', async () => {
+		writeIdentity(root, { name: 'X', features: {} });
+		const identityPath = path.join(root, IDENTITY_FILE);
+		const original = fs.readFileSync.bind(fs);
+		const spy = jest
+			.spyOn(fs, 'readFileSync')
+			.mockImplementation((filePath, ...rest) => {
+				if (filePath === identityPath) {
+					const err = new Error('EACCES: permission denied');
+					err.code = 'EACCES';
+					throw err;
+				}
+				return original(filePath, ...rest);
+			});
+		let stdout;
+		try {
+			({ stdout } = await capture(() =>
+				run(CONFIG, { root, argv: ['--reinit'] })
+			));
+		} finally {
+			spy.mockRestore();
+		}
+		expect(stdout).toMatch(/EACCES/);
+		expect(process.exitCode).toBe(1);
+		// --reinit did not treat this as discardable corruption: the identity
+		// file is untouched, setup never ran.
+		expect(JSON.parse(fs.readFileSync(identityPath, 'utf8'))).toEqual({
+			name: 'X',
+			features: {},
+		});
 	});
 });
 

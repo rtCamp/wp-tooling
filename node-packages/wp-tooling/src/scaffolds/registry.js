@@ -415,7 +415,7 @@ class ScaffoldRegistry {
 			);
 		const collapseModules = (p) =>
 			baseNestedInModules
-				? p.replace('/Modules/Modules/', '/Modules/')
+				? p.replace(/(^|\/)Modules\/Modules\//, '$1Modules/')
 				: p;
 		const aiWiring = (scaffold.wiring || []).map((w) => ({
 			targetFile: collapseModules(
