@@ -63,6 +63,10 @@ const BINARY_EXTENSIONS = [
  *
  * `bin` is skipped so the per-project scaffold config (which embeds the search
  * tokens verbatim) is never corrupted; `build`/lock files avoid generated noise.
+ * `.claude` is skipped because it holds generic, reusable AI skills whose prose
+ * uses the placeholder name ("Project Name", "project name") as example text -
+ * renaming those to the real project name corrupts the instructions (e.g.
+ * "Never assume a project name" would become "Never assume a <project>").
  */
 const DEFAULT_IGNORE = [
 	'.git',
@@ -70,6 +74,7 @@ const DEFAULT_IGNORE = [
 	'vendor',
 	'bin',
 	'build',
+	'.claude',
 	'package-lock.json',
 	'composer.lock',
 ];
@@ -281,7 +286,9 @@ const renameFiles = (files, replacements, ui) => {
 		}
 		try {
 			fs.renameSync(filePath, path.join(path.dirname(filePath), newBase));
-			ui.info(`${base} -> ${newBase}`);
+			// No per-file line here: the caller prints a "renamed N file(s)"
+			// summary. One line per renamed file is pure noise for a human and
+			// wasted tokens for an AI reading the run. Failures still warn below.
 			renamed++;
 		} catch (err) {
 			ui.warn(`Could not rename ${base}: ${err.message}`);
