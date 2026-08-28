@@ -83,6 +83,25 @@ const detectIndent = (raw) => {
 };
 
 /**
+ * Find the directory `fs.mkdirSync(dir, { recursive: true })` would actually
+ * create. Its recursive option can create several levels in one call, so
+ * removing just this one directory on rollback undoes exactly that.
+ *
+ * @param {string} dir - Directory that is about to be mkdir'd.
+ * @return {string|null} Topmost missing ancestor, or null if `dir` exists.
+ */
+const firstMissingAncestor = (dir) => {
+	if (fs.existsSync(dir)) {
+		return null;
+	}
+	let cur = dir;
+	while (!fs.existsSync(path.dirname(cur))) {
+		cur = path.dirname(cur);
+	}
+	return cur;
+};
+
+/**
  * Build the FeatureApi handed to every hook / probe. All mutating calls record
  * an undo entry in `api._journal` so a feature can be rolled back on failure.
  *
@@ -115,12 +134,16 @@ const makeFeatureApi = (root, identity, ui) => {
 			const abs = join(rel);
 			const existed = fs.existsSync(abs);
 			const old = existed ? fs.readFileSync(abs) : null;
+			const createdDir = firstMissingAncestor(path.dirname(abs));
 			journal.push({
 				undo: () => {
 					if (existed) {
 						fs.writeFileSync(abs, old);
 					} else {
 						fs.rmSync(abs, { force: true });
+					}
+					if (createdDir) {
+						fs.rmSync(createdDir, { recursive: true, force: true });
 					}
 				},
 			});
@@ -161,7 +184,7 @@ const makeFeatureApi = (root, identity, ui) => {
 			const reference =
 				null !== raw
 					? raw
-					: (opts.indentFrom && this.read(opts.indentFrom)) || '';
+					: (opts.indentFrom && api.read(opts.indentFrom)) || '';
 			const indent = detectIndent(reference);
 			let obj = {};
 			if (null !== raw) {
@@ -175,12 +198,16 @@ const makeFeatureApi = (root, identity, ui) => {
 				}
 			}
 			mutator(obj);
+			const createdDir = firstMissingAncestor(path.dirname(abs));
 			journal.push({
 				undo: () => {
 					if (existed) {
 						fs.writeFileSync(abs, raw, 'utf8');
 					} else {
 						fs.rmSync(abs, { force: true });
+					}
+					if (createdDir) {
+						fs.rmSync(createdDir, { recursive: true, force: true });
 					}
 				},
 			});
@@ -193,7 +220,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		},
 
 		editPackageJson(mutator) {
-			this.editJson('package.json', mutator);
+			api.editJson('package.json', mutator);
 		},
 
 		// Defer a "do this next" line. Hooks run inside an active spinner, so
@@ -250,7 +277,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		// Set KEY=value in a dotenv-style file: replace the line if present,
 		// append it otherwise, creating the file when missing. Journaled.
 		setEnv(rel, key, value) {
-			const raw = this.read(rel) || '';
+			const raw = api.read(rel) || '';
 			const line = `${key}=${value}`;
 			const re = new RegExp(`^[ \\t]*${key}[ \\t]*=.*$`, 'm');
 			let next;
@@ -263,7 +290,7 @@ const makeFeatureApi = (root, identity, ui) => {
 					? `${raw}${line}\n`
 					: `${raw}\n${line}\n`;
 			}
-			this.write(rel, next);
+			api.write(rel, next);
 		},
 
 		// Read a `define( 'NAME', true|false )` boolean from a PHP file. Returns
@@ -290,7 +317,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		// Anchored to line start so commented-out defines are left untouched.
 		// Journaled.
 		setDefine(rel, name, value) {
-			const raw = this.read(rel);
+			const raw = api.read(rel);
 			if (null === raw) {
 				throw new Error(`setDefine: ${rel} not found`);
 			}
@@ -303,7 +330,7 @@ const makeFeatureApi = (root, identity, ui) => {
 					`setDefine: define( '${name}', ... ) not found in ${rel}`
 				);
 			}
-			this.write(rel, raw.replace(re, `$1${value ? 'true' : 'false'}$2`));
+			api.write(rel, raw.replace(re, `$1${value ? 'true' : 'false'}$2`));
 		},
 	};
 

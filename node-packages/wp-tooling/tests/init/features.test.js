@@ -15,6 +15,7 @@ const {
 	detectFeature,
 	toggleFeatures,
 } = require('../../src/init/features');
+const { makeFeatureApi: makeFeatureApiFromIndex } = require('../../src/init');
 const { makeRoot, touch } = require('./_helpers');
 
 /**
@@ -182,6 +183,57 @@ describe('api.editJson', () => {
 		);
 	});
 
+	it('rolls back directory creation for a newly created nested path', () => {
+		const feature = {
+			key: 'rollback-dir',
+			label: 'Rollback dir',
+			onEnable: (a) => {
+				a.editJson(
+					'nested/new/dir/file.json',
+					(obj) => {
+						obj.ok = true;
+					},
+					{ create: true }
+				);
+				throw new Error('late failure');
+			},
+			onDisable: () => {},
+		};
+
+		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
+			'late failure'
+		);
+
+		expect(fs.existsSync(path.join(root, 'nested'))).toBe(false);
+	});
+
+	it('preserves a pre-existing ancestor directory on rollback', () => {
+		touch(root, 'a/existing.txt', 'keep me\n');
+
+		const feature = {
+			key: 'rollback-dir-preserve',
+			label: 'Rollback dir preserve',
+			onEnable: (a) => {
+				a.editJson(
+					'a/b/new.json',
+					(obj) => {
+						obj.ok = true;
+					},
+					{ create: true }
+				);
+				throw new Error('late failure');
+			},
+			onDisable: () => {},
+		};
+
+		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
+			'late failure'
+		);
+
+		expect(fs.existsSync(path.join(root, 'a', 'b'))).toBe(false);
+		expect(raw(root, 'a/existing.txt')).toBe('keep me\n');
+	});
+
 	it('still backs editPackageJson, which keeps its own indent', () => {
 		touch(root, 'package.json', '{\n  "name": "demo"\n}\n');
 
@@ -193,6 +245,47 @@ describe('api.editJson', () => {
 			'claude mcp add wp-dev-tools'
 		);
 		expect(raw(root, 'package.json')).toContain('\n  "scripts": {');
+	});
+});
+
+describe('makeFeatureApi from the public ./init entry point', () => {
+	// src/init/index.js re-exports makeFeatureApi so a consumer can unit-test
+	// its scaffold config's hooks; api methods must not rely on `this`, since
+	// a consumer may destructure them (see PR #54 review).
+	let root;
+	let api;
+
+	beforeEach(() => {
+		root = makeRoot();
+		api = makeFeatureApiFromIndex(root, IDENTITY, fakeUi());
+	});
+
+	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	it('editJson works when destructured off the api', () => {
+		touch(root, '.wp-env.json', '{\n  "core": null\n}\n');
+		const { editJson } = api;
+
+		editJson(
+			'.wp-env.override.json',
+			(obj) => {
+				obj.port = 9999;
+			},
+			{ create: true, indentFrom: '.wp-env.json' }
+		);
+
+		expect(raw(root, '.wp-env.override.json')).toBe(
+			'{\n  "port": 9999\n}\n'
+		);
+	});
+
+	it('setDefine works when destructured off the api', () => {
+		touch(root, 'entry.php', "<?php\ndefine( 'FOO', false );\n");
+		const { setDefine } = api;
+
+		setDefine('entry.php', 'FOO', true);
+
+		expect(raw(root, 'entry.php')).toContain("define( 'FOO', true )");
 	});
 });
 
