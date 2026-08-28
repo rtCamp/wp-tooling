@@ -48,6 +48,12 @@ const FAILED_REPORT = {
 	},
 };
 
+/** Error text used by both the thrown Error and its `.stderr`, for the mocked "binary not found" probe. */
+const VERSION_PROBE_NOT_FOUND_ERROR = 'command not found';
+
+/** Version string the mocked `--version` probe returns when the binary is available. */
+const MOCK_VERSION = '3.1.0\n';
+
 /**
  * Drive the mocked pa11y-ci binary.
  *
@@ -63,25 +69,47 @@ function mockBin(o = {}) {
 	const available = o.available !== false;
 	execFileSync.mockImplementation((cmd, args) => {
 		if (args.includes('--version')) {
-			if (!available) {
-				const err = new Error('command not found');
-				err.stderr = 'command not found';
-				throw err;
-			}
-			return '3.1.0\n';
+			return versionProbeResult(available);
 		}
-		if (o.runThrows) {
-			const err = new Error('exited non-zero');
-			err.status = 2;
-			err.stdout = o.runStdout !== undefined ? o.runStdout : '';
-			err.stderr = o.runStderr !== undefined ? o.runStderr : '';
-			throw err;
-		}
-		if (o.runReturn !== undefined) {
-			return o.runReturn;
-		}
-		return JSON.stringify(o.report !== undefined ? o.report : REPORT);
+		return runResult(o);
 	});
+}
+
+/**
+ * Result of the mocked `--version` probe.
+ *
+ * @param {boolean} available Whether the probe should succeed.
+ * @return {string} The version output, when available.
+ * @throws {Error} When `available` is false.
+ */
+function versionProbeResult(available) {
+	if (!available) {
+		const err = new Error(VERSION_PROBE_NOT_FOUND_ERROR);
+		err.stderr = VERSION_PROBE_NOT_FOUND_ERROR;
+		throw err;
+	}
+	return MOCK_VERSION;
+}
+
+/**
+ * Result of the mocked pa11y-ci run (everything but the `--version` probe).
+ *
+ * @param {Object} o `mockBin`'s options — see its JSDoc.
+ * @return {string} Raw stdout for a non-throwing run.
+ * @throws {Error} When `o.runThrows` is set.
+ */
+function runResult(o) {
+	if (o.runThrows) {
+		const err = new Error('exited non-zero');
+		err.status = 2;
+		err.stdout = o.runStdout !== undefined ? o.runStdout : '';
+		err.stderr = o.runStderr !== undefined ? o.runStderr : '';
+		throw err;
+	}
+	if (o.runReturn !== undefined) {
+		return o.runReturn;
+	}
+	return JSON.stringify(o.report !== undefined ? o.report : REPORT);
 }
 
 describe('a11y runCli', () => {
@@ -125,7 +153,7 @@ describe('a11y runCli', () => {
 
 	test('--config with no value exits 2', () => {
 		expect(runCli(['--config'])).toBe(2);
-		expect(stderr.join('')).toMatch(/missing value for --config/);
+		expect(stderr.join('')).toMatch(/Missing value for --config/);
 	});
 
 	test('an unreadable config exits 2 (ENOURLS)', () => {
@@ -146,7 +174,7 @@ describe('a11y runCli', () => {
 		let runArgs;
 		execFileSync.mockImplementation((cmd, args) => {
 			if (args.includes('--version')) {
-				return '3.1.0\n';
+				return MOCK_VERSION;
 			}
 			runArgs = [...args];
 			return JSON.stringify(CLEAN_REPORT);

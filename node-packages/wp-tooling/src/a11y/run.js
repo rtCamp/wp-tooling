@@ -17,10 +17,11 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
-const { RunnerError } = require('./errors');
+const { RunnerError, isUsageError } = require('./errors');
 const { resolveUrls } = require('./urls');
 const { detectBin } = require('./resolve-bin');
 const { normalizeA11y } = require('./normalize');
+const { requireFlagValue } = require('../scaffolds/cli-support');
 
 const BIN = 'pa11y-ci';
 const INSTALL_HINT = 'wp-tooling add setup/pa11y';
@@ -37,6 +38,9 @@ const MAX_BUFFER = 64 * 1024 * 1024;
  */
 function runA11y(options = {}) {
 	const cwd = options.cwd || process.cwd();
+	// resolveUrls both resolves and validates the config (throws ENOURLS /
+	// EBADJSON on problems); only the path is used below — pa11y-ci re-reads
+	// and re-parses the same config file itself.
 	const { configPath } = resolveUrls(options);
 
 	const bin = detectBin(BIN, { cwd });
@@ -68,8 +72,12 @@ function buildArgs(bin, configPath) {
  * Invoke pa11y-ci and return its parsed JSON report.
  *
  * pa11y-ci exits non-zero (typically 2) WHEN it finds violations -- that is a
- * successful run for us, and the report is still on stdout. Only a run that
- * yields no parseable report is a genuine failure.
+ * successful run for us, and the report is still on stdout. So "the process
+ * threw" and "stdout holds a usable report" are independent: a crashed run
+ * can still have printed a good report, and a "successful" run can still
+ * have printed garbage. Only "no usable report either way" is a genuine
+ * failure — and only then does whether it also threw decide EBINFAIL vs
+ * EBADJSON.
  *
  * @param {string}   command Binary command.
  * @param {string[]} args    Argument vector.
@@ -78,33 +86,63 @@ function buildArgs(bin, configPath) {
  * @throws {RunnerError} EBINFAIL / EBADJSON.
  */
 function execPa11y(command, args, cwd) {
-	let stdout;
+	const { stdout, crashDetail } = runPa11yProcess(command, args, cwd);
+
+	const report = parseReport(stdout);
+	if (report) {
+		return report;
+	}
+	if (crashDetail !== null) {
+		throw new RunnerError(
+			'EBINFAIL',
+			`${BIN} failed to run: ${crashDetail}`,
+			{ detail: crashDetail }
+		);
+	}
+	throw new RunnerError(
+		'EBADJSON',
+		`${BIN} produced output that could not be parsed as a JSON report.`
+	);
+}
+
+/**
+ * Run the pa11y-ci child process, tolerating the non-zero exit it uses both
+ * for "found violations" and for a genuine crash — see execPa11y.
+ *
+ * @param {string}   command Binary command.
+ * @param {string[]} args    Argument vector.
+ * @param {string}   cwd     Working directory.
+ * @return {{stdout: string, crashDetail: string|null}} stdout captured
+ *   either way, and the crash detail when the process threw (else null).
+ */
+function runPa11yProcess(command, args, cwd) {
 	try {
-		stdout = execFileSync(command, args, {
+		const stdout = execFileSync(command, args, {
 			cwd,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'pipe'],
 			maxBuffer: MAX_BUFFER,
 		});
+		return { stdout, crashDetail: null };
 	} catch (err) {
-		const parsed = tryParse((err.stdout || '').toString());
-		if (parsed && parsed.results) {
-			return parsed;
-		}
-		const detail = (err.stderr || err.message || '').toString().trim();
-		throw new RunnerError('EBINFAIL', `${BIN} failed to run: ${detail}`, {
-			detail,
-		});
+		return {
+			stdout: (err.stdout || '').toString(),
+			crashDetail: (err.stderr || err.message || '').toString().trim(),
+		};
 	}
+}
 
-	const parsed = tryParse(stdout);
-	if (!parsed || !parsed.results) {
-		throw new RunnerError(
-			'EBADJSON',
-			`${BIN} produced output that could not be parsed as a JSON report.`
-		);
-	}
-	return parsed;
+/**
+ * Parse pa11y-ci JSON output and confirm it carries the `results` key that
+ * makes it a usable report — a bare parse success isn't enough.
+ *
+ * @param {string} text Raw stdout.
+ * @return {Object|null} The parsed report, or null when `text` doesn't
+ *   parse as one.
+ */
+function parseReport(text) {
+	const parsed = tryParse(text);
+	return parsed && parsed.results ? parsed : null;
 }
 
 /**
@@ -131,22 +169,6 @@ function tryParse(text) {
 const VALID_OUTPUTS = ['text', 'json'];
 
 /**
- * Consume the argv slot at `index` as a value for `flag`.
- *
- * @param {string[]} argv  Argument vector.
- * @param {number}   index Position of the value.
- * @param {string}   flag  Flag name, for the error message.
- * @return {string} The validated value.
- */
-function takeValue(argv, index, flag) {
-	const value = argv[index];
-	if (value === undefined || value.startsWith('-')) {
-		throw new Error(`missing value for ${flag}`);
-	}
-	return value;
-}
-
-/**
  * Parse argv (without leading `node` and script path).
  *
  * @param {string[]} argv Argument vector.
@@ -159,10 +181,10 @@ function parseArgs(argv) {
 		const arg = argv[i];
 		switch (arg) {
 			case '--config':
-				opts.configPath = takeValue(argv, ++i, '--config');
+				opts.configPath = requireFlagValue(argv[++i], '--config');
 				break;
 			case '--output':
-				opts.output = takeValue(argv, ++i, '--output');
+				opts.output = requireFlagValue(argv[++i], '--output');
 				break;
 			case '--dry-run':
 				opts.dryRun = true;
@@ -187,31 +209,69 @@ function parseArgs(argv) {
  * @return {void}
  */
 function emit(report, mode) {
-	if (mode === 'json') {
-		process.stdout.write(JSON.stringify(report) + '\n');
-		return;
-	}
-	const s = report.summary;
-	const failed = s.failedUrls > 0 ? `, ${s.failedUrls} failed to load` : '';
-	const lines = [
-		`${report.tool} (${report.standard}): ${s.violations} violation(s) across ${s.urls} URL(s) — ${s.errors} error, ${s.warnings} warning, ${s.notices} notice; ${s.passedUrls} clean${failed}.`,
-	];
-	for (const r of report.results) {
-		lines.push('');
-		if (r.scanError) {
-			lines.push(`${r.url} — scan failed`);
-			lines.push(`  ${r.scanError}`);
-			continue;
-		}
-		lines.push(`${r.url} — ${r.violations.length} violation(s)`);
-		for (const v of r.violations) {
-			const crit = v.wcagCriterion ? ` [${v.wcagCriterion}]` : '';
-			lines.push(`  ${v.impact}${crit} ${v.selector}`);
-			lines.push(`    ${v.message}`);
-		}
+	process.stdout.write(
+		mode === 'json' ? formatJson(report) : formatText(report)
+	);
+}
+
+/**
+ * Render the report as JSON (the `--output json` mode).
+ *
+ * @param {Object} report Normalized report.
+ * @return {string} The rendered text.
+ */
+function formatJson(report) {
+	return JSON.stringify(report) + '\n';
+}
+
+/**
+ * Render the report as a human-readable summary: one summary line, then a
+ * block per URL (either its scan error, or its violations).
+ *
+ * @param {Object} report Normalized report.
+ * @return {string} The rendered text.
+ */
+function formatText(report) {
+	const lines = [formatSummaryLine(report)];
+	for (const result of report.results) {
+		lines.push('', ...formatUrlResult(result));
 	}
 	lines.push('');
-	process.stdout.write(lines.join('\n'));
+	return lines.join('\n');
+}
+
+/**
+ * Build the one-line report summary.
+ *
+ * @param {Object} report Normalized report.
+ * @return {string} The summary line.
+ */
+function formatSummaryLine(report) {
+	const s = report.summary;
+	const failed = s.failedUrls > 0 ? `, ${s.failedUrls} failed to load` : '';
+	return `${report.tool} (${report.standard}): ${s.violations} violation(s) across ${s.urls} URL(s) — ${s.errors} error, ${s.warnings} warning, ${s.notices} notice; ${s.passedUrls} clean${failed}.`;
+}
+
+/**
+ * Build the text block for a single URL's result: its scan error, or its
+ * violation list.
+ *
+ * @param {Object} result One entry of `report.results`.
+ * @return {string[]} Lines for this URL (no leading/trailing blank line).
+ */
+function formatUrlResult(result) {
+	if (result.scanError) {
+		return [`${result.url} — scan failed`, `  ${result.scanError}`];
+	}
+	const lines = [`${result.url} — ${result.violations.length} violation(s)`];
+	for (const violation of result.violations) {
+		const crit = violation.wcagCriterion ? ` [${violation.wcagCriterion}]` : '';
+		lines.push(
+			`  ${violation.impact}${crit} ${violation.selector}`,
+			`    ${violation.message}`
+		);
+	}
+	return lines;
 }
 
 /**
@@ -281,13 +341,7 @@ function runDryRun(opts, cwd) {
  */
 function handleError(err) {
 	process.stderr.write(`a11y: ${err.message}\n`);
-	if (
-		err instanceof RunnerError &&
-		(err.code === 'EBINMISSING' || err.code === 'ENOURLS')
-	) {
-		return 2;
-	}
-	return 1;
+	return isUsageError(err) ? 2 : 1;
 }
 
 /**

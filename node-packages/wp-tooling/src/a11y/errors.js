@@ -7,10 +7,10 @@
  * `configPath`, `detail`).
  *
  * Codes:
- *   EBINMISSING  the external binary (pa11y-ci) is not installed
+ *   EBINMISSING  the external binary (pa11y-ci) is not installed — usage error
  *   EBINFAIL     the binary ran but failed for a reason other than "found violations"
  *   EBADJSON     the binary produced output that could not be parsed as JSON
- *   ENOURLS      no URLs could be resolved from the pa11y config
+ *   ENOURLS      no URLs could be resolved from the pa11y config — usage error
  */
 
 'use strict';
@@ -24,4 +24,21 @@ class RunnerError extends Error {
 	}
 }
 
-module.exports = { RunnerError };
+/**
+ * RunnerError codes that mean "the CLI was misused or misconfigured" (missing
+ * binary, missing/invalid config) rather than "the run itself failed".
+ */
+const USAGE_ERROR_CODES = ['EBINMISSING', 'ENOURLS'];
+
+/**
+ * Whether `err` is a RunnerError the CLI should treat as a usage error
+ * (exit code 2) rather than a run failure (exit code 1).
+ *
+ * @param {*} err Value caught from a runner call.
+ * @return {boolean} True for EBINMISSING / ENOURLS.
+ */
+function isUsageError(err) {
+	return err instanceof RunnerError && USAGE_ERROR_CODES.includes(err.code);
+}
+
+module.exports = { RunnerError, isUsageError };

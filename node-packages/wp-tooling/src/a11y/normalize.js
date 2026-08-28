@@ -21,11 +21,22 @@
 
 'use strict';
 
+const {
+	WCAG_CRITERION_RE,
+	TAG_FROM_CONTEXT_RE,
+	TAG_FROM_SELECTOR_RE,
+	OPEN_TAG_RE,
+	ATTR_RE,
+} = require('./regex');
+
 /** pa11y `type` → normalised `impact`. */
 const IMPACT_BY_TYPE = { error: 'error', warning: 'warning', notice: 'notice' };
 
 /** Sort order for violations within a URL (lower ranks sort first). */
 const IMPACT_RANK = { error: 0, warning: 1, notice: 2 };
+
+/** Rank for an impact outside the known set — sorts after error/warning/notice. */
+const UNKNOWN_IMPACT_RANK = 9;
 
 /**
  * Normalise a full pa11y-ci report.
@@ -43,10 +54,8 @@ function normalizeA11y(raw, options = {}) {
 			: {};
 
 	const results = [];
+	const impactCounts = { error: 0, warning: 0, notice: 0 };
 	let violations = 0;
-	let errors = 0;
-	let warnings = 0;
-	let notices = 0;
 	let passedUrls = 0;
 	let failedUrls = 0;
 
@@ -66,14 +75,10 @@ function normalizeA11y(raw, options = {}) {
 		} else if (normViolations.length === 0) {
 			passedUrls++;
 		}
-		for (const v of normViolations) {
+		for (const violation of normViolations) {
 			violations++;
-			if (v.impact === 'error') {
-				errors++;
-			} else if (v.impact === 'warning') {
-				warnings++;
-			} else if (v.impact === 'notice') {
-				notices++;
+			if (violation.impact in impactCounts) {
+				impactCounts[violation.impact]++;
 			}
 		}
 
@@ -86,9 +91,9 @@ function normalizeA11y(raw, options = {}) {
 		summary: {
 			urls: urls.length,
 			violations,
-			errors,
-			warnings,
-			notices,
+			errors: impactCounts.error,
+			warnings: impactCounts.warning,
+			notices: impactCounts.notice,
 			passedUrls,
 			failedUrls,
 		},
@@ -98,8 +103,10 @@ function normalizeA11y(raw, options = {}) {
 
 /**
  * Detect a URL-level load failure. pa11y-ci reports one as a bare
- * `{ message }` entry with none of the fields a real issue carries
- * (`code`, `type`, `runner`).
+ * `{ message }` entry — no other field at all — unlike a real issue, which
+ * always carries `code`/`type`/`runner`/etc. Checking "message is the only
+ * key" matches that documented shape directly, rather than checking that a
+ * few issue-only fields happen to be undefined.
  *
  * @param {Object} issue Raw pa11y results entry.
  * @return {boolean} True when the entry is a load failure, not an issue.
@@ -108,11 +115,20 @@ function isScanError(issue) {
 	return (
 		issue !== null &&
 		typeof issue === 'object' &&
-		issue.code === undefined &&
-		issue.type === undefined &&
-		issue.runner === undefined &&
-		typeof issue.message === 'string'
+		typeof issue.message === 'string' &&
+		Object.keys(issue).length === 1
 	);
+}
+
+/**
+ * Coerce a possibly-missing/non-string raw field to a string.
+ *
+ * @param {*}      value      Raw field value.
+ * @param {string} [fallback] Value to use when `value` isn't a string.
+ * @return {string} `value` when it's a string, else `fallback`.
+ */
+function stringField(value, fallback = '') {
+	return typeof value === 'string' ? value : fallback;
 }
 
 /**
@@ -122,17 +138,16 @@ function isScanError(issue) {
  * @return {Object} Normalised violation.
  */
 function normalizeIssue(issue) {
-	const code = typeof issue.code === 'string' ? issue.code : '';
-	const type = typeof issue.type === 'string' ? issue.type : 'error';
-	const context = typeof issue.context === 'string' ? issue.context : '';
-	const selector = typeof issue.selector === 'string' ? issue.selector : '';
+	const code = stringField(issue.code);
+	const context = stringField(issue.context);
+	const selector = stringField(issue.selector);
 
 	return {
 		id: code,
 		wcagCriterion: parseWcagCriterion(code),
-		impact: IMPACT_BY_TYPE[type] || 'error',
-		runner: typeof issue.runner === 'string' ? issue.runner : null,
-		message: typeof issue.message === 'string' ? issue.message : '',
+		impact: IMPACT_BY_TYPE[stringField(issue.type)] || 'error',
+		runner: stringField(issue.runner, null),
+		message: stringField(issue.message),
 		selector,
 		context,
 		domHints: extractDomHints(context, selector),
@@ -148,11 +163,11 @@ function normalizeIssue(issue) {
  * @return {string|null} Dotted criterion, or null.
  */
 function parseWcagCriterion(code) {
-	const m = /(\d+)_(\d+)_(\d+)/.exec(code || '');
-	if (!m) {
+	const match = WCAG_CRITERION_RE.exec(code || '');
+	if (!match) {
 		return null;
 	}
-	return `${m[1]}.${m[2]}.${m[3]}`;
+	return `${match[1]}.${match[2]}.${match[3]}`;
 }
 
 /**
@@ -166,62 +181,94 @@ function parseWcagCriterion(code) {
  *   attrs: Object<string,string>}} Extracted hints.
  */
 function extractDomHints(context, selector) {
-	const hints = { tagName: null, classList: [], idAttr: null, attrs: {} };
+	const hints = {
+		tagName: tagNameFrom(context, selector),
+		classList: [],
+		idAttr: null,
+		attrs: {},
+	};
 
-	const tagFromContext = /^\s*<\s*([a-zA-Z][\w-]*)/.exec(context || '');
-	if (tagFromContext) {
-		hints.tagName = tagFromContext[1].toLowerCase();
-	} else {
-		const segments = (selector || '')
-			.split('>')
-			.map((s) => s.trim())
-			.filter(Boolean);
-		const last = segments[segments.length - 1] || '';
-		const tagFromSelector = /^([a-zA-Z][\w-]*)/.exec(last);
-		if (tagFromSelector) {
-			hints.tagName = tagFromSelector[1].toLowerCase();
-		}
+	const openTag = OPEN_TAG_RE.exec(context || '');
+	if (!openTag) {
+		return hints;
 	}
 
-	const openTag = /<[^>]*>/.exec(context || '');
-	if (openTag) {
-		const attrRe =
-			/([a-zA-Z_:][-\w:.]*)\s*=\s*"([^"]*)"|([a-zA-Z_:][-\w:.]*)\s*=\s*'([^']*)'/g;
-		let m;
-		while ((m = attrRe.exec(openTag[0])) !== null) {
-			const name = (m[1] || m[3]).toLowerCase();
-			const value = m[2] !== undefined ? m[2] : m[4];
-			if (name === 'class') {
-				hints.classList = value.split(/\s+/).filter(Boolean);
-			} else if (name === 'id') {
-				hints.idAttr = value;
-			} else {
-				hints.attrs[name] = value;
-			}
-		}
+	// Global regex shared across calls (see regex.js) — reset before every
+	// scan so a previous call's position doesn't cause missed attributes.
+	ATTR_RE.lastIndex = 0;
+	let attrMatch;
+	while ((attrMatch = ATTR_RE.exec(openTag[0])) !== null) {
+		const name = (attrMatch[1] || attrMatch[3]).toLowerCase();
+		const value = attrMatch[2] !== undefined ? attrMatch[2] : attrMatch[4];
+		assignAttr(hints, name, value);
 	}
 
 	return hints;
 }
 
 /**
+ * Resolve the element's tag name: prefer the context HTML's own opening
+ * tag, falling back to the last segment of the CSS selector when the
+ * context has none.
+ *
+ * @param {string} context  Issue context HTML snippet.
+ * @param {string} selector Issue CSS selector.
+ * @return {string|null} Lowercased tag name, or null if neither has one.
+ */
+function tagNameFrom(context, selector) {
+	const tagFromContext = TAG_FROM_CONTEXT_RE.exec(context || '');
+	if (tagFromContext) {
+		return tagFromContext[1].toLowerCase();
+	}
+
+	const segments = (selector || '')
+		.split('>')
+		.map((s) => s.trim())
+		.filter(Boolean);
+	const last = segments[segments.length - 1] || '';
+	const tagFromSelector = TAG_FROM_SELECTOR_RE.exec(last);
+	return tagFromSelector ? tagFromSelector[1].toLowerCase() : null;
+}
+
+/**
+ * Assign one parsed `name="value"` attribute onto `hints`, routing `class`
+ * and `id` to their dedicated fields and everything else into `attrs`.
+ *
+ * @param {Object} hints Hints object being built (mutated in place).
+ * @param {string} name  Lowercased attribute name.
+ * @param {string} value Attribute value.
+ * @return {void}
+ */
+function assignAttr(hints, name, value) {
+	if (name === 'class') {
+		hints.classList = value.split(/\s+/).filter(Boolean);
+		return;
+	}
+	if (name === 'id') {
+		hints.idAttr = value;
+		return;
+	}
+	hints.attrs[name] = value;
+}
+
+/**
  * Deterministic ordering: by impact, then id, then selector.
  *
- * @param {Object} a First violation.
- * @param {Object} b Second violation.
+ * @param {Object} violationA First violation.
+ * @param {Object} violationB Second violation.
  * @return {number} Comparator result.
  */
-function compareViolations(a, b) {
-	const ra = a.impact in IMPACT_RANK ? IMPACT_RANK[a.impact] : 9;
-	const rb = b.impact in IMPACT_RANK ? IMPACT_RANK[b.impact] : 9;
-	if (ra !== rb) {
-		return ra - rb;
+function compareViolations(violationA, violationB) {
+	const rankA = IMPACT_RANK[violationA.impact] ?? UNKNOWN_IMPACT_RANK;
+	const rankB = IMPACT_RANK[violationB.impact] ?? UNKNOWN_IMPACT_RANK;
+	if (rankA !== rankB) {
+		return rankA - rankB;
 	}
-	if (a.id !== b.id) {
-		return a.id < b.id ? -1 : 1;
+	if (violationA.id !== violationB.id) {
+		return violationA.id < violationB.id ? -1 : 1;
 	}
-	if (a.selector !== b.selector) {
-		return a.selector < b.selector ? -1 : 1;
+	if (violationA.selector !== violationB.selector) {
+		return violationA.selector < violationB.selector ? -1 : 1;
 	}
 	return 0;
 }

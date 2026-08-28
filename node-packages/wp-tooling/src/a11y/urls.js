@@ -78,18 +78,34 @@ function extractUrls(config) {
 	}
 	const out = [];
 	for (const entry of config.urls) {
-		if (typeof entry === 'string' && entry.length > 0) {
-			out.push(entry);
-		} else if (
-			entry &&
-			typeof entry === 'object' &&
-			typeof entry.url === 'string' &&
-			entry.url.length > 0
-		) {
-			out.push(entry.url);
+		const url = urlFromEntry(entry);
+		if (url) {
+			out.push(url);
 		}
 	}
 	return out;
+}
+
+/**
+ * Pull the URL string out of one `urls[]` entry, which may be a bare string
+ * or a `{ url, ... }` object.
+ *
+ * @param {*} entry One `urls[]` entry.
+ * @return {string|null} The URL, or null when `entry` isn't a usable shape.
+ */
+function urlFromEntry(entry) {
+	if (typeof entry === 'string') {
+		return entry.length > 0 ? entry : null;
+	}
+	if (
+		entry &&
+		typeof entry === 'object' &&
+		typeof entry.url === 'string' &&
+		entry.url.length > 0
+	) {
+		return entry.url;
+	}
+	return null;
 }
 
 module.exports = { resolveUrls, extractUrls, DEFAULT_CONFIG };

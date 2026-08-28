@@ -27,7 +27,7 @@ const VERSION_PROBE_TIMEOUT_MS = 20000;
 function findInNodeModules(binName, cwd) {
 	const start = path.resolve(cwd);
 	let dir = start;
-	for (;;) {
+	while (dir) {
 		const candidate = path.join(dir, 'node_modules', '.bin', binName);
 		if (fs.existsSync(candidate)) {
 			return {
@@ -35,12 +35,21 @@ function findInNodeModules(binName, cwd) {
 				source: dir === start ? 'local' : 'hoisted',
 			};
 		}
-		const parent = path.dirname(dir);
-		if (parent === dir) {
-			return null;
-		}
-		dir = parent;
+		dir = parentDir(dir);
 	}
+	return null;
+}
+
+/**
+ * One directory up from `dir`, or `null` once `dir` is the filesystem root
+ * (`path.dirname` of the root returns the root itself).
+ *
+ * @param {string} dir Directory path.
+ * @return {string|null} Parent directory, or `null` at the root.
+ */
+function parentDir(dir) {
+	const parent = path.dirname(dir);
+	return parent === dir ? null : parent;
 }
 
 /**
