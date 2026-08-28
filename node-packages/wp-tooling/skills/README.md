@@ -16,14 +16,12 @@ The simplest path, for Claude Code users:
 
 ```bash
 # from inside any project that has @rtcamp/wp-tooling available (via npm or npx)
-mkdir -p .claude/skills
 
-# Option A — copy from the installed npm package (preferred):
-cp -r node_modules/@rtcamp/wp-tooling/skills/scaffold      .claude/skills/scaffold
-cp -r node_modules/@rtcamp/wp-tooling/skills/setup         .claude/skills/setup
-cp -r node_modules/@rtcamp/wp-tooling/skills/accessibility .claude/skills/accessibility
+# Option A — via the scaffold engine (preferred, works from the installed npm package):
+npx wp-tooling add setup/claude-skills
 
 # Option B — download directly from GitHub if you can't install the package locally:
+mkdir -p .claude/skills
 git clone --depth 1 https://github.com/rtCamp/wp-tooling.git /tmp/wp-tooling
 cp -r /tmp/wp-tooling/skills/scaffold      .claude/skills/scaffold
 cp -r /tmp/wp-tooling/skills/setup         .claude/skills/setup

@@ -51,6 +51,38 @@ describe('resolveUrls', () => {
 		expect(err.code).toBe('ENOURLS');
 		expect(err.message).toMatch(/wp-tooling add setup\/pa11y/);
 	});
+
+	test('returns defaults.standard from the config', () => {
+		const r = resolveUrls({
+			cwd: FIXTURES,
+			configPath: 'custom-standard.pa11yci.json',
+		});
+		expect(r.standard).toBe('WCAG2AAA');
+	});
+
+	test('standard is undefined when the config sets none', () => {
+		const r = resolveUrls({
+			cwd: FIXTURES,
+			configPath: 'no-standard.pa11yci.json',
+		});
+		expect(r.standard).toBeUndefined();
+	});
+
+	test('a .js config path is rejected as JSON-only, not parsed', () => {
+		const err = grab(() =>
+			resolveUrls({ cwd: FIXTURES, configPath: '.pa11yci.js' })
+		);
+		expect(err).toBeInstanceOf(RunnerError);
+		expect(err.code).toBe('ECONFIGJS');
+		expect(err.message).toMatch(/JavaScript pa11y-ci config/);
+	});
+
+	test('a .cjs config path is rejected as JSON-only, not parsed', () => {
+		const err = grab(() =>
+			resolveUrls({ cwd: FIXTURES, configPath: '.pa11yci.cjs' })
+		);
+		expect(err.code).toBe('ECONFIGJS');
+	});
 });
 
 describe('extractUrls', () => {

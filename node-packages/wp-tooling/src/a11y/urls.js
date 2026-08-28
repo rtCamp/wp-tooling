@@ -14,20 +14,41 @@ const { RunnerError } = require('./errors');
 /** Default pa11y-ci config filename, relative to the project root. */
 const DEFAULT_CONFIG = '.pa11yci.json';
 
+/** Matches a JavaScript pa11y-ci config path (.js/.cjs/.mjs) — see resolveUrls. */
+const JS_CONFIG_RE = /\.(m?js|cjs)$/i;
+
 /**
  * Resolve the URLs to scan from the pa11y config.
  *
  * @param {Object} [options]
  * @param {string} [options.configPath] Path to the pa11y config (default `.pa11yci.json`).
  * @param {string} [options.cwd]        Project root.
- * @return {{urls: string[], configPath: string}} Resolved URLs and the config path read.
- * @throws {RunnerError} `ENOURLS` when no URLs are available; `EBADJSON` when the config is malformed.
+ * @return {{urls: string[], configPath: string, standard: (string|undefined)}}
+ *   Resolved URLs, the config path read, and the config's `defaults.standard`
+ *   (undefined when the config doesn't set one).
+ * @throws {RunnerError} `ENOURLS` when no URLs are available; `ECONFIGJS`
+ *   when the config path is a .js/.cjs/.mjs file (this runner reads JSON
+ *   configs only — see `JS_CONFIG_RE` below); `EBADJSON` when the config is
+ *   JSON but malformed.
  */
 function resolveUrls(options = {}) {
 	const cwd = options.cwd || process.cwd();
 	const configPath = options.configPath
 		? path.resolve(cwd, options.configPath)
 		: path.join(cwd, DEFAULT_CONFIG);
+
+	// pa11y-ci itself accepts JSON or JavaScript (.js/.cjs) configs, but this
+	// runner reads the config directly (to resolve URLs without shelling out)
+	// and only ever scaffolds JSON (`setup/pa11y`), so a JS config is called
+	// out explicitly here rather than failing with a confusing JSON.parse
+	// SyntaxError below.
+	if (JS_CONFIG_RE.test(configPath)) {
+		throw new RunnerError(
+			'ECONFIGJS',
+			`${configPath} looks like a JavaScript pa11y-ci config. This runner only reads JSON pa11y-ci configs — keep a "${DEFAULT_CONFIG}" (or a --config path ending in .json) with the same "urls"/"defaults", or run pa11y-ci directly for a JavaScript config.`,
+			{ configPath }
+		);
+	}
 
 	let raw;
 	try {
@@ -62,7 +83,8 @@ function resolveUrls(options = {}) {
 		);
 	}
 
-	return { urls, configPath };
+	const standard = parsed.defaults && parsed.defaults.standard;
+	return { urls, configPath, standard };
 }
 
 /**

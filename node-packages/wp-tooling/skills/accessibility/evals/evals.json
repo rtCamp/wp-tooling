@@ -43,6 +43,34 @@
 				"Project-owned violations still go through trace -> diff -> consent -> re-check.",
 				"The skill never adds pa11y ignore rules, drops URLs, or lowers the standard to make the run pass."
 			]
+		},
+		{
+			"id": 4,
+			"prompt": "The a11y scan reports: { \"id\": \"WCAG2AA.Principle1.Guideline1_1.1_1_1.H37\", \"wcagCriterion\": \"1.1.1\", \"impact\": \"error\", \"message\": \"Img element missing an alt attribute.\", \"selector\": \"html > body > div.hero-banner > img\", \"context\": \"<img class=\\\"hero-banner__image\\\" src=\\\"/wp-content/uploads/2024/hero.jpg\\\">\", \"domHints\": { \"tagName\": \"img\", \"classList\": [\"hero-banner__image\"], \"idAttr\": null, \"attrs\": { \"src\": \"/wp-content/uploads/2024/hero.jpg\" } } } at http://localhost:8888/. The theme has template-parts/hero.php rendering that exact markup. Fix it.",
+			"expected_output": "The skill greps theme templates for the hero-banner__image class (domHints.classList), finds the <img> in template-parts/hero.php, and proposes adding a real alt attribute (or an explicit alt=\"\" if the image is decorative) rather than a placeholder. The diff is shown and applied only after consent, and a re-run confirms the WCAG2AA.Principle1.Guideline1_1.1_1_1.H37 id + the img selector are gone from the report.",
+			"files": ["evals/files/template-parts/hero.php"],
+			"expectations": [
+				"The skill uses domHints (classList: hero-banner__image, tagName: img) to grep theme/plugin source, not vendor/, node_modules/, or build output.",
+				"template-parts/hero.php is identified as the render site for the failing <img>.",
+				"The proposed fix adds a meaningful alt attribute, or an explicit alt=\"\" with a stated reason if the image is decorative — not a placeholder like alt=\"image\".",
+				"The diff is shown with file and line, and applied only after developer consent.",
+				"The re-run confirms the specific id + selector pair is gone, not just that overall violation counts dropped.",
+				"The skill does not suppress the finding with a pa11y ignore rule instead of fixing the markup."
+			]
+		},
+		{
+			"id": 5,
+			"prompt": "The a11y scan reports a colour-contrast violation: { \"id\": \"color-contrast\", \"wcagCriterion\": null, \"impact\": \"error\", \"runner\": \"axe\", \"message\": \"Element has insufficient color contrast of 1.65 (foreground color: #abb8c3, background color: #0693e3, font size: 12pt, font weight: normal): expected contrast ratio of 4.5:1\", \"selector\": \"div.wp-block-group > p\", \"context\": \"<p class=\\\"has-text-color has-background has-cyan-bluish-gray-color has-vivid-cyan-blue-background-color\\\">Read more</p>\", \"domHints\": { \"tagName\": \"p\", \"classList\": [\"has-text-color\", \"has-background\", \"has-cyan-bluish-gray-color\", \"has-vivid-cyan-blue-background-color\"], \"idAttr\": null, \"attrs\": {} } } at http://localhost:8888/. There's no hand-authored template with that class combination — the color comes from the Gutenberg block editor. The project's theme.json is attached.",
+			"expected_output": "The skill recognizes the has-*-color / has-*-background-color classes (inside a wp-block-group ancestor) as WordPress-generated Gutenberg block color-support markup, not a project-authored CSS class, so it does not grep theme PHP for that literal class string as if someone wrote it there. It traces the two color slugs (cyan-bluish-gray, vivid-cyan-blue) to their definitions in theme.json's settings.color.palette (#abb8c3 on #0693e3, ~1.65:1 — genuinely below the 4.5:1 requirement) and proposes adjusting that palette pairing (or the block's chosen colors) rather than inventing a new override class. The change is shown as a diff and applied only after consent, and a re-run confirms the color-contrast id + selector are gone.",
+			"files": ["evals/files/theme.json"],
+			"expectations": [
+				"domHints.classList containing wp-block-* / has-*-color / has-*-background-color utility classes is recognized as Gutenberg block color-support styling, not raw project-authored markup.",
+				"The skill does NOT grep theme/plugin PHP templates for the literal has-cyan-bluish-gray-color class string as if it were hand-authored there.",
+				"The fix is proposed at the level WordPress actually defines the palette (theme.json settings.color.palette, or the block's chosen color attributes) rather than a new ad-hoc CSS override class.",
+				"The change is shown as a diff and applied only after developer consent.",
+				"The re-run confirms the color-contrast id + selector pair is gone from the report.",
+				"The skill does not silence the finding by adding a class or style outside the project's existing block-color convention."
+			]
 		}
 	]
 }

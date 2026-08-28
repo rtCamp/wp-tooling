@@ -7,6 +7,11 @@ const { execFileSync } = require('child_process');
 const { runCli } = require('../../src/a11y/run');
 
 const FIXTURE_CONFIG = path.join(__dirname, 'fixtures', '.pa11yci.json');
+const CUSTOM_STANDARD_CONFIG = path.join(
+	__dirname,
+	'fixtures',
+	'custom-standard.pa11yci.json'
+);
 
 const REPORT = {
 	total: 1,
@@ -163,6 +168,16 @@ describe('a11y runCli', () => {
 		expect(stderr.join('')).toMatch(/no URLs to scan/);
 	});
 
+	test('a JavaScript config path exits 2 (ECONFIGJS)', () => {
+		expect(
+			runCli([
+				'--config',
+				path.join(__dirname, 'fixtures', '.pa11yci.js'),
+			])
+		).toBe(2);
+		expect(stderr.join('')).toMatch(/JavaScript pa11y-ci config/);
+	});
+
 	test('missing pa11y-ci exits 2 with the install hint', () => {
 		mockBin({ available: false });
 		expect(runCli(['--config', FIXTURE_CONFIG])).toBe(2);
@@ -257,5 +272,39 @@ describe('a11y runCli', () => {
 		// Only the --version probe ran; pa11y-ci itself was never invoked.
 		expect(execFileSync.mock.calls).toHaveLength(1);
 		expect(execFileSync.mock.calls[0][1]).toContain('--version');
+	});
+
+	test('--dry-run with pa11y-ci missing still exits 2, after printing the plan', () => {
+		mockBin({ available: false });
+		const code = runCli(['--dry-run', '--config', FIXTURE_CONFIG]);
+		expect(code).toBe(2);
+		expect(stdout.join('')).toMatch(/\[dry-run\] a11y would run:/);
+		expect(stdout.join('')).toMatch(/NOT FOUND/);
+		expect(stderr.join('')).toMatch(/pa11y-ci not found/);
+	});
+
+	test("a config's defaults.standard is propagated to the report", () => {
+		mockBin({ report: CLEAN_REPORT });
+		const code = runCli([
+			'--config',
+			CUSTOM_STANDARD_CONFIG,
+			'--output',
+			'json',
+		]);
+		expect(code).toBe(0);
+		expect(JSON.parse(stdout.join('')).standard).toBe('WCAG2AAA');
+	});
+
+	test('a second JSON object on stdout (e.g. a configured json reporter) does not break parsing — the last, report-shaped object wins', () => {
+		mockBin({
+			runReturn:
+				JSON.stringify(CLEAN_REPORT) +
+				'\n' +
+				JSON.stringify(REPORT) +
+				'\n',
+		});
+		const code = runCli(['--config', FIXTURE_CONFIG, '--output', 'json']);
+		expect(code).toBe(3);
+		expect(JSON.parse(stdout.join('')).summary.violations).toBe(1);
 	});
 });

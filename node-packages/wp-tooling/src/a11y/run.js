@@ -34,26 +34,38 @@ const MAX_BUFFER = 64 * 1024 * 1024;
  * @param {string} [options.configPath] Path to the pa11y config (default `.pa11yci.json`).
  * @param {string} [options.cwd]        Project root.
  * @return {Object} Normalized report (see normalize.js).
- * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / ENOURLS.
+ * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / ECONFIGJS / ENOURLS.
  */
 function runA11y(options = {}) {
 	const cwd = options.cwd || process.cwd();
 	// resolveUrls both resolves and validates the config (throws ENOURLS /
-	// EBADJSON on problems); only the path is used below — pa11y-ci re-reads
-	// and re-parses the same config file itself.
-	const { configPath } = resolveUrls(options);
+	// ECONFIGJS / EBADJSON on problems); only the path (and the standard, for
+	// labelling the report) is used below — pa11y-ci re-reads and re-parses
+	// the same config file itself.
+	const { configPath, standard } = resolveUrls(options);
 
 	const bin = detectBin(BIN, { cwd });
 	if (!bin.available) {
-		throw new RunnerError(
-			'EBINMISSING',
-			`${BIN} not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`,
-			{ bin: BIN, install: INSTALL_HINT }
-		);
+		throw binMissingError();
 	}
 
 	const raw = execPa11y(bin.command, buildArgs(bin, configPath), cwd);
-	return normalizeA11y(raw);
+	return normalizeA11y(raw, { standard });
+}
+
+/**
+ * Build the RunnerError thrown/reported when `pa11y-ci` isn't installed.
+ * Shared by `runA11y` (throws it) and `runDryRun` (reports it after printing
+ * the plan) so the message stays in one place.
+ *
+ * @return {RunnerError} EBINMISSING.
+ */
+function binMissingError() {
+	return new RunnerError(
+		'EBINMISSING',
+		`${BIN} not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`,
+		{ bin: BIN, install: INSTALL_HINT }
+	);
 }
 
 /**
@@ -136,31 +148,102 @@ function runPa11yProcess(command, args, cwd) {
  * Parse pa11y-ci JSON output and confirm it carries the `results` key that
  * makes it a usable report — a bare parse success isn't enough.
  *
- * @param {string} text Raw stdout.
- * @return {Object|null} The parsed report, or null when `text` doesn't
- *   parse as one.
- */
-function parseReport(text) {
-	const parsed = tryParse(text);
-	return parsed && parsed.results ? parsed : null;
-}
-
-/**
- * Parse pa11y-ci JSON, tolerating a leading non-JSON preamble line.
+ * stdout can hold more than one complete JSON object: a config with
+ * `defaults.reporters: ['json']` makes pa11y-ci's own reporter print the
+ * report once, then our `--json` flag makes it print again (see
+ * `buildArgs`) — always last, always report-shaped. So rather than assuming
+ * "first `{` to end of string" is one JSON value, scan out every complete
+ * top-level object and keep the last one that's actually a report.
  *
  * @param {string} text Raw stdout.
- * @return {Object|null} Parsed object, or null when not parseable.
+ * @return {Object|null} The parsed report, or null when none of the
+ *   objects found in `text` is a usable report.
  */
-function tryParse(text) {
+function parseReport(text) {
 	if (!text) {
 		return null;
 	}
-	const start = text.indexOf('{');
-	if (start === -1) {
-		return null;
+	let report = null;
+	for (const candidate of extractJsonObjects(text)) {
+		const parsed = tryParseCandidate(candidate);
+		if (parsed && parsed.results) {
+			report = parsed;
+		}
 	}
+	return report;
+}
+
+/**
+ * Yield every complete top-level `{...}` JSON object substring found in
+ * `text`, left to right, ignoring any non-object text between/around them.
+ *
+ * @param {string} text Raw stdout.
+ * @return {IterableIterator<string>} Candidate JSON object substrings.
+ */
+function* extractJsonObjects(text) {
+	let i = 0;
+	while (i < text.length) {
+		if (text[i] !== '{') {
+			i++;
+			continue;
+		}
+		const end = findObjectEnd(text, i);
+		if (end === -1) {
+			return;
+		}
+		yield text.slice(i, end + 1);
+		i = end + 1;
+	}
+}
+
+/**
+ * Find the index of the `}` that closes the JSON object starting at
+ * `text[start]`, tracking brace depth and skipping over string contents
+ * (so a `{` or `}` inside a quoted string doesn't affect the count).
+ *
+ * @param {string} text  Text to scan.
+ * @param {number} start Index of the object's opening `{`.
+ * @return {number} Index of the matching `}`, or -1 if unbalanced.
+ */
+function findObjectEnd(text, start) {
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = start; i < text.length; i++) {
+		const char = text[i];
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+			} else if (char === '\\') {
+				escaped = true;
+			} else if (char === '"') {
+				inString = false;
+			}
+			continue;
+		}
+		if (char === '"') {
+			inString = true;
+		} else if (char === '{') {
+			depth++;
+		} else if (char === '}') {
+			depth--;
+			if (depth === 0) {
+				return i;
+			}
+		}
+	}
+	return -1;
+}
+
+/**
+ * Parse one candidate JSON substring, tolerating failure.
+ *
+ * @param {string} candidate Substring to parse.
+ * @return {Object|null} Parsed object, or null when not valid JSON.
+ */
+function tryParseCandidate(candidate) {
 	try {
-		return JSON.parse(text.slice(start));
+		return JSON.parse(candidate);
 	} catch {
 		return null;
 	}
@@ -265,7 +348,9 @@ function formatUrlResult(result) {
 	}
 	const lines = [`${result.url} — ${result.violations.length} violation(s)`];
 	for (const violation of result.violations) {
-		const crit = violation.wcagCriterion ? ` [${violation.wcagCriterion}]` : '';
+		const crit = violation.wcagCriterion
+			? ` [${violation.wcagCriterion}]`
+			: '';
 		lines.push(
 			`  ${violation.impact}${crit} ${violation.selector}`,
 			`    ${violation.message}`
@@ -330,6 +415,9 @@ function runDryRun(opts, cwd) {
 			'',
 		].join('\n')
 	);
+	if (!bin.available) {
+		return handleError(binMissingError());
+	}
 	return 0;
 }
 
