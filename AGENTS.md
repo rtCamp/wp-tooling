@@ -52,7 +52,11 @@ tests/              mirrors src/'s 8 dirs, plus fixtures/ and a skills/ test dir
 
 Two distinct `features.js` files — don't confuse them:
 - `src/scaffolds/features.js` — exported publicly as `require('@rtcamp/wp-tooling/features')`.
-- `src/init/features.js` — internal to the init engine only, not exported.
+- `src/init/features.js` — internal to the init engine; not deep-importable (no
+  wildcard in the exports map). Its `makeFeatureApi` is re-exported through
+  `./init` (`require('@rtcamp/wp-tooling/init').makeFeatureApi`) so a consumer
+  plugin/theme can unit-test its own scaffold config's feature hooks against
+  the real `FeatureApi`. Nothing else from this file is exported.
 
 `package.json` `exports` map (8 entries, all resolve to real files):
 ```json
