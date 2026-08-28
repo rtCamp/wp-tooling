@@ -83,6 +83,25 @@ const detectIndent = (raw) => {
 };
 
 /**
+ * Find the directory `fs.mkdirSync(dir, { recursive: true })` would actually
+ * create. Its recursive option can create several levels in one call, so
+ * removing just this one directory on rollback undoes exactly that.
+ *
+ * @param {string} dir - Directory that is about to be mkdir'd.
+ * @return {string|null} Topmost missing ancestor, or null if `dir` exists.
+ */
+const firstMissingAncestor = (dir) => {
+	if (fs.existsSync(dir)) {
+		return null;
+	}
+	let cur = dir;
+	while (!fs.existsSync(path.dirname(cur))) {
+		cur = path.dirname(cur);
+	}
+	return cur;
+};
+
+/**
  * Build the FeatureApi handed to every hook / probe. All mutating calls record
  * an undo entry in `api._journal` so a feature can be rolled back on failure.
  *
@@ -93,6 +112,7 @@ const detectIndent = (raw) => {
  */
 const makeFeatureApi = (root, identity, ui) => {
 	const journal = [];
+	const notes = [];
 	// Confine every api path to the project root so a feature hook can't read or
 	// write outside the project being initialized.
 	const join = (rel) => resolveWithin(root, rel);
@@ -102,6 +122,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		identity,
 		ui,
 		_journal: journal,
+		_notes: notes,
 		path: join,
 		exists: (rel) => fs.existsSync(join(rel)),
 		read: (rel) =>
@@ -113,12 +134,16 @@ const makeFeatureApi = (root, identity, ui) => {
 			const abs = join(rel);
 			const existed = fs.existsSync(abs);
 			const old = existed ? fs.readFileSync(abs) : null;
+			const createdDir = firstMissingAncestor(path.dirname(abs));
 			journal.push({
 				undo: () => {
 					if (existed) {
 						fs.writeFileSync(abs, old);
 					} else {
 						fs.rmSync(abs, { force: true });
+					}
+					if (createdDir) {
+						fs.rmSync(createdDir, { recursive: true, force: true });
 					}
 				},
 			});
@@ -147,18 +172,61 @@ const makeFeatureApi = (root, identity, ui) => {
 			fs.rmSync(abs, { force: true });
 		},
 
-		editPackageJson(mutator) {
-			const abs = join('package.json');
-			const raw = fs.readFileSync(abs, 'utf8');
-			const indent = detectIndent(raw);
-			const obj = JSON.parse(raw);
+		// Read-modify-write a JSON file, preserving its indentation. `create`
+		// starts from `{}` when absent, taking its indent from `indentFrom`.
+		editJson(rel, mutator, opts = {}) {
+			const abs = join(rel);
+			const existed = fs.existsSync(abs);
+			if (!existed && !opts.create) {
+				throw new Error(`editJson: ${rel} not found`);
+			}
+			const raw = existed ? fs.readFileSync(abs, 'utf8') : null;
+			const reference =
+				null !== raw
+					? raw
+					: (opts.indentFrom && api.read(opts.indentFrom)) || '';
+			const indent = detectIndent(reference);
+			let obj = {};
+			if (null !== raw) {
+				try {
+					obj = JSON.parse(raw);
+				} catch (err) {
+					// Name the file: a bare parse error says only "position 2".
+					throw new Error(
+						`editJson: ${rel} is not valid JSON -- ${err.message}`
+					);
+				}
+			}
 			mutator(obj);
-			journal.push({ undo: () => fs.writeFileSync(abs, raw, 'utf8') });
+			const createdDir = firstMissingAncestor(path.dirname(abs));
+			journal.push({
+				undo: () => {
+					if (existed) {
+						fs.writeFileSync(abs, raw, 'utf8');
+					} else {
+						fs.rmSync(abs, { force: true });
+					}
+					if (createdDir) {
+						fs.rmSync(createdDir, { recursive: true, force: true });
+					}
+				},
+			});
+			fs.mkdirSync(path.dirname(abs), { recursive: true });
 			fs.writeFileSync(
 				abs,
 				`${JSON.stringify(obj, null, indent)}\n`,
 				'utf8'
 			);
+		},
+
+		editPackageJson(mutator) {
+			api.editJson('package.json', mutator);
+		},
+
+		// Defer a "do this next" line. Hooks run inside an active spinner, so
+		// toggleFeatures flushes these once every transition has finished.
+		note(message) {
+			notes.push(message);
 		},
 
 		hasDep(name) {
@@ -209,7 +277,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		// Set KEY=value in a dotenv-style file: replace the line if present,
 		// append it otherwise, creating the file when missing. Journaled.
 		setEnv(rel, key, value) {
-			const raw = this.read(rel) || '';
+			const raw = api.read(rel) || '';
 			const line = `${key}=${value}`;
 			const re = new RegExp(`^[ \\t]*${key}[ \\t]*=.*$`, 'm');
 			let next;
@@ -222,7 +290,7 @@ const makeFeatureApi = (root, identity, ui) => {
 					? `${raw}${line}\n`
 					: `${raw}\n${line}\n`;
 			}
-			this.write(rel, next);
+			api.write(rel, next);
 		},
 
 		// Read a `define( 'NAME', true|false )` boolean from a PHP file. Returns
@@ -249,7 +317,7 @@ const makeFeatureApi = (root, identity, ui) => {
 		// Anchored to line start so commented-out defines are left untouched.
 		// Journaled.
 		setDefine(rel, name, value) {
-			const raw = this.read(rel);
+			const raw = api.read(rel);
 			if (null === raw) {
 				throw new Error(`setDefine: ${rel} not found`);
 			}
@@ -262,7 +330,7 @@ const makeFeatureApi = (root, identity, ui) => {
 					`setDefine: define( '${name}', ... ) not found in ${rel}`
 				);
 			}
-			this.write(rel, raw.replace(re, `$1${value ? 'true' : 'false'}$2`));
+			api.write(rel, raw.replace(re, `$1${value ? 'true' : 'false'}$2`));
 		},
 	};
 
@@ -279,6 +347,7 @@ const makeFeatureApi = (root, identity, ui) => {
  */
 const runJournaled = (api, fn) => {
 	const start = api._journal.length;
+	const notesStart = (api._notes || []).length;
 	try {
 		fn();
 		api._journal.length = start;
@@ -291,6 +360,10 @@ const runJournaled = (api, fn) => {
 			}
 		}
 		api._journal.length = start;
+		// Its writes were just undone, so its notes would point at nothing.
+		if (api._notes) {
+			api._notes.length = notesStart;
+		}
 		throw err;
 	}
 };
@@ -561,16 +634,15 @@ const safeDetectMap = (config, api) => {
 };
 
 /**
- * Whether a feature touches package.json (so we know to suggest npm install).
+ * Whether a feature changes installed packages (so we know to suggest npm
+ * install). Scripts alone don't qualify -- they need no install.
  *
  * @param {Object} feature - Feature definition.
- * @return {boolean} True if it has deps/scripts.
+ * @return {boolean} True if it has deps.
  */
 const touchesPackage = (feature) => {
 	const apply = feature.apply || {};
-	return Boolean(
-		apply.dependencies || apply.devDependencies || apply.scripts
-	);
+	return Boolean(apply.dependencies || apply.devDependencies);
 };
 
 /**
@@ -727,6 +799,12 @@ const toggleFeatures = async (config, root, opts) => {
 
 	if (depsChanged) {
 		ui.warn('Dependencies changed -- run `npm install` to sync.');
+	}
+	// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
+	const notes = api._notes || [];
+	if (notes.length) {
+		ui.heading('Next steps');
+		notes.splice(0).forEach((message) => ui.info(message));
 	}
 	if (!failed.length) {
 		ui.success('Features updated.');
