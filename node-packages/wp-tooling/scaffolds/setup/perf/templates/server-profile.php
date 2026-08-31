@@ -95,13 +95,30 @@ echo wp_json_encode( $server_profile_profiler->stop( $server_profile_top, 'serve
 // Route diagnostic (STDERR): makes a silently mis-routed path -- or a missing
 // profiling backend -- visible next to the JSON.
 $server_profile_query = $GLOBALS['wp_query'];
+
+$server_profile_route_type = static function ( \WP_Query $query ): string {
+	if ( $query->is_singular() ) {
+		return $query->is_page() ? 'page' : 'singular';
+	}
+	if ( $query->is_home() ) {
+		return 'home';
+	}
+	if ( $query->is_archive() ) {
+		return 'archive';
+	}
+	if ( $query->is_404() ) {
+		return '404';
+	}
+	return 'other';
+};
+
 fwrite(
 	STDERR,
 	sprintf(
 		'[server-profile] path=%s backend=%s resolved=%s object_id=%d%s',
 		$server_profile_path,
 		$server_profile_backend,
-		$server_profile_query->is_singular() ? ( $server_profile_query->is_page() ? 'page' : 'singular' ) : ( $server_profile_query->is_home() ? 'home' : ( $server_profile_query->is_archive() ? 'archive' : ( $server_profile_query->is_404() ? '404' : 'other' ) ) ),
+		$server_profile_route_type( $server_profile_query ),
 		(int) get_queried_object_id(),
 		PHP_EOL
 	)

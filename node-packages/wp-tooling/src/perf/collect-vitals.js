@@ -27,14 +27,14 @@ const { METRIC_NAMES } = require('./normalize');
 const REGISTER_SNIPPET = `
 window.__wpToolingVitals = {};
 (function () {
-	var store = function (m) {
-		window.__wpToolingVitals[m.name] = {
-			value: m.value,
-			rating: m.rating,
+	var store = function (metric) {
+		window.__wpToolingVitals[metric.name] = {
+			value: metric.value,
+			rating: metric.rating,
 			attribution: {
-				element: (m.attribution && m.attribution.element) || null,
-				largestShiftTarget: (m.attribution && m.attribution.largestShiftTarget) || null,
-				interactionTarget: (m.attribution && m.attribution.interactionTarget) || null,
+				element: (metric.attribution && metric.attribution.element) || null,
+				largestShiftTarget: (metric.attribution && metric.attribution.largestShiftTarget) || null,
+				interactionTarget: (metric.attribution && metric.attribution.interactionTarget) || null,
 			},
 		};
 	};
@@ -113,10 +113,10 @@ async function collectVitals(browser, scriptSource, url, options = {}) {
 function buildResult(raw) {
 	const metrics = {};
 	for (const name of METRIC_NAMES) {
-		const m = raw[name];
+		const metric = raw[name];
 		metrics[name] =
-			m && typeof m.value === 'number'
-				? { value: m.value, rating: m.rating || null }
+			metric && typeof metric.value === 'number'
+				? { value: metric.value, rating: metric.rating || null }
 				: null;
 	}
 

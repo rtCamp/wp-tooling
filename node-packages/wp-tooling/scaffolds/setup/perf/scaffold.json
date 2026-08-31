@@ -43,8 +43,8 @@
 		},
 		{
 			"key": "server_env_cwd",
-			"description": "Project path inside the WP-CLI environment, as `wp-env run cli --env-cwd` expects it (e.g. wp-content/plugins/my-plugin, or `.` to profile from the WordPress root).",
-			"default": "."
+			"description": "Project path inside the WP-CLI environment, as `wp-env run cli --env-cwd` expects it. Must match where this scaffold just installed server-profile.php — e.g. wp-content/plugins/my-plugin for a plugin, wp-content/themes/my-theme for a theme — or `.` only if this project IS the WordPress root. There's no safe default: guessing wrong means the server layer can't find its own shim.",
+			"required": true
 		}
 	],
 	"npm_dev_dependencies": {

@@ -14,6 +14,7 @@ const FIXTURES = path.join(__dirname, 'fixtures');
 const FIXTURE_CONFIG = path.join(FIXTURES, '.perfrc.json');
 const PARTIAL_CONFIG = path.join(FIXTURES, 'partial.perfrc.json');
 const MISSING_CONFIG = path.join(FIXTURES, 'does-not-exist.json');
+const MALFORMED_CONFIG = path.join(FIXTURES, 'malformed.perfrc.json');
 
 const GOOD_METRICS = {
 	metrics: {
@@ -148,6 +149,11 @@ describe('perf runCli', () => {
 	test('no config and no --url exits 2 (ENOURLS)', async () => {
 		expect(await runCli(['--config', MISSING_CONFIG])).toBe(2);
 		expect(stderr.join('')).toMatch(/no URLs to test/);
+	});
+
+	test('a malformed config exits 2 (EBADJSON), not 1', async () => {
+		expect(await runCli(['--config', MALFORMED_CONFIG])).toBe(2);
+		expect(stderr.join('')).toMatch(/invalid JSON/);
 	});
 
 	test('--url runs without any config file at all', async () => {

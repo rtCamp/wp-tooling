@@ -120,7 +120,7 @@ describe('setup/perf rendered config', () => {
 		const target = makeTmpDir();
 		await r.execute(
 			'setup/perf',
-			{ base_url: 'http://localhost:8888' },
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
 			{ cwd: target }
 		);
 		const config = JSON.parse(
@@ -185,12 +185,16 @@ describe('setup/perf rendered config', () => {
 		]);
 	});
 
-	it('enables the server layer at the WordPress root when server_env_cwd is left at its "." default', async () => {
+	it('enables the server layer at the WordPress root when server_env_cwd is explicitly "."', async () => {
 		const r = registry;
 		const target = makeTmpDir();
 		await r.execute(
 			'setup/perf',
-			{ base_url: 'http://localhost:8888', server_enabled: 'true' },
+			{
+				base_url: 'http://localhost:8888',
+				server_enabled: 'true',
+				server_env_cwd: '.',
+			},
 			{ cwd: target }
 		);
 		const config = JSON.parse(
@@ -208,12 +212,24 @@ describe('setup/perf rendered config', () => {
 		]);
 	});
 
+	it('has no safe default for server_env_cwd, since a wrong guess would silently point the server layer at the wrong shim location', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await expect(
+			r.execute(
+				'setup/perf',
+				{ base_url: 'http://localhost:8888' },
+				{ cwd: target }
+			)
+		).rejects.toThrow(/server_env_cwd/);
+	});
+
 	it('copies the server-profile.php shim verbatim (raw: true, no mustache rendering)', async () => {
 		const r = registry;
 		const target = makeTmpDir();
 		await r.execute(
 			'setup/perf',
-			{ base_url: 'http://localhost:8888' },
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
 			{ cwd: target }
 		);
 		const shim = fs.readFileSync(

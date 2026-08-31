@@ -36,6 +36,9 @@ const MEASURABLE_METRIC_NAMES = METRIC_NAMES.filter((name) => name !== 'INP');
 const SERVER_FIDELITY_NOTE =
 	'profiled via `wp eval-file` in CLI context — representative for hot functions and N+1s, not a real HTTP request (routing/superglobals differ and it will not reflect web-server/opcache warmth).';
 
+/** Lighthouse audit score (0-1) below which an audit counts as "failing" and gets surfaced. */
+const FAILING_AUDIT_SCORE_THRESHOLD = 0.9;
+
 /**
  * Rate a metric value against its good/needs-improvement/poor band. Used as
  * a fallback when the web-vitals library did not supply its own `rating`.
@@ -85,13 +88,20 @@ function extractLighthouse(lhr, options = {}) {
 	const audits =
 		lhr.audits && typeof lhr.audits === 'object' ? lhr.audits : {};
 	const failing = Object.entries(audits)
-		.filter(([, a]) => a && typeof a.score === 'number' && a.score < 0.9)
-		.map(([id, a]) => ({
+		.filter(
+			([, audit]) =>
+				audit &&
+				typeof audit.score === 'number' &&
+				audit.score < FAILING_AUDIT_SCORE_THRESHOLD
+		)
+		.map(([id, audit]) => ({
 			id,
-			title: typeof a.title === 'string' ? a.title : id,
-			score: a.score,
+			title: typeof audit.title === 'string' ? audit.title : id,
+			score: audit.score,
 			displayValue:
-				typeof a.displayValue === 'string' ? a.displayValue : null,
+				typeof audit.displayValue === 'string'
+					? audit.displayValue
+					: null,
 		}))
 		.sort((a, b) => a.score - b.score)
 		.slice(0, topAudits);
@@ -113,14 +123,14 @@ function normalizeServer(result) {
 	const { data, diagnostic, error } = result;
 	const top = [];
 	if (data && typeof data === 'object' && !Array.isArray(data)) {
-		for (const [fn, m] of Object.entries(data)) {
+		for (const [fn, stat] of Object.entries(data)) {
 			top.push({
 				fn,
-				calls: Number(m.ct) || 0,
-				wallMs: (Number(m.wt) || 0) / 1000,
-				cpuMs: (Number(m.cpu) || 0) / 1000,
-				memBytes: Number(m.mu) || 0,
-				peakMemBytes: Number(m.pmu) || 0,
+				calls: Number(stat.ct) || 0,
+				wallMs: (Number(stat.wt) || 0) / 1000,
+				cpuMs: (Number(stat.cpu) || 0) / 1000,
+				memBytes: Number(stat.mu) || 0,
+				peakMemBytes: Number(stat.pmu) || 0,
 			});
 		}
 	}
@@ -162,14 +172,14 @@ function isCwvIssue(rating, mode) {
 function buildAssessment(metrics, lighthouse, thresholds) {
 	const lines = [];
 	for (const name of MEASURABLE_METRIC_NAMES) {
-		const m = metrics[name];
-		if (!m) {
+		const metric = metrics[name];
+		if (!metric) {
 			continue;
 		}
 		const band = THRESHOLDS[name];
 		const unit = name === 'CLS' ? '' : 'ms';
 		lines.push(
-			`${name} ${m.value}${unit} — ${m.rating} (good ≤ ${band[0]}${unit}, poor > ${band[1]}${unit})`
+			`${name} ${metric.value}${unit} — ${metric.rating} (good ≤ ${band[0]}${unit}, poor > ${band[1]}${unit})`
 		);
 	}
 	lines.push('INP: not measurable in lab (no interaction performed)');
@@ -188,6 +198,44 @@ function buildAssessment(metrics, lighthouse, thresholds) {
 		);
 	}
 	return lines;
+}
+
+/**
+ * Rate one measurable metric's raw vitals reading and produce a worst-issue
+ * candidate when it isn't "good". Pulled out of `normalizePerf`'s per-URL
+ * loop so rating, issue-counting and worst-tracking aren't nested three
+ * levels inside a per-metric branch.
+ *
+ * @param {string}      name        Metric name.
+ * @param {Object|null} vitalMetric Raw `{value, rating}` reading for this metric, or null/undefined.
+ * @param {string}      url         URL this reading belongs to (for the worst-candidate).
+ * @param {string}      cwvMode     `thresholds.cwv` mode.
+ * @return {{metric: ({value: number, rating: string}|null), isIssue: boolean,
+ *   worstCandidate: ({metric: string, url: string, value: number, rating: string, severity: number}|null)}}
+ *   Normalised metric, whether it counts as an issue, and a worst-candidate (or null when not applicable).
+ */
+function rateMeasurableMetric(name, vitalMetric, url, cwvMode) {
+	if (!vitalMetric || typeof vitalMetric.value !== 'number') {
+		return { metric: null, isIssue: false, worstCandidate: null };
+	}
+
+	const rating = vitalMetric.rating || rateMetric(name, vitalMetric.value);
+	let worstCandidate = null;
+	if (rating !== 'good') {
+		worstCandidate = {
+			metric: name,
+			url,
+			value: vitalMetric.value,
+			rating,
+			severity: vitalMetric.value / THRESHOLDS[name][1],
+		};
+	}
+
+	return {
+		metric: { value: vitalMetric.value, rating },
+		isIssue: isCwvIssue(rating, cwvMode),
+		worstCandidate,
+	};
 }
 
 /**
@@ -241,27 +289,21 @@ function normalizePerf(rawResults, options = {}) {
 		let urlIssues = 0;
 
 		for (const name of MEASURABLE_METRIC_NAMES) {
-			const m = vitals.metrics[name];
-			if (m && typeof m.value === 'number') {
-				const rating = m.rating || rateMetric(name, m.value);
-				metrics[name] = { value: m.value, rating };
-				if (isCwvIssue(rating, thresholds.cwv)) {
-					urlIssues++;
-				}
-				if (rating !== 'good') {
-					const severity = m.value / THRESHOLDS[name][1];
-					if (!worst || severity > worst.severity) {
-						worst = {
-							metric: name,
-							url: raw.url,
-							value: m.value,
-							rating,
-							severity,
-						};
-					}
-				}
-			} else {
-				metrics[name] = null;
+			const { metric, isIssue, worstCandidate } = rateMeasurableMetric(
+				name,
+				vitals.metrics[name],
+				raw.url,
+				thresholds.cwv
+			);
+			metrics[name] = metric;
+			if (isIssue) {
+				urlIssues++;
+			}
+			if (
+				worstCandidate &&
+				(!worst || worstCandidate.severity > worst.severity)
+			) {
+				worst = worstCandidate;
 			}
 		}
 		metrics.INP = null;

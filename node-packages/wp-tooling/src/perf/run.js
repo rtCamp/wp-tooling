@@ -270,38 +270,39 @@ function emit(report, mode) {
 		process.stdout.write(JSON.stringify(report) + '\n');
 		return;
 	}
-	const s = report.summary;
-	const failed = s.failedUrls > 0 ? `, ${s.failedUrls} failed to load` : '';
+	const summary = report.summary;
+	const failed =
+		summary.failedUrls > 0 ? `, ${summary.failedUrls} failed to load` : '';
 	const lines = [
-		`${report.tool}: ${s.issues} issue(s) across ${s.urls} URL(s); ${s.passedUrls} clean${failed}.`,
+		`${report.tool}: ${summary.issues} issue(s) across ${summary.urls} URL(s); ${summary.passedUrls} clean${failed}.`,
 	];
-	if (s.worst) {
+	if (summary.worst) {
 		lines.push(
-			`worst: ${s.worst.metric} ${s.worst.value} (${s.worst.rating}) on ${s.worst.url}`
+			`worst: ${summary.worst.metric} ${summary.worst.value} (${summary.worst.rating}) on ${summary.worst.url}`
 		);
 	}
-	for (const r of report.results) {
+	for (const result of report.results) {
 		lines.push('');
-		if (r.scanError) {
-			lines.push(`${r.url} — scan failed`);
-			lines.push(`  ${r.scanError}`);
+		if (result.scanError) {
+			lines.push(`${result.url} — scan failed`);
+			lines.push(`  ${result.scanError}`);
 			continue;
 		}
-		lines.push(`${r.url}`);
-		for (const line of r.assessment) {
+		lines.push(`${result.url}`);
+		for (const line of result.assessment) {
 			lines.push(`  ${line}`);
 		}
-		if (r.server) {
-			const top = r.server.top
+		if (result.server) {
+			const top = result.server.top
 				.slice(0, 3)
-				.map((f) => `${f.fn} (${f.wallMs.toFixed(1)}ms)`)
+				.map((entry) => `${entry.fn} (${entry.wallMs.toFixed(1)}ms)`)
 				.join(', ');
 			lines.push(`  server top: ${top || 'none'}`);
-			if (r.server.error) {
-				lines.push(`  server error: ${r.server.error}`);
+			if (result.server.error) {
+				lines.push(`  server error: ${result.server.error}`);
 			}
 		}
-		for (const note of r.notes) {
+		for (const note of result.notes) {
 			lines.push(`  note: ${note}`);
 		}
 	}
@@ -406,14 +407,21 @@ function runDryRun(opts, cwd) {
 /**
  * Map a thrown error to an exit code and a stderr message.
  *
+ * `EBADJSON` here is always `resolveConfig`'s "the project's own perf config
+ * is malformed" — a usage error. `lighthouse.js` throws the same code for a
+ * corrupted Lighthouse run, but that one is always caught and degraded
+ * inside `collectOne`, so it never reaches this function.
+ *
  * @param {Error} err The error.
- * @return {number} Exit code: 2 (usage / module or binary missing), 1 (run failure).
+ * @return {number} Exit code: 2 (usage / module or binary missing / bad config), 1 (run failure).
  */
 function handleError(err) {
 	process.stderr.write(`perf: ${err.message}\n`);
 	if (
 		err instanceof RunnerError &&
-		(err.code === 'EBINMISSING' || err.code === 'ENOURLS')
+		(err.code === 'EBINMISSING' ||
+			err.code === 'ENOURLS' ||
+			err.code === 'EBADJSON')
 	) {
 		return 2;
 	}

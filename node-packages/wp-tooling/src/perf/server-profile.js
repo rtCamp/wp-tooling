@@ -32,8 +32,11 @@ const RUN_TIMEOUT_MS = 120000;
  * @return {{origin: string, pathAndQuery: string}} Split URL.
  */
 function splitUrl(url) {
-	const u = new URL(url);
-	return { origin: u.origin, pathAndQuery: `${u.pathname}${u.search}` };
+	const parsedUrl = new URL(url);
+	return {
+		origin: parsedUrl.origin,
+		pathAndQuery: `${parsedUrl.pathname}${parsedUrl.search}`,
+	};
 }
 
 /**
@@ -47,6 +50,8 @@ function tryParse(text) {
 		return null;
 	}
 	const trimmed = text.trim();
+	// Find where JSON actually starts -- an array `[` or object `{` -- so a
+	// leading non-JSON preamble line (e.g. a PHP notice) doesn't break parsing.
 	const start = trimmed.search(/[[{]/);
 	if (start === -1) {
 		return null;
