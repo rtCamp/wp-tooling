@@ -103,12 +103,19 @@ function runServerProfile(server, url, options = {}) {
 	}
 
 	const command = server.command[0];
-	const result = spawnSync(command, args, {
-		cwd,
-		encoding: 'utf8',
-		maxBuffer: MAX_BUFFER,
-		timeout: RUN_TIMEOUT_MS,
-	});
+	let result;
+	try {
+		// spawnSync itself can throw synchronously (e.g. command undefined),
+		// separately from the return-based result.error handled below.
+		result = spawnSync(command, args, {
+			cwd,
+			encoding: 'utf8',
+			maxBuffer: MAX_BUFFER,
+			timeout: RUN_TIMEOUT_MS,
+		});
+	} catch (err) {
+		return { data: null, diagnostic: null, error: err.message };
+	}
 
 	const diagnostic = (result.stderr || '').toString().trim() || null;
 

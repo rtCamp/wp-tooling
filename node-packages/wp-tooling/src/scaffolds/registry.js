@@ -46,6 +46,22 @@ const {
 	indexEntryToRecord,
 } = require('./sources');
 
+/**
+ * Render every value in a scripts map (npm or composer) through Mustache.
+ *
+ * @param {Object} scripts  Raw `{name: command}` map from scaffold.json.
+ * @param {Object} resolved Resolved inputs to render with.
+ * @return {Object} Rendered `{name: command}` map.
+ */
+function renderScriptMap(scripts, resolved) {
+	return Object.fromEntries(
+		Object.entries(scripts || {}).map(([name, cmd]) => [
+			name,
+			render(cmd, resolved),
+		])
+	);
+}
+
 class ScaffoldRegistry {
 	/**
 	 * @param {Object|string} options
@@ -493,8 +509,11 @@ class ScaffoldRegistry {
 					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
 				scripts: {
-					npm: { ...(scaffoldScripts.npm || {}) },
-					composer: { ...(scaffoldScripts.composer || {}) },
+					npm: renderScriptMap(scaffoldScripts.npm, resolved),
+					composer: renderScriptMap(
+						scaffoldScripts.composer,
+						resolved
+					),
 				},
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},

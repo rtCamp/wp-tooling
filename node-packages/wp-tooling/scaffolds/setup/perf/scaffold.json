@@ -55,7 +55,7 @@
 	"scripts": {
 		"npm": {
 			"test:perf": "wp-tooling perf",
-			"profile:server": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- wp eval-file server-profile.php"
+			"profile:server": "wp-env run cli --env-cwd={{server_env_cwd}} -- wp eval-file server-profile.php"
 		}
 	}
 }

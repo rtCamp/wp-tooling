@@ -245,7 +245,7 @@ function rateMeasurableMetric(name, vitalMetric, url, cwvMode) {
  * shape (or `null`), never a raw LHR.
  *
  * @param {Object[]} rawResults           Raw per-URL capture: `{ url, scanError,
- *                                        vitals, lighthouse, server, notes }`.
+ *                                        vitalsError, vitals, lighthouse, server, notes }`.
  * @param {Object}   [options]
  * @param {Object}   [options.thresholds] Resolved `thresholds` config section.
  * @return {Object} Normalised report.
@@ -319,7 +319,12 @@ function normalizePerf(rawResults, options = {}) {
 		}
 
 		issues += urlIssues;
-		if (urlIssues === 0) {
+
+		const notes = raw.notes ? [...raw.notes] : [];
+		if (raw.vitalsError) {
+			notes.push(raw.vitalsError);
+			failedUrls++;
+		} else if (urlIssues === 0) {
 			passedUrls++;
 		}
 
@@ -335,7 +340,7 @@ function normalizePerf(rawResults, options = {}) {
 			lighthouse,
 			server: normalizeServer(raw.server),
 			assessment: buildAssessment(metrics, lighthouse, thresholds),
-			notes: raw.notes || [],
+			notes,
 		});
 	}
 
@@ -366,5 +371,6 @@ module.exports = {
 	normalizeServer,
 	THRESHOLDS,
 	METRIC_NAMES,
+	MEASURABLE_METRIC_NAMES,
 	SERVER_FIDELITY_NOTE,
 };

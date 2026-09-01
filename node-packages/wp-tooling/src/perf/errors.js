@@ -12,6 +12,9 @@
  *   EBINFAIL     a browser or binary launch failed for a reason other than
  *                "found issues"
  *   EBADJSON     the perf config could not be parsed as JSON
+ *   ECONFIGREAD  the perf config path exists but could not be read — e.g. it
+ *                is a directory, or permission was denied (distinct from a
+ *                simply-absent config, which is not an error)
  *   ENOURLS      no URLs could be resolved from the perf config or --url
  */
 

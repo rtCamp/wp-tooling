@@ -247,6 +247,63 @@ describe('perf runCli', () => {
 		expect(spawnSync).toHaveBeenCalled();
 	});
 
+	test('an empty web-vitals harvest is a run failure (exit 1), and lighthouse still runs for it', async () => {
+		collectVitalsModule.collectVitals.mockResolvedValue({
+			metrics: { LCP: null, CLS: null, INP: null, FCP: null, TTFB: null },
+			attribution: { lcpElement: null, clsSources: [], inpTarget: null },
+		});
+		const code = await runCli([
+			'--config',
+			FIXTURE_CONFIG,
+			'--output',
+			'json',
+		]);
+		expect(code).toBe(1);
+		const parsed = JSON.parse(stdout.join(''));
+		expect(parsed.summary.passedUrls).toBe(0);
+		expect(parsed.summary.failedUrls).toBeGreaterThan(0);
+		expect(parsed.results[0].notes.join('')).toMatch(
+			/web-vitals harvest returned no metrics/
+		);
+
+		// Unlike a scanError, the page loaded fine, so lighthouse still runs.
+		const nonProbeCalls = execFileSync.mock.calls.filter(
+			(call) => !call[1].includes('--version')
+		);
+		expect(nonProbeCalls.length).toBeGreaterThan(0);
+	});
+
+	test('--output text still renders the server section for a URL that failed to scan', async () => {
+		mockChildProcess({
+			serverResult: {
+				stdout: JSON.stringify({
+					'WP_Query::get_posts': {
+						ct: 3,
+						wt: 41200,
+						cpu: 38000,
+						mu: 1048576,
+						pmu: 1148576,
+					},
+				}),
+				stderr: '',
+				status: 0,
+			},
+		});
+		collectVitalsModule.collectVitals.mockRejectedValue(
+			new Error('net::ERR_CONNECTION_REFUSED')
+		);
+		const code = await runCli([
+			'--config',
+			FIXTURE_CONFIG,
+			'--output',
+			'text',
+		]);
+		expect(code).toBe(1);
+		const out = stdout.join('');
+		expect(out).toMatch(/— scan failed/);
+		expect(out).toMatch(/server top: WP_Query::get_posts/);
+	});
+
 	test('a lighthouse runtime failure degrades that layer without affecting the exit code', async () => {
 		mockChildProcess({ lighthouseRunThrows: true });
 		const code = await runCli([

@@ -131,4 +131,16 @@ describe('runServerProfile', () => {
 		expect(result.error).toBeTruthy();
 		expect(spawnSync).not.toHaveBeenCalled();
 	});
+
+	test('degrades (never throws) when spawnSync itself throws — e.g. an empty server.command', () => {
+		spawnSync.mockImplementation(() => {
+			throw new TypeError('The "file" argument must be of type string');
+		});
+		const result = runServerProfile(
+			{ ...SERVER, command: [] },
+			'http://localhost:8765/'
+		);
+		expect(result.data).toBeNull();
+		expect(result.error).toMatch(/file.*argument/);
+	});
 });

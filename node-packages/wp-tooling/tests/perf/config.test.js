@@ -108,6 +108,26 @@ describe('resolveConfig — errors', () => {
 		expect(err).toBeInstanceOf(RunnerError);
 		expect(err.code).toBe('EBADJSON');
 	});
+
+	test('a config path that is a directory throws ECONFIGREAD, not a silent fallback', () => {
+		const err = grab(() =>
+			resolveConfig({ cwd: FIXTURES, configPath: '.' })
+		);
+		expect(err).toBeInstanceOf(RunnerError);
+		expect(err.code).toBe('ECONFIGREAD');
+	});
+
+	test('a config path that is a directory throws ECONFIGREAD even when --url is given', () => {
+		const err = grab(() =>
+			resolveConfig({
+				cwd: FIXTURES,
+				configPath: '.',
+				urls: ['http://example.test/'],
+			})
+		);
+		expect(err).toBeInstanceOf(RunnerError);
+		expect(err.code).toBe('ECONFIGREAD');
+	});
 });
 
 describe('mergeConfig', () => {

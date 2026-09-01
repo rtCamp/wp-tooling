@@ -89,7 +89,8 @@ function mergeConfig(raw) {
  * @param {string}   [options.cwd]        Project root.
  * @return {{config: Object, configPath: string|null, urls: string[]}} Resolved config, the
  *   config path actually read (`null` when none was read), and the effective URL list.
- * @throws {RunnerError} `ENOURLS` when no URLs are available; `EBADJSON` when the config is malformed.
+ * @throws {RunnerError} `ENOURLS` when no URLs are available; `EBADJSON` when the config
+ *   is malformed; `ECONFIGREAD` when the config path exists but could not be read.
  */
 function resolveConfig(options = {}) {
 	const cwd = options.cwd || process.cwd();
@@ -105,6 +106,13 @@ function resolveConfig(options = {}) {
 	try {
 		text = fs.readFileSync(configPath, 'utf8');
 	} catch (err) {
+		if (err.code !== 'ENOENT') {
+			throw new RunnerError(
+				'ECONFIGREAD',
+				`could not read ${configPath}: ${err.message}`,
+				{ configPath }
+			);
+		}
 		if (explicitUrls.length === 0) {
 			throw new RunnerError(
 				'ENOURLS',

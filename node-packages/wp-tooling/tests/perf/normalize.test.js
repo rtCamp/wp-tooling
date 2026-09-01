@@ -350,6 +350,53 @@ describe('normalizePerf', () => {
 		expect(report.results[0].server.top[0].fn).toBe('WP_Query::get_posts');
 	});
 
+	test('vitalsError counts the URL as failed (not passed), even with zero metric issues, and is appended to notes', () => {
+		const report = normalizePerf([
+			{
+				url: 'http://localhost:8888/',
+				scanError: null,
+				vitalsError: 'web-vitals harvest returned no metrics',
+				vitals: {
+					metrics: { LCP: null, CLS: null, FCP: null, TTFB: null },
+					attribution: {},
+				},
+				lighthouse: null,
+				server: null,
+				notes: [],
+			},
+		]);
+		expect(report.summary).toEqual({
+			urls: 1,
+			passedUrls: 0,
+			failedUrls: 1,
+			issues: 0,
+			worst: null,
+		});
+		expect(report.results[0].notes).toEqual([
+			'web-vitals harvest returned no metrics',
+		]);
+	});
+
+	test('a lighthouse issue still counts towards summary.issues alongside a vitalsError', () => {
+		const report = normalizePerf(
+			[
+				{
+					url: 'http://localhost:8888/',
+					scanError: null,
+					vitalsError: 'web-vitals harvest returned no metrics',
+					vitals: { metrics: {}, attribution: {} },
+					lighthouse: extractLighthouse(LHR),
+					server: null,
+					notes: [],
+				},
+			],
+			{ thresholds: { cwv: 'poor', lighthousePerformance: 0.9 } }
+		);
+		expect(report.summary.failedUrls).toBe(1);
+		expect(report.summary.passedUrls).toBe(0);
+		expect(report.summary.issues).toBe(1);
+	});
+
 	test('carries per-URL notes through untouched', () => {
 		const report = normalizePerf([
 			{

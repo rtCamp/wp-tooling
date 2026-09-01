@@ -31,7 +31,11 @@ const { detectBin } = require('./resolve-bin');
 const { launchBrowser, collectVitals } = require('./collect-vitals');
 const { runLighthouse, BIN: LIGHTHOUSE_BIN } = require('./lighthouse');
 const { runServerProfile } = require('./server-profile');
-const { normalizePerf, extractLighthouse } = require('./normalize');
+const {
+	normalizePerf,
+	extractLighthouse,
+	MEASURABLE_METRIC_NAMES,
+} = require('./normalize');
 
 const INSTALL_HINT = 'wp-tooling add setup/perf';
 const WEB_VITALS_DIST = 'dist/web-vitals.attribution.iife.js';
@@ -135,7 +139,9 @@ async function runPerf(options = {}) {
 /**
  * Run every layer for one URL. Frontend load failure becomes a per-URL
  * `scanError` (the caller's run continues); lighthouse and server failures
- * degrade to `null` + a note without affecting the overall run.
+ * degrade to `null` + a note without affecting the overall run. A page that
+ * loads but harvests no metric is a separate `vitalsError` — Lighthouse
+ * navigates independently, so it still runs for it.
  *
  * @param {string}      url               Target URL.
  * @param {Object}      ctx               Shared context for the run.
@@ -153,6 +159,7 @@ async function collectOne(url, ctx) {
 	const notes = [];
 	let vitals = null;
 	let scanError = null;
+	let vitalsError = null;
 
 	try {
 		vitals = await collectVitals(
@@ -161,6 +168,10 @@ async function collectOne(url, ctx) {
 			url,
 			config.webVitals
 		);
+		if (MEASURABLE_METRIC_NAMES.every((name) => !vitals.metrics[name])) {
+			vitalsError =
+				'web-vitals harvest returned no metrics — the injected collector may not have registered (e.g. the page never became interactive, or CSP blocked the injected script).';
+		}
 	} catch (err) {
 		scanError = (err && err.message ? err.message : '').toString();
 	}
@@ -201,7 +212,7 @@ async function collectOne(url, ctx) {
 		}
 	}
 
-	return { url, scanError, vitals, lighthouse, server, notes };
+	return { url, scanError, vitalsError, vitals, lighthouse, server, notes };
 }
 
 const VALID_OUTPUTS = ['text', 'json'];
@@ -286,11 +297,11 @@ function emit(report, mode) {
 		if (result.scanError) {
 			lines.push(`${result.url} — scan failed`);
 			lines.push(`  ${result.scanError}`);
-			continue;
-		}
-		lines.push(`${result.url}`);
-		for (const line of result.assessment) {
-			lines.push(`  ${line}`);
+		} else {
+			lines.push(`${result.url}`);
+			for (const line of result.assessment) {
+				lines.push(`  ${line}`);
+			}
 		}
 		if (result.server) {
 			const top = result.server.top
@@ -421,7 +432,8 @@ function handleError(err) {
 		err instanceof RunnerError &&
 		(err.code === 'EBINMISSING' ||
 			err.code === 'ENOURLS' ||
-			err.code === 'EBADJSON')
+			err.code === 'EBADJSON' ||
+			err.code === 'ECONFIGREAD')
 	) {
 		return 2;
 	}

@@ -212,6 +212,31 @@ describe('setup/perf rendered config', () => {
 		]);
 	});
 
+	it('renders the profile:server npm script from the resolved server_env_cwd, not a hardcoded plugin-path guess', async () => {
+		const r = registry;
+
+		const pluginResult = await r.execute(
+			'setup/perf',
+			{
+				base_url: 'http://localhost:8888',
+				server_env_cwd: 'wp-content/plugins/dummy-plugin',
+			},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(pluginResult.developer.scripts.npm['profile:server']).toBe(
+			'wp-env run cli --env-cwd=wp-content/plugins/dummy-plugin -- wp eval-file server-profile.php'
+		);
+
+		const rootResult = await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(rootResult.developer.scripts.npm['profile:server']).toBe(
+			'wp-env run cli --env-cwd=. -- wp eval-file server-profile.php'
+		);
+	});
+
 	it('has no safe default for server_env_cwd, since a wrong guess would silently point the server layer at the wrong shim location', async () => {
 		const r = registry;
 		const target = makeTmpDir();
