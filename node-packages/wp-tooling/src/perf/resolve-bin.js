@@ -27,7 +27,7 @@ const VERSION_PROBE_TIMEOUT_MS = 20000;
 function findInNodeModules(binName, cwd) {
 	const start = path.resolve(cwd);
 	let dir = start;
-	for (;;) {
+	while (true) {
 		const candidate = path.join(dir, 'node_modules', '.bin', binName);
 		if (fs.existsSync(candidate)) {
 			return {

@@ -49,16 +49,41 @@ const FAILING_AUDIT_SCORE_THRESHOLD = 0.9;
  */
 function rateMetric(name, value) {
 	const band = THRESHOLDS[name];
-	if (!band) {
-		return 'good';
-	}
-	if (value <= band[0]) {
+	if (!band || value <= band[0]) {
 		return 'good';
 	}
 	if (value <= band[1]) {
 		return 'needs-improvement';
 	}
 	return 'poor';
+}
+
+/**
+ * Extract and rank an LHR's failing audits (score below the threshold).
+ *
+ * @param {Object} audits    Raw LHR `audits` map.
+ * @param {number} topAudits Max entries to return.
+ * @return {Object[]} Failing audits, ascending by score.
+ */
+function extractFailingAudits(audits, topAudits) {
+	return Object.entries(audits)
+		.filter(
+			([, audit]) =>
+				audit &&
+				typeof audit.score === 'number' &&
+				audit.score < FAILING_AUDIT_SCORE_THRESHOLD
+		)
+		.map(([id, audit]) => ({
+			id,
+			title: typeof audit.title === 'string' ? audit.title : id,
+			score: audit.score,
+			displayValue:
+				typeof audit.displayValue === 'string'
+					? audit.displayValue
+					: null,
+		}))
+		.sort((a, b) => a.score - b.score)
+		.slice(0, topAudits);
 }
 
 /**
@@ -87,26 +112,8 @@ function extractLighthouse(lhr, options = {}) {
 
 	const audits =
 		lhr.audits && typeof lhr.audits === 'object' ? lhr.audits : {};
-	const failing = Object.entries(audits)
-		.filter(
-			([, audit]) =>
-				audit &&
-				typeof audit.score === 'number' &&
-				audit.score < FAILING_AUDIT_SCORE_THRESHOLD
-		)
-		.map(([id, audit]) => ({
-			id,
-			title: typeof audit.title === 'string' ? audit.title : id,
-			score: audit.score,
-			displayValue:
-				typeof audit.displayValue === 'string'
-					? audit.displayValue
-					: null,
-		}))
-		.sort((a, b) => a.score - b.score)
-		.slice(0, topAudits);
 
-	return { scores, audits: failing };
+	return { scores, audits: extractFailingAudits(audits, topAudits) };
 }
 
 /**
@@ -239,6 +246,97 @@ function rateMeasurableMetric(name, vitalMetric, url, cwvMode) {
 }
 
 /**
+ * Build the per-URL result entry for a browser scan failure — empty metrics
+ * and no assessment; the server layer (which runs independently of the
+ * browser) is unaffected.
+ *
+ * @param {Object} raw Raw per-URL capture with a truthy `scanError`.
+ * @return {Object} Result entry for `normalizePerf`'s `results[]`.
+ */
+function buildScanErrorResult(raw) {
+	return {
+		url: raw.url,
+		scanError: raw.scanError,
+		metrics: Object.fromEntries(METRIC_NAMES.map((name) => [name, null])),
+		attribution: { lcpElement: null, clsSources: [], inpTarget: null },
+		lighthouse: null,
+		server: normalizeServer(raw.server),
+		assessment: [],
+		notes: raw.notes || [],
+	};
+}
+
+/**
+ * Build the per-URL result entry for a page that loaded successfully, and
+ * fold its issue count / worst-candidate / pass-fail outcome into `totals`.
+ *
+ * @param {Object} raw        Raw per-URL capture (no `scanError`).
+ * @param {Object} thresholds Resolved `thresholds` config section.
+ * @param {Object} totals     Running summary totals, mutated in place.
+ * @return {Object} Result entry for `normalizePerf`'s `results[]`.
+ */
+function buildUrlResult(raw, thresholds, totals) {
+	const vitals = raw.vitals || { metrics: {}, attribution: {} };
+	const metrics = {};
+	let urlIssues = 0;
+
+	for (const name of MEASURABLE_METRIC_NAMES) {
+		const { metric, isIssue, worstCandidate } = rateMeasurableMetric(
+			name,
+			vitals.metrics[name],
+			raw.url,
+			thresholds.cwv
+		);
+		metrics[name] = metric;
+		if (isIssue) {
+			urlIssues++;
+		}
+		if (
+			worstCandidate &&
+			(!totals.worst || worstCandidate.severity > totals.worst.severity)
+		) {
+			totals.worst = worstCandidate;
+		}
+	}
+	metrics.INP = null;
+
+	const lighthouse = raw.lighthouse;
+	if (
+		lighthouse &&
+		typeof lighthouse.scores.performance === 'number' &&
+		typeof thresholds.lighthousePerformance === 'number' &&
+		lighthouse.scores.performance < thresholds.lighthousePerformance
+	) {
+		urlIssues++;
+	}
+
+	totals.issues += urlIssues;
+
+	const notes = raw.notes ? [...raw.notes] : [];
+	if (raw.vitalsError) {
+		notes.push(raw.vitalsError);
+		totals.failedUrls++;
+	} else if (urlIssues === 0) {
+		totals.passedUrls++;
+	}
+
+	return {
+		url: raw.url,
+		scanError: null,
+		metrics,
+		attribution: vitals.attribution || {
+			lcpElement: null,
+			clsSources: [],
+			inpTarget: null,
+		},
+		lighthouse,
+		server: normalizeServer(raw.server),
+		assessment: buildAssessment(metrics, lighthouse, thresholds),
+		notes,
+	};
+}
+
+/**
  * Normalise raw per-URL perf capture into the final two-layer report.
  *
  * `raw.lighthouse` is expected to already be the extracted `{scores, audits}`
@@ -257,106 +355,30 @@ function normalizePerf(rawResults, options = {}) {
 	};
 
 	const results = [];
-	let passedUrls = 0;
-	let failedUrls = 0;
-	let issues = 0;
-	let worst = null;
+	const totals = { passedUrls: 0, failedUrls: 0, issues: 0, worst: null };
 
 	for (const raw of rawResults || []) {
 		if (raw.scanError) {
-			failedUrls++;
-			results.push({
-				url: raw.url,
-				scanError: raw.scanError,
-				metrics: Object.fromEntries(
-					METRIC_NAMES.map((name) => [name, null])
-				),
-				attribution: {
-					lcpElement: null,
-					clsSources: [],
-					inpTarget: null,
-				},
-				lighthouse: null,
-				server: normalizeServer(raw.server),
-				assessment: [],
-				notes: raw.notes || [],
-			});
+			totals.failedUrls++;
+			results.push(buildScanErrorResult(raw));
 			continue;
 		}
-
-		const vitals = raw.vitals || { metrics: {}, attribution: {} };
-		const metrics = {};
-		let urlIssues = 0;
-
-		for (const name of MEASURABLE_METRIC_NAMES) {
-			const { metric, isIssue, worstCandidate } = rateMeasurableMetric(
-				name,
-				vitals.metrics[name],
-				raw.url,
-				thresholds.cwv
-			);
-			metrics[name] = metric;
-			if (isIssue) {
-				urlIssues++;
-			}
-			if (
-				worstCandidate &&
-				(!worst || worstCandidate.severity > worst.severity)
-			) {
-				worst = worstCandidate;
-			}
-		}
-		metrics.INP = null;
-
-		const lighthouse = raw.lighthouse;
-		if (
-			lighthouse &&
-			typeof lighthouse.scores.performance === 'number' &&
-			typeof thresholds.lighthousePerformance === 'number' &&
-			lighthouse.scores.performance < thresholds.lighthousePerformance
-		) {
-			urlIssues++;
-		}
-
-		issues += urlIssues;
-
-		const notes = raw.notes ? [...raw.notes] : [];
-		if (raw.vitalsError) {
-			notes.push(raw.vitalsError);
-			failedUrls++;
-		} else if (urlIssues === 0) {
-			passedUrls++;
-		}
-
-		results.push({
-			url: raw.url,
-			scanError: null,
-			metrics,
-			attribution: vitals.attribution || {
-				lcpElement: null,
-				clsSources: [],
-				inpTarget: null,
-			},
-			lighthouse,
-			server: normalizeServer(raw.server),
-			assessment: buildAssessment(metrics, lighthouse, thresholds),
-			notes,
-		});
+		results.push(buildUrlResult(raw, thresholds, totals));
 	}
 
 	return {
 		tool: 'web-vitals+lighthouse',
 		summary: {
 			urls: results.length,
-			passedUrls,
-			failedUrls,
-			issues,
-			worst: worst
+			passedUrls: totals.passedUrls,
+			failedUrls: totals.failedUrls,
+			issues: totals.issues,
+			worst: totals.worst
 				? {
-						metric: worst.metric,
-						url: worst.url,
-						value: worst.value,
-						rating: worst.rating,
+						metric: totals.worst.metric,
+						url: totals.worst.url,
+						value: totals.worst.value,
+						rating: totals.worst.rating,
 					}
 				: null,
 		},

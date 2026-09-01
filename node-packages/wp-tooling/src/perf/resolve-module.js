@@ -24,7 +24,7 @@ const path = require('path');
 function findModuleDir(moduleName, cwd) {
 	const start = path.resolve(cwd);
 	let dir = start;
-	for (;;) {
+	while (true) {
 		const candidate = path.join(dir, 'node_modules', moduleName);
 		if (fs.existsSync(path.join(candidate, 'package.json'))) {
 			return {
