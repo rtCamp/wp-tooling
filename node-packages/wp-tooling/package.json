@@ -27,6 +27,7 @@
     "./release": "./src/release/index.js",
     "./hooks": "./src/hooks/index.js",
     "./ci": "./src/ci/index.js",
+    "./a11y": "./src/a11y/index.js",
     "./version-monitor": "./src/version-monitor/index.js"
   },
     "files": [

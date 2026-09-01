@@ -1,0 +1,76 @@
+{
+	"skill_name": "accessibility",
+	"evals": [
+		{
+			"id": 1,
+			"prompt": "Run an accessibility audit on my plugin's dev site and fix whatever you find. The site runs at http://localhost:8765 via wp-env and .pa11yci.json is already set up at the project root.",
+			"expected_output": "A dry-run shown first (resolved binary, config, URL list), then `npx wp-tooling a11y --output json` executed with exit 3 treated as work-to-do. Violations grouped by id, ranked errors first, and the group list confirmed with the developer before any edit. Each fixed group is traced via domHints to the theme/plugin source, a diff is shown and approved before applying, and a re-run proves the id+selector pairs are gone. Final report includes before/after summary counts.",
+			"files": [],
+			"expectations": [
+				"The skill runs `wp-tooling a11y --dry-run` and shows the resolved config and URLs before the real scan.",
+				"The scan uses `--output json` and exit code 3 is treated as violations-to-work-on, not a failure.",
+				"Violations are grouped by id and ranked by impact (errors before warnings; notices listed but not fixed unasked).",
+				"The developer confirms which groups to fix before any file is edited.",
+				"Source location uses domHints (idAttr, classList, attrs) to grep project source, not vendor/, node_modules/, or build output.",
+				"Every edit is shown as a diff and applied only after consent.",
+				"After each fix the skill re-runs the scan and verifies the specific id+selector pairs are gone.",
+				"The final report contains before/after summary counts and file:line for each fix."
+			]
+		},
+		{
+			"id": 2,
+			"prompt": "Check this project for accessibility issues.",
+			"expected_output": "The project has no pa11y config and no pa11y-ci installed, so the skill stops at preflight: it offers `npx wp-tooling add setup/pa11y` to scaffold .pa11yci.json and the pa11y-ci dev dependency, surfaces the npm install as a developer action, and does not run any package manager or invoke pa11y-ci by hand.",
+			"files": [],
+			"expectations": [
+				"The skill detects the missing pa11y config / pa11y-ci during preflight rather than failing mid-run.",
+				"It offers the setup/pa11y scaffold as one way to get a config, not as a mandatory requirement.",
+				"It does NOT run npm install or composer require itself; installs are surfaced as developer actions.",
+				"It does NOT hand-roll a pa11y or pa11y-ci invocation to work around the missing setup.",
+				"If a config exists but the dev site is down, starting the environment is surfaced as a developer action or run only with consent."
+			]
+		},
+		{
+			"id": 3,
+			"prompt": "The a11y scan is failing on our WordPress site - can you sort out whatever it's complaining about? Config scans the front page, /wp-admin/ and /wp-login.php.",
+			"expected_output": "Violations on wp-login.php (WordPress core markup) are classified as upstream findings with suggested remedies (hooks/filters, upstream report) and are not patched in core or vendor code. Any URL with a scanError (e.g. connection refused) is treated as an environment problem - the skill checks the dev server rather than editing code. Project-owned violations follow the normal fix-with-consent loop.",
+			"files": [],
+			"expectations": [
+				"Violations in markup rendered by WordPress core (wp-login.php) are classified as upstream and NOT fixed by editing core or vendor files.",
+				"Upstream findings appear in the report with suggested remedies instead of code patches.",
+				"A scanError entry (unreachable URL) is treated as an environment problem: the skill checks/starts the dev server, never edits code for it.",
+				"failedUrls > 0 with exit 1 does not get misreported as accessibility violations.",
+				"Project-owned violations still go through trace -> diff -> consent -> re-check.",
+				"The skill never adds pa11y ignore rules, drops URLs, or lowers the standard to make the run pass."
+			]
+		},
+		{
+			"id": 4,
+			"prompt": "The a11y scan reports: { \"id\": \"WCAG2AA.Principle1.Guideline1_1.1_1_1.H37\", \"wcagCriterion\": \"1.1.1\", \"impact\": \"error\", \"message\": \"Img element missing an alt attribute.\", \"selector\": \"html > body > div.hero-banner > img\", \"context\": \"<img class=\\\"hero-banner__image\\\" src=\\\"/wp-content/uploads/2024/hero.jpg\\\">\", \"domHints\": { \"tagName\": \"img\", \"classList\": [\"hero-banner__image\"], \"idAttr\": null, \"attrs\": { \"src\": \"/wp-content/uploads/2024/hero.jpg\" } } } at http://localhost:8888/. The theme has template-parts/hero.php rendering that exact markup. Fix it.",
+			"expected_output": "The skill greps theme templates for the hero-banner__image class (domHints.classList), finds the <img> in template-parts/hero.php, and proposes adding a real alt attribute (or an explicit alt=\"\" if the image is decorative) rather than a placeholder. The diff is shown and applied only after consent, and a re-run confirms the WCAG2AA.Principle1.Guideline1_1.1_1_1.H37 id + the img selector are gone from the report.",
+			"files": ["evals/files/template-parts/hero.php"],
+			"expectations": [
+				"The skill uses domHints (classList: hero-banner__image, tagName: img) to grep theme/plugin source, not vendor/, node_modules/, or build output.",
+				"template-parts/hero.php is identified as the render site for the failing <img>.",
+				"The proposed fix adds a meaningful alt attribute, or an explicit alt=\"\" with a stated reason if the image is decorative — not a placeholder like alt=\"image\".",
+				"The diff is shown with file and line, and applied only after developer consent.",
+				"The re-run confirms the specific id + selector pair is gone, not just that overall violation counts dropped.",
+				"The skill does not suppress the finding with a pa11y ignore rule instead of fixing the markup."
+			]
+		},
+		{
+			"id": 5,
+			"prompt": "The a11y scan reports a colour-contrast violation: { \"id\": \"color-contrast\", \"wcagCriterion\": null, \"impact\": \"error\", \"runner\": \"axe\", \"message\": \"Element has insufficient color contrast of 1.65 (foreground color: #abb8c3, background color: #0693e3, font size: 12pt, font weight: normal): expected contrast ratio of 4.5:1\", \"selector\": \"div.wp-block-group > p\", \"context\": \"<p class=\\\"has-text-color has-background has-cyan-bluish-gray-color has-vivid-cyan-blue-background-color\\\">Read more</p>\", \"domHints\": { \"tagName\": \"p\", \"classList\": [\"has-text-color\", \"has-background\", \"has-cyan-bluish-gray-color\", \"has-vivid-cyan-blue-background-color\"], \"idAttr\": null, \"attrs\": {} } } at http://localhost:8888/. There's no hand-authored template with that class combination — the color comes from the Gutenberg block editor. The project's theme.json is attached.",
+			"expected_output": "The skill recognizes the has-*-color / has-*-background-color classes (inside a wp-block-group ancestor) as WordPress-generated Gutenberg block color-support markup, not a project-authored CSS class, so it does not grep theme PHP for that literal class string as if someone wrote it there. It traces the two color slugs (cyan-bluish-gray, vivid-cyan-blue) to their definitions in theme.json's settings.color.palette (#abb8c3 on #0693e3, ~1.65:1 — genuinely below the 4.5:1 requirement) and proposes adjusting that palette pairing (or the block's chosen colors) rather than inventing a new override class. The change is shown as a diff and applied only after consent, and a re-run confirms the color-contrast id + selector are gone.",
+			"files": ["evals/files/theme.json"],
+			"expectations": [
+				"domHints.classList containing wp-block-* / has-*-color / has-*-background-color utility classes is recognized as Gutenberg block color-support styling, not raw project-authored markup.",
+				"The skill does NOT grep theme/plugin PHP templates for the literal has-cyan-bluish-gray-color class string as if it were hand-authored there.",
+				"The fix is proposed at the level WordPress actually defines the palette (theme.json settings.color.palette, or the block's chosen color attributes) rather than a new ad-hoc CSS override class.",
+				"The change is shown as a diff and applied only after developer consent.",
+				"The re-run confirms the color-contrast id + selector pair is gone from the report.",
+				"The skill does not silence the finding by adding a class or style outside the project's existing block-color convention."
+			]
+		}
+	]
+}

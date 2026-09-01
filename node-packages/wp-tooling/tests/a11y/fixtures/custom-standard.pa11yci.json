@@ -1,0 +1,4 @@
+{
+	"defaults": { "standard": "WCAG2AAA" },
+	"urls": ["http://localhost:8888/"]
+}
