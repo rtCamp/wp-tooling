@@ -27,7 +27,7 @@ const {
 	requireModule,
 	detectModule,
 } = require('./resolve-module');
-const { detectBin } = require('./resolve-bin');
+const { detectBin, resolveBin } = require('./resolve-bin');
 const { launchBrowser, collectVitals } = require('./collect-vitals');
 const { runLighthouse, BIN: LIGHTHOUSE_BIN } = require('./lighthouse');
 const { runServerProfile } = require('./server-profile');
@@ -309,6 +309,9 @@ function emit(report, mode) {
 				.map((entry) => `${entry.fn} (${entry.wallMs.toFixed(1)}ms)`)
 				.join(', ');
 			lines.push(`  server top: ${top || 'none'}`);
+			if (result.server.note) {
+				lines.push(`  server note: ${result.server.note}`);
+			}
 			if (result.server.error) {
 				lines.push(`  server error: ${result.server.error}`);
 			}
@@ -392,9 +395,11 @@ function runDryRun(opts, cwd) {
 	];
 
 	if (config.lighthouse.enabled) {
-		const bin = detectBin(LIGHTHOUSE_BIN, { cwd });
-		const state = bin.available ? bin.version : 'NOT FOUND';
-		lines.push(`  lighthouse:  ${bin.command} (${bin.source}, ${state})`);
+		// resolveBin only -- dry-run must not spawn lighthouse --version.
+		const bin = resolveBin(LIGHTHOUSE_BIN, { cwd });
+		lines.push(
+			`  lighthouse:  ${bin.command} (${bin.source}, not probed — dry run)`
+		);
 	} else {
 		lines.push('  lighthouse:  disabled');
 	}

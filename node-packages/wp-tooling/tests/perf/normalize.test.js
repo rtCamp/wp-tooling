@@ -125,6 +125,28 @@ describe('normalizeServer', () => {
 		expect(normalized.note).toMatch(/xhprof\/tideways_xhprof/);
 	});
 
+	test('skips malformed entries in the profiler payload instead of throwing', () => {
+		const normalized = normalizeServer({
+			data: {
+				'WP_Query::get_posts': {
+					ct: 3,
+					wt: 41200,
+					cpu: 38000,
+					mu: 1048576,
+					pmu: 1148576,
+				},
+				bad_null: null,
+				bad_array: [1, 2],
+				bad_primitive: 'oops',
+			},
+			diagnostic: null,
+			error: null,
+		});
+		expect(normalized.top.map((f) => f.fn)).toEqual([
+			'WP_Query::get_posts',
+		]);
+	});
+
 	test('an invocation failure carries the error and skips the empty-backend guidance', () => {
 		const normalized = normalizeServer({
 			data: null,

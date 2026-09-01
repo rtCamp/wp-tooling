@@ -52,15 +52,17 @@ function tryParse(text) {
 	const trimmed = text.trim();
 	// Find where JSON actually starts -- an array `[` or object `{` -- so a
 	// leading non-JSON preamble line (e.g. a PHP notice) doesn't break parsing.
-	const start = trimmed.search(/[[{]/);
-	if (start === -1) {
-		return null;
+	// A failed candidate may itself be non-JSON text, so keep searching.
+	let start = trimmed.search(/[[{]/);
+	while (start !== -1) {
+		try {
+			return JSON.parse(trimmed.slice(start));
+		} catch {
+			const next = trimmed.slice(start + 1).search(/[[{]/);
+			start = next === -1 ? -1 : start + next + 1;
+		}
 	}
-	try {
-		return JSON.parse(trimmed.slice(start));
-	} catch {
-		return null;
-	}
+	return null;
 }
 
 /**
@@ -123,11 +125,19 @@ function runServerProfile(server, url, options = {}) {
 		return { data: null, diagnostic, error: result.error.message };
 	}
 
+	// A non-zero exit can still leave parseable JSON on stdout (e.g. a fatal
+	// render error), so check status before trusting the payload.
+	if (result.status !== 0) {
+		return {
+			data: null,
+			diagnostic,
+			error: `non-zero exit (${result.status === null ? 'null (timed out?)' : result.status})`,
+		};
+	}
+
 	const parsed = tryParse((result.stdout || '').toString());
 	if (parsed === null) {
-		const detail =
-			diagnostic ||
-			`exit code ${result.status === null ? 'null (timed out?)' : result.status}`;
+		const detail = diagnostic || 'exit code 0';
 		return {
 			data: null,
 			diagnostic,

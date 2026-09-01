@@ -32,7 +32,7 @@ window.__wpToolingVitals = {};
 			value: metric.value,
 			rating: metric.rating,
 			attribution: {
-				element: (metric.attribution && metric.attribution.element) || null,
+				target: (metric.attribution && metric.attribution.target) || null,
 				largestShiftTarget: (metric.attribution && metric.attribution.largestShiftTarget) || null,
 				interactionTarget: (metric.attribution && metric.attribution.interactionTarget) || null,
 			},
@@ -85,8 +85,8 @@ async function launchBrowser(puppeteer, options = {}) {
  *   Rejects when the page fails to load (the caller records this as a per-URL scan error).
  */
 async function collectVitals(browser, scriptSource, url, options = {}) {
-	const settleMs = options.settleMs || 3000;
-	const timeoutMs = options.timeoutMs || 30000;
+	const settleMs = options.settleMs ?? 3000;
+	const timeoutMs = options.timeoutMs ?? 30000;
 
 	const page = await browser.newPage();
 	try {
@@ -127,7 +127,7 @@ function buildResult(raw) {
 	return {
 		metrics,
 		attribution: {
-			lcpElement: lcpAttr.element || null,
+			lcpElement: lcpAttr.target || null,
 			clsSources: clsAttr.largestShiftTarget
 				? [clsAttr.largestShiftTarget]
 				: [],

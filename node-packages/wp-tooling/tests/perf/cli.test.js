@@ -302,6 +302,7 @@ describe('perf runCli', () => {
 		const out = stdout.join('');
 		expect(out).toMatch(/— scan failed/);
 		expect(out).toMatch(/server top: WP_Query::get_posts/);
+		expect(out).toMatch(/server note: profiled via/);
 	});
 
 	test('a lighthouse runtime failure degrades that layer without affecting the exit code', async () => {
@@ -335,7 +336,7 @@ describe('perf runCli', () => {
 		]);
 		expect(code).toBe(0);
 		const parsed = JSON.parse(stdout.join(''));
-		expect(parsed.results[0].server.error).toMatch(/no parseable output/);
+		expect(parsed.results[0].server.error).toMatch(/non-zero exit \(255\)/);
 		expect(stderr.join('')).toMatch(/server profile failed for/);
 	});
 
@@ -360,17 +361,17 @@ describe('perf runCli', () => {
 		const out = stdout.join('');
 		expect(out).toMatch(/\[dry-run\] perf would run:/);
 		expect(out).toMatch(/puppeteer:/);
-		expect(out).toMatch(/lighthouse:/);
+		expect(out).toMatch(/lighthouse:.*not probed — dry run/);
 		expect(out).toMatch(/server:/);
 
-		// Only the lighthouse --version probe ran; nothing else was invoked.
+		// Dry-run must not probe lighthouse (or invoke anything else).
 		// Filtered rather than asserting the raw total, so this doesn't
 		// depend on perfect mock-call isolation from other test files
 		// sharing the same auto-mocked child_process module.
 		const versionProbes = execFileSync.mock.calls.filter((call) =>
 			call[1].includes('--version')
 		);
-		expect(versionProbes).toHaveLength(1);
+		expect(versionProbes).toHaveLength(0);
 		expect(spawnSync).not.toHaveBeenCalled();
 		expect(collectVitalsModule.launchBrowser).not.toHaveBeenCalled();
 		expect(collectVitalsModule.collectVitals).not.toHaveBeenCalled();

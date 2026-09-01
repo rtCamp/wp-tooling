@@ -117,7 +117,40 @@ describe('runServerProfile', () => {
 		spawnSync.mockReturnValue({
 			stdout: 'PHP Fatal error: something exploded',
 			stderr: '',
+			status: 0,
+		});
+		const result = runServerProfile(SERVER, 'http://localhost:8765/');
+		expect(result.data).toBeNull();
+		expect(result.error).toMatch(/no parseable output/);
+	});
+
+	test('a non-zero exit is a failure even when stdout happens to be parseable', () => {
+		spawnSync.mockReturnValue({
+			stdout: '{"fn":{"ct":1,"wt":1,"cpu":1,"mu":1,"pmu":1}}',
+			stderr: '',
 			status: 255,
+		});
+		const result = runServerProfile(SERVER, 'http://localhost:8765/');
+		expect(result.data).toBeNull();
+		expect(result.error).toMatch(/non-zero exit \(255\)/);
+	});
+
+	test('keeps searching past a bracket that is not the real JSON payload', () => {
+		spawnSync.mockReturnValue({
+			stdout: '[notice] filesystem warning\n{"fn":{"ct":1,"wt":10,"cpu":10,"mu":100,"pmu":200}}',
+			stderr: '',
+			status: 0,
+		});
+		const result = runServerProfile(SERVER, 'http://localhost:8765/');
+		expect(result.data.fn.ct).toBe(1);
+		expect(result.error).toBeNull();
+	});
+
+	test('falls through to null when no candidate bracket ever parses', () => {
+		spawnSync.mockReturnValue({
+			stdout: '[not json] {also not json',
+			stderr: '',
+			status: 0,
 		});
 		const result = runServerProfile(SERVER, 'http://localhost:8765/');
 		expect(result.data).toBeNull();

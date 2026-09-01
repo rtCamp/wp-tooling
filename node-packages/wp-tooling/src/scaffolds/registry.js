@@ -306,6 +306,13 @@ class ScaffoldRegistry {
 		const discovery = await loadDiscovery(cwd);
 		const resolved = resolveInputs(scaffold, inputs, discovery);
 
+		// Rendered before any write, so a bad placeholder throws before partial writes.
+		const scaffoldScripts = scaffold.scripts || {};
+		const renderedScripts = {
+			npm: renderScriptMap(scaffoldScripts.npm, resolved),
+			composer: renderScriptMap(scaffoldScripts.composer, resolved),
+		};
+
 		// Warn on supplied keys the scaffold does not declare. Typos like
 		// `--namspace=Inc` would otherwise be silently dropped while the
 		// real `namespace` input falls back to its default. Soft warning,
@@ -478,7 +485,6 @@ class ScaffoldRegistry {
 			});
 		}
 
-		const scaffoldScripts = scaffold.scripts || {};
 		return {
 			scaffold: {
 				id: makeId(scaffold),
@@ -508,13 +514,7 @@ class ScaffoldRegistry {
 					npm: { ...(scaffold.npm_dependencies || {}) },
 					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
-				scripts: {
-					npm: renderScriptMap(scaffoldScripts.npm, resolved),
-					composer: renderScriptMap(
-						scaffoldScripts.composer,
-						resolved
-					),
-				},
+				scripts: renderedScripts,
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},
 			ai: { wiring: aiWiring, tests: aiTests },

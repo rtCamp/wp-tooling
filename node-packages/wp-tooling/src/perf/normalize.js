@@ -131,6 +131,9 @@ function normalizeServer(result) {
 	const top = [];
 	if (data && typeof data === 'object' && !Array.isArray(data)) {
 		for (const [fn, stat] of Object.entries(data)) {
+			if (!stat || typeof stat !== 'object' || Array.isArray(stat)) {
+				continue;
+			}
 			top.push({
 				fn,
 				calls: Number(stat.ct) || 0,

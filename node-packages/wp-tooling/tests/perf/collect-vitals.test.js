@@ -68,7 +68,7 @@ describe('collectVitals', () => {
 				LCP: {
 					value: 2431.2,
 					rating: 'good',
-					attribution: { element: 'img.hero' },
+					attribution: { target: 'img.hero' },
 				},
 			},
 		});
@@ -94,6 +94,22 @@ describe('collectVitals', () => {
 		expect(result.attribution.lcpElement).toBe('img.hero');
 	});
 
+	test('an explicit 0 for settleMs/timeoutMs is respected, not defaulted', async () => {
+		const { page, calls } = fakePage({ harvested: {} });
+		const browser = { newPage: jest.fn(async () => page) };
+
+		await collectVitals(browser, '/* iife */', 'http://localhost:8888/', {
+			settleMs: 0,
+			timeoutMs: 0,
+		});
+
+		expect(calls[1]).toEqual([
+			'goto',
+			'http://localhost:8888/',
+			{ waitUntil: 'networkidle2', timeout: 0 },
+		]);
+	});
+
 	test('a goto rejection propagates, but the page is still closed', async () => {
 		const gotoError = new Error('net::ERR_CONNECTION_REFUSED');
 		const { page, calls } = fakePage({ gotoError });
@@ -115,7 +131,7 @@ describe('buildResult', () => {
 			LCP: {
 				value: 2000,
 				rating: 'good',
-				attribution: { element: 'img' },
+				attribution: { target: 'img' },
 			},
 			CLS: {
 				value: 0.05,

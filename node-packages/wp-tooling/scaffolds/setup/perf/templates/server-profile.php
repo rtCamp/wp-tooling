@@ -82,13 +82,18 @@ $_REQUEST = array_merge( $_REQUEST, $_GET );
 
 $server_profile_profiler->start();
 
+// wp()/template-loader.php may open their own nested buffers; unwind to
+// the level recorded here rather than assuming only one was opened.
+$server_profile_ob_level = ob_get_level();
 ob_start();
 wp();
 if ( ! defined( 'WP_USE_THEMES' ) ) {
 	define( 'WP_USE_THEMES', true );
 }
 require ABSPATH . WPINC . '/template-loader.php';
-ob_end_clean();
+while ( ob_get_level() > $server_profile_ob_level ) {
+	ob_end_clean();
+}
 
 echo wp_json_encode( $server_profile_profiler->stop( $server_profile_top, 'server-profile' ) ) . PHP_EOL;
 
