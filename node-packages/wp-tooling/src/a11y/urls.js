@@ -33,8 +33,34 @@ const JS_CONFIG_RE = /\.(m?js|cjs)$/i;
  */
 function resolveUrls(options = {}) {
 	const cwd = options.cwd || process.cwd();
-	const configPath = options.configPath
-		? path.resolve(cwd, options.configPath)
+	const configPath = resolveConfigPath(cwd, options.configPath);
+	const raw = readConfigFile(configPath);
+	const parsed = parseConfigJson(raw, configPath);
+
+	const urls = extractUrls(parsed);
+	if (urls.length === 0) {
+		throw new RunnerError(
+			'ENOURLS',
+			`no "urls" entries found in ${configPath}. Add the URLs to scan there.`,
+			{ configPath }
+		);
+	}
+
+	const standard = parsed.defaults && parsed.defaults.standard;
+	return { urls, configPath, standard };
+}
+
+/**
+ * Resolve the config path and reject a JavaScript pa11y-ci config early.
+ *
+ * @param {string} cwd                Project root.
+ * @param {string} [configPathOption] Explicit `--config` path, if any.
+ * @return {string} Resolved absolute config path.
+ * @throws {RunnerError} `ECONFIGJS` when the path is a .js/.cjs/.mjs file.
+ */
+function resolveConfigPath(cwd, configPathOption) {
+	const configPath = configPathOption
+		? path.resolve(cwd, configPathOption)
 		: path.join(cwd, DEFAULT_CONFIG);
 
 	// pa11y-ci itself accepts JSON or JavaScript (.js/.cjs) configs, but this
@@ -50,9 +76,19 @@ function resolveUrls(options = {}) {
 		);
 	}
 
-	let raw;
+	return configPath;
+}
+
+/**
+ * Read the pa11y config file from disk.
+ *
+ * @param {string} configPath Resolved config path.
+ * @return {string} Raw file contents.
+ * @throws {RunnerError} `ENOURLS` when the file can't be read.
+ */
+function readConfigFile(configPath) {
 	try {
-		raw = fs.readFileSync(configPath, 'utf8');
+		return fs.readFileSync(configPath, 'utf8');
 	} catch (err) {
 		throw new RunnerError(
 			'ENOURLS',
@@ -62,10 +98,19 @@ function resolveUrls(options = {}) {
 			{ configPath }
 		);
 	}
+}
 
-	let parsed;
+/**
+ * Parse the raw pa11y config as JSON.
+ *
+ * @param {string} raw        Raw file contents.
+ * @param {string} configPath Config path being parsed (for the error message).
+ * @return {Object} Parsed config.
+ * @throws {RunnerError} `EBADJSON` when the config is malformed JSON.
+ */
+function parseConfigJson(raw, configPath) {
 	try {
-		parsed = JSON.parse(raw);
+		return JSON.parse(raw);
 	} catch (err) {
 		throw new RunnerError(
 			'EBADJSON',
@@ -73,18 +118,6 @@ function resolveUrls(options = {}) {
 			{ configPath }
 		);
 	}
-
-	const urls = extractUrls(parsed);
-	if (urls.length === 0) {
-		throw new RunnerError(
-			'ENOURLS',
-			`no "urls" entries found in ${configPath}. Add the URLs to scan there.`,
-			{ configPath }
-		);
-	}
-
-	const standard = parsed.defaults && parsed.defaults.standard;
-	return { urls, configPath, standard };
 }
 
 /**

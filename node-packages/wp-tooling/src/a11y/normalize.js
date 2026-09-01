@@ -55,9 +55,7 @@ function normalizeA11y(raw, options = {}) {
 
 	const results = [];
 	const impactCounts = { error: 0, warning: 0, notice: 0 };
-	let violations = 0;
-	let passedUrls = 0;
-	let failedUrls = 0;
+	const counts = { violations: 0, passedUrls: 0, failedUrls: 0 };
 
 	const urls = Object.keys(resultsMap).sort();
 	for (const url of urls) {
@@ -71,12 +69,12 @@ function normalizeA11y(raw, options = {}) {
 		const scanError =
 			loadFailures.length > 0 ? loadFailures[0].message : null;
 		if (scanError) {
-			failedUrls++;
+			counts.failedUrls++;
 		} else if (normViolations.length === 0) {
-			passedUrls++;
+			counts.passedUrls++;
 		}
 		for (const violation of normViolations) {
-			violations++;
+			counts.violations++;
 			if (violation.impact in impactCounts) {
 				impactCounts[violation.impact]++;
 			}
@@ -90,12 +88,12 @@ function normalizeA11y(raw, options = {}) {
 		standard,
 		summary: {
 			urls: urls.length,
-			violations,
+			violations: counts.violations,
 			errors: impactCounts.error,
 			warnings: impactCounts.warning,
 			notices: impactCounts.notice,
-			passedUrls,
-			failedUrls,
+			passedUrls: counts.passedUrls,
+			failedUrls: counts.failedUrls,
 		},
 		results,
 	};
