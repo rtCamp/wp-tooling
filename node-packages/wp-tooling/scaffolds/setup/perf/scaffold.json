@@ -1,0 +1,61 @@
+{
+	"slug": "perf",
+	"category": "setup",
+	"name": "perf (web-vitals + lighthouse + server xhprof)",
+	"description": "Adds .perfrc.json and server-profile.php for two-layer performance testing against a running WordPress environment: lab Core Web Vitals (web-vitals attribution build under headless Chromium) + Lighthouse performance scores, and optional server-side xhprof function profiling via WP-CLI. The server layer needs `composer require --dev rtcamp/wp-dev-tools` (not on Packagist — add it via a path or VCS repository) and the xhprof or tideways_xhprof PHP extension in the WP-CLI environment; without either it degrades gracefully rather than erroring.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/.perfrc.json.mustache",
+			"dest": ".perfrc.json"
+		},
+		{
+			"src": "templates/server-profile.php",
+			"dest": "server-profile.php",
+			"raw": true
+		}
+	],
+	"inputs": [
+		{
+			"key": "base_url",
+			"description": "Base URL of the WordPress environment to test against (e.g. http://localhost:8888).",
+			"required": true
+		},
+		{
+			"key": "sample_page",
+			"description": "Path of a post or page to test, appended to base_url (e.g. /hello-world/ or a permalink path).",
+			"default": "/?p=1"
+		},
+		{
+			"key": "search_page",
+			"description": "Path of the search-results page to test, appended to base_url.",
+			"default": "/?s=hello"
+		},
+		{
+			"key": "extra_page",
+			"description": "Optional path of one more page to test, appended to base_url. Omitted when empty; add further URLs directly in .perfrc.json.",
+			"default": ""
+		},
+		{
+			"key": "server_enabled",
+			"description": "Enable the server-side xhprof layer (needs rtcamp/wp-dev-tools and the xhprof/tideways_xhprof PHP extension in the WP-CLI environment). One of true/false/yes/no.",
+			"default": "false"
+		},
+		{
+			"key": "server_env_cwd",
+			"description": "Project path inside the WP-CLI environment, as `wp-env run cli --env-cwd` expects it. Must match where this scaffold just installed server-profile.php — e.g. wp-content/plugins/my-plugin for a plugin, wp-content/themes/my-theme for a theme — or `.` only if this project IS the WordPress root. There's no safe default: guessing wrong means the server layer can't find its own shim.",
+			"required": true
+		}
+	],
+	"npm_dev_dependencies": {
+		"web-vitals": "^5.3.0",
+		"lighthouse": "^13.4.0",
+		"puppeteer": "^25.3.0"
+	},
+	"scripts": {
+		"npm": {
+			"test:perf": "wp-tooling perf",
+			"profile:server": "wp-env run cli --env-cwd={{server_env_cwd}} -- wp eval-file server-profile.php"
+		}
+	}
+}

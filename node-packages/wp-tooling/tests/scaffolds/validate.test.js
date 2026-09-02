@@ -409,6 +409,28 @@ describe('validateOne on-disk checks', () => {
 			fssync.rmSync(dir, { recursive: true, force: true });
 		}
 	});
+
+	test('scripts commands are render-checked alongside files/tests/wiring', () => {
+		const { dir, file } = makeOnDiskScaffold({
+			slug: 'local',
+			category: 'wp',
+			name: 'Local',
+			description: 'fixture',
+			source: 'template',
+			scripts: { npm: { 'lint:js': 123 } },
+		});
+		try {
+			const result = validateOne(file);
+			expect(result.valid).toBe(false);
+			expect(
+				result.errors.some((e) =>
+					/scripts\.npm\['lint:js'\] render failed/.test(e)
+				)
+			).toBe(true);
+		} finally {
+			fssync.rmSync(dir, { recursive: true, force: true });
+		}
+	});
 });
 
 function makeTmpDir() {

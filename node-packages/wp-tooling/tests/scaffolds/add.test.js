@@ -209,6 +209,61 @@ describe('add command non-interactive flow', () => {
 	});
 });
 
+describe('add command human report', () => {
+	async function buildProjectWithDevDeps(cwd) {
+		const scaffoldDir = path.join(
+			cwd,
+			'bin',
+			'scaffolds',
+			'test',
+			'devdeps'
+		);
+		await fs.mkdir(path.join(scaffoldDir, 'templates'), {
+			recursive: true,
+		});
+		await fs.writeFile(
+			path.join(scaffoldDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'devdeps',
+				category: 'test',
+				name: 'Dev deps',
+				description:
+					'Scaffold with dev dependencies, for report testing.',
+				source: 'template',
+				files: [{ src: 'templates/out.txt.mustache', dest: 'out.txt' }],
+				npm_dev_dependencies: { 'pa11y-ci': '^6.0.0' },
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(scaffoldDir, 'templates/out.txt.mustache'),
+			'ok\n',
+			'utf8'
+		);
+	}
+
+	it('prints an "Install (npm dev):" section for npm_dev_dependencies', async () => {
+		const cwd = makeTmpDir();
+		await buildProjectWithDevDeps(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		let captured = '';
+		process.stdout.write = (chunk) => {
+			captured += chunk;
+			return true;
+		};
+		const code = await add.runCli([
+			'test/devdeps',
+			'--non-interactive',
+			'--cwd',
+			cwd,
+		]);
+		process.stdout.write = originalOut;
+		expect(code).toBe(0);
+		expect(captured).toContain('Install (npm dev):');
+		expect(captured).toContain('npm install --save-dev pa11y-ci@^6.0.0');
+	});
+});
+
 describe('add debug logging does not leak raw argument values', () => {
 	let logPath;
 
