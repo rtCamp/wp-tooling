@@ -1113,6 +1113,14 @@ function inferPlaceholders(scaffold) {
 			seen.add(p);
 		}
 	}
+	for (const target of ['npm', 'composer']) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const cmd of Object.values(map)) {
+			for (const p of collectPlaceholders(cmd)) {
+				seen.add(p);
+			}
+		}
+	}
 	return Array.from(seen);
 }
 
