@@ -24,7 +24,7 @@ Naming gotcha: the GitHub repo is `rtCamp/wp-devtools` (no hyphen before "tools"
 | Command | Does |
 |---|---|
 | `npm run init -- --enable=dev-tools` | Manage-mode toggle (needs `.wp-scaffold.json`). Adds the Composer wiring, writes `.wp-env.override.json`, and the `dev:connect`/`dev:disconnect` scripts — exact contents in §2. Confirms before writing unless `-y`. |
-| `npm run dev:connect` | `claude mcp add wp-dev-tools -- npx wp-env run cli -- wp mcp-adapter serve --server=wp-dev-tools --user=admin` (STDIO; no `.mcp.json`). `dev:disconnect` runs `claude mcp remove wp-dev-tools`. |
+| `npm run dev:connect` | `claude mcp add wp-dev-tools -- <wp-cli runner> -- wp mcp-adapter serve --server=wp-dev-tools --user=admin` (STDIO; no `.mcp.json`). Via the init engine, `<wp-cli runner>` is always `npx wp-env run cli` — hardcoded in `dev-tools.js`, wp-env only. Wiring by hand on another environment: substitute how that environment runs WP-CLI. `dev:disconnect` runs `claude mcp remove wp-dev-tools`. |
 | `/mcp` | Confirms the `wp-dev-tools` server is connected. |
 | `bash bin/dev-tools-e2e.sh` (if present) | The reference consumer's verify smoke — boot+gate, abilities, MCP route, `tools/list` allow-list, capture loop, CWV beacon, adapter isolation. Exit `0`/`1`/`2` = pass/fail/prerequisite-missing. Not every project has this script — see §4 for the manual equivalent. |
 
