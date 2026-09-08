@@ -22,7 +22,7 @@
       "expectations": [
         "Because the init engine is present, the skill invokes the init engine's dev-tools feature via --enable=dev-tools rather than manually editing composer.json/.wp-env.json/package.json by hand, and does not use --features= for this.",
         "The skill guides or runs npm run dev:connect for the Connect step.",
-        "The skill confirms /mcp shows the wp-devtools server connected before considering Connect complete.",
+        "The skill confirms /mcp shows the wp-dev-tools server connected before considering Connect complete.",
         "No composer install/require or npm install is run by the skill itself — surfaced as a developer action only.",
         "The skill proceeds through Check -> Install/enable -> Connect in that order, not out of sequence."
       ]
@@ -30,12 +30,15 @@
     {
       "id": 3,
       "prompt": "This is an older plugin that doesn't have the wp-tooling init engine — no npm run init here. I still want dev-tools wired in by hand and connected.",
-      "expected_output": "Since the init engine isn't available, the skill guides the equivalent manual wiring: the composer.json require-dev + VCS repositories entry, the .wp-env.json keys (Query Monitor, MCP Adapter, WP_ENVIRONMENT_TYPE, SAVEQUERIES, enablement knob, CONTAINER_ROOT/HOST_ROOT, LOOPBACK_BASE), and the dev:connect script in package.json — each shown as a diff with consent requested before applying. No package manager command is run by the skill.",
+      "expected_output": "Since the init engine isn't available, the skill guides the equivalent manual wiring: the composer.json repositories (VCS entry for rtCamp/wp-devtools) + require-dev entry for rtcamp/wp-dev-tools, then the same six settings (WP_ENVIRONMENT_TYPE, SAVEQUERIES, RT_DEV_TOOLS_DEV_MODE, RT_DEV_TOOLS_TELEMETRY_CONTAINER_ROOT/_HOST_ROOT/_LOOPBACK_BASE) plus the Query Monitor + MCP Adapter plugins — as a gitignored .wp-env.override.json (never the committed .wp-env.json) if the project uses wp-env, or as wp-config.php constants plus a manual plugin install otherwise. It also asks or infers which local environment is in use before picking the target, adds a .gitignore entry only when it wrote .wp-env.override.json, and wires the dev:connect/dev:disconnect scripts in package.json — each shown as a diff with consent requested before applying. No package manager command is run by the skill.",
       "files": [],
       "expectations": [
         "The skill detects or is told the init engine is unavailable and switches to guiding manual wiring rather than trying to invoke npm run init.",
-        "Each manual edit (composer.json, .wp-env.json, package.json) is shown as a diff with consent requested before being applied.",
-        "The .wp-env.json wiring includes Query Monitor, the MCP Adapter, WP_ENVIRONMENT_TYPE, SAVEQUERIES, and the enablement knob.",
+        "The skill does not assume wp-env — it asks or infers the local environment before deciding whether to target .wp-env.override.json or wp-config.php constants.",
+        "Each manual edit (composer.json, the local-env config, .gitignore where applicable, package.json) is shown as a diff with consent requested before being applied.",
+        "If the project uses wp-env, the wiring targets .wp-env.override.json (never the committed .wp-env.json) and the skill adds a .gitignore entry for it; on any other environment it targets wp-config.php constants instead, with no override file or .gitignore entry.",
+        "The config settings named are WP_ENVIRONMENT_TYPE, SAVEQUERIES, RT_DEV_TOOLS_DEV_MODE, and the RT_DEV_TOOLS_TELEMETRY_* keys — not a generic 'enablement knob' placeholder.",
+        "The composer wiring uses the correct hyphenation: rtcamp/wp-dev-tools as the require-dev package, https://github.com/rtCamp/wp-devtools.git as the VCS repository URL.",
         "The skill does not run composer install, composer require, or npm install itself — these are surfaced as developer actions.",
         "The skill still proceeds to Connect and Verify after the manual wiring is applied."
       ]
@@ -43,11 +46,11 @@
     {
       "id": 4,
       "prompt": "wp-devtools is supposed to be connected already but /mcp doesn't show anything and Claude can't see any of its tools. What's wrong?",
-      "expected_output": "The skill treats this as a Verify + Troubleshoot case rather than restarting from Check: it runs the verify smoke (abilities registered, tools/list, capture loop), identifies the likely cause from the troubleshoot table (dev:connect never run, MCP Adapter inactive, enablement knob off, wrong WP_ENVIRONMENT_TYPE), reports the diagnosis and the specific fix, and does not apply any file edit without consent.",
+      "expected_output": "The skill treats this as a Verify + Troubleshoot case rather than restarting from Check: it runs the verify smoke (abilities registered, tools/list, capture loop), identifies the likely cause from the troubleshoot table (dev:connect never run, MCP Adapter inactive, RT_DEV_TOOLS_DEV_MODE not true, wrong WP_ENVIRONMENT_TYPE), reports the diagnosis and the specific fix, and does not apply any file edit without consent.",
       "files": [],
       "expectations": [
         "The skill runs or references the Verify step's checks (abilities registered, tools/list, capture loop) to pin down what's actually broken rather than guessing.",
-        "The diagnosis maps the symptom to one of the documented likely causes (dev:connect not run, MCP Adapter inactive, enablement knob off, wrong WP_ENVIRONMENT_TYPE, wp-env not running) with its specific fix.",
+        "The diagnosis maps the symptom to one of the documented likely causes (dev:connect not run, MCP Adapter inactive, RT_DEV_TOOLS_DEV_MODE not true, wrong WP_ENVIRONMENT_TYPE, wp-env not running) with its specific fix — not a vague 'enablement knob' placeholder.",
         "The skill reports the diagnosis and fix rather than silently applying a change.",
         "If a fix requires editing a file, the skill shows the diff and asks for consent before applying it.",
         "The skill does not run any package manager command as part of troubleshooting."

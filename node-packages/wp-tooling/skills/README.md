@@ -25,9 +25,9 @@ cp -r node_modules/@rtcamp/wp-tooling/skills/devtools-setup .claude/skills/devto
 
 # Option B — download directly from GitHub if you can't install the package locally:
 git clone --depth 1 https://github.com/rtCamp/wp-tooling.git /tmp/wp-tooling
-cp -r /tmp/wp-tooling/skills/scaffold       .claude/skills/scaffold
-cp -r /tmp/wp-tooling/skills/setup          .claude/skills/setup
-cp -r /tmp/wp-tooling/skills/devtools-setup .claude/skills/devtools-setup
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/scaffold       .claude/skills/scaffold
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/setup          .claude/skills/setup
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/devtools-setup .claude/skills/devtools-setup
 ```
 
 Claude Code picks up the skill on next session start. Invoke it with `/scaffold`, `/setup`, or `/devtools-setup`, or just by describing what you want ("add a WP-CLI command to ...", "set up this plugin", "connect Claude to wp-devtools").
