@@ -6,6 +6,7 @@ Copy-pasteable skill files for AI assistants (Claude Code, Cursor, etc.) that dr
 
 - [`scaffold/`](scaffold/SKILL.md) — End-to-end AI skill for `npx wp-tooling add`. Tells the AI how to discover scaffolds, introspect the project, apply naming conventions, invoke the engine, handle adaptive wiring, surface secrets without writing them, drive the TDD loop, and report.
 - [`setup/`](setup/SKILL.md) — Bootstraps a whole plugin or theme from one natural-language request. Detects existing tooling, plans the right sequence of setup + lint + test + feature scaffolds, confirms the plan with the developer, executes it in two phases, then emits one consolidated report of files written + developer actions outstanding.
+- [`devtools-setup/`](devtools-setup/SKILL.md) — Gets `rtcamp/wp-devtools` connected on a project end to end: checks prerequisites, installs/enables it (via the init engine where available, guided manual wiring otherwise), connects the MCP client, verifies the loop works, and troubleshoots when it doesn't.
 
 Each skill is a directory containing a `SKILL.md` file. Same layout as the Claude Code Skills convention.
 
@@ -18,16 +19,18 @@ The simplest path, for Claude Code users:
 mkdir -p .claude/skills
 
 # Option A — copy from the installed npm package (preferred):
-cp -r node_modules/@rtcamp/wp-tooling/skills/scaffold .claude/skills/scaffold
-cp -r node_modules/@rtcamp/wp-tooling/skills/setup    .claude/skills/setup
+cp -r node_modules/@rtcamp/wp-tooling/skills/scaffold       .claude/skills/scaffold
+cp -r node_modules/@rtcamp/wp-tooling/skills/setup          .claude/skills/setup
+cp -r node_modules/@rtcamp/wp-tooling/skills/devtools-setup .claude/skills/devtools-setup
 
 # Option B — download directly from GitHub if you can't install the package locally:
 git clone --depth 1 https://github.com/rtCamp/wp-tooling.git /tmp/wp-tooling
-cp -r /tmp/wp-tooling/skills/scaffold .claude/skills/scaffold
-cp -r /tmp/wp-tooling/skills/setup    .claude/skills/setup
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/scaffold       .claude/skills/scaffold
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/setup          .claude/skills/setup
+cp -r /tmp/wp-tooling/node-packages/wp-tooling/skills/devtools-setup .claude/skills/devtools-setup
 ```
 
-Claude Code picks up the skill on next session start. Invoke it with `/scaffold` or `/setup`, or just by describing what you want to add ("add a WP-CLI command to ...", "set up this plugin").
+Claude Code picks up the skill on next session start. Invoke it with `/scaffold`, `/setup`, or `/devtools-setup`, or just by describing what you want ("add a WP-CLI command to ...", "set up this plugin", "connect Claude to wp-devtools").
 
 For other AI orchestrators (Cursor, Continue, Aider, custom agents): drop the skill directory wherever your tool reads skill files from. The frontmatter follows the Claude Code convention (`name:`, `description:`); the body is portable Markdown.
 
@@ -59,7 +62,7 @@ Then, in a Claude Code session at the repo root, ask the skill-creator skill to 
 /skill-creator:skill-creator run the behavioural evals in skills/scaffold/evals/evals.json against the scaffold skill at skills/scaffold/. Spawn with-skill and without-skill subagents, grade against expectations, aggregate, open the viewer.
 ```
 
-The skill-creator skill will create `skills/scaffold-workspace/iteration-N/` (gitignored), drop per-eval outputs, grade them, produce `benchmark.json`, and open the HTML reviewer in your browser. Same flow for setup.
+The skill-creator skill will create `skills/scaffold-workspace/iteration-N/` (gitignored), drop per-eval outputs, grade them, produce `benchmark.json`, and open the HTML reviewer in your browser. Same flow for `setup` and `devtools-setup`.
 
 For a manual spot-check without the skill-creator plugin: copy a `prompt` from `evals.json` into any AI session with the skill installed at `.claude/skills/<name>/` and compare the response against the `expectations[]` list by hand.
 
