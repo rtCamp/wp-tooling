@@ -12,6 +12,25 @@ const fs = require('fs');
 const path = require('path');
 
 /**
+ * Require a nonempty relative path without parent traversal.
+ *
+ * @param {string} value Configured path.
+ * @return {void}
+ */
+const validateRelativePath = (value) => {
+	if (
+		'string' !== typeof value ||
+		!value ||
+		path.isAbsolute(value) ||
+		value.split(/[\\/]/).includes('..')
+	) {
+		throw new Error(
+			`Expected a relative path without "..", received ${JSON.stringify(value)}`
+		);
+	}
+};
+
+/**
  * Resolve a project-relative path and assert it stays inside `root`, so a config
  * value can never reach outside the project being initialized (e.g. a stray
  * `../` in an examples glob or cleanup target). Throws on any escape.
@@ -24,6 +43,26 @@ const resolveWithin = (root, rel) => {
 	const base = path.resolve(root);
 	const abs = path.resolve(base, rel);
 	if (abs !== base && !abs.startsWith(base + path.sep)) {
+		throw new Error(`Refusing path outside the project root: ${rel}`);
+	}
+	if (!fs.existsSync(base)) {
+		return abs;
+	}
+	const realBase = fs.realpathSync(base);
+	let ancestor = abs;
+	while (!fs.existsSync(ancestor)) {
+		if (
+			fs.lstatSync(ancestor, { throwIfNoEntry: false })?.isSymbolicLink()
+		) {
+			throw new Error(`Refusing unresolved symlink: ${rel}`);
+		}
+		ancestor = path.dirname(ancestor);
+	}
+	const realAncestor = fs.realpathSync(ancestor);
+	if (
+		realAncestor !== realBase &&
+		!realAncestor.startsWith(realBase + path.sep)
+	) {
 		throw new Error(`Refusing path outside the project root: ${rel}`);
 	}
 	return abs;
@@ -174,12 +213,7 @@ const PHP_RESERVED_WORDS = [
  * @return {string[]} Absolute file paths.
  */
 const collectFiles = (dir, ignore = DEFAULT_IGNORE) => {
-	let entries;
-	try {
-		entries = fs.readdirSync(dir, { withFileTypes: true });
-	} catch {
-		return [];
-	}
+	const entries = fs.readdirSync(dir, { withFileTypes: true });
 
 	let files = [];
 	entries.forEach((entry) => {
@@ -244,10 +278,9 @@ const applyReplacements = (text, replacements) => {
  *
  * @param {string[]}                files        - Absolute file paths.
  * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Object}                  ui           - `@rtcamp/wp-tooling/ui`.
  * @return {number} Count of files changed.
  */
-const replaceInFiles = (files, replacements, ui) => {
+const replaceInFiles = (files, replacements) => {
 	let changed = 0;
 	files.forEach((filePath) => {
 		try {
@@ -262,10 +295,45 @@ const replaceInFiles = (files, replacements, ui) => {
 				changed++;
 			}
 		} catch (err) {
-			ui.warn(`Skipped ${path.basename(filePath)}: ${err.message}`);
+			throw new Error(`Could not replace ${filePath}: ${err.message}`, {
+				cause: err,
+			});
 		}
 	});
 	return changed;
+};
+
+/**
+ * Check every rename destination before any content or path changes.
+ *
+ * @param {string[]} files        Source file paths.
+ * @param {Array}    replacements Literal replacement pairs.
+ * @return {Array} Validated source/destination pairs.
+ */
+const planRenames = (files, replacements) => {
+	const destinations = new Set();
+	const renames = [];
+	for (const from of files) {
+		const basename = applyReplacements(path.basename(from), replacements);
+		const to = path.join(path.dirname(from), basename);
+		if (from === to) {
+			continue;
+		}
+		const destinationExists = fs.lstatSync(to, { throwIfNoEntry: false });
+		const isCaseOnlyRename =
+			destinationExists &&
+			!destinationExists.isSymbolicLink() &&
+			from.toLowerCase() === to.toLowerCase() &&
+			fs.realpathSync.native(from) === fs.realpathSync.native(to);
+		if (destinations.has(to) || (destinationExists && !isCaseOnlyRename)) {
+			throw new Error(
+				`Rename collision: expected an unused destination for ${from}, received ${to}`
+			);
+		}
+		destinations.add(to);
+		renames.push({ from, to });
+	}
+	return renames;
 };
 
 /**
@@ -273,28 +341,14 @@ const replaceInFiles = (files, replacements, ui) => {
  *
  * @param {string[]}                files        - Absolute file paths.
  * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Object}                  ui           - `@rtcamp/wp-tooling/ui`.
  * @return {number} Count of files renamed.
  */
-const renameFiles = (files, replacements, ui) => {
-	let renamed = 0;
-	files.forEach((filePath) => {
-		const base = path.basename(filePath);
-		const newBase = applyReplacements(base, replacements);
-		if (newBase === base) {
-			return;
-		}
-		try {
-			fs.renameSync(filePath, path.join(path.dirname(filePath), newBase));
-			// No per-file line here: the caller prints a "renamed N file(s)"
-			// summary. One line per renamed file is pure noise for a human and
-			// wasted tokens for an AI reading the run. Failures still warn below.
-			renamed++;
-		} catch (err) {
-			ui.warn(`Could not rename ${base}: ${err.message}`);
-		}
-	});
-	return renamed;
+const renameFiles = (files, replacements) => {
+	const renames = planRenames(files, replacements);
+	for (const { from, to } of renames) {
+		fs.renameSync(from, to);
+	}
+	return renames.length;
 };
 
 /**
@@ -320,13 +374,7 @@ const applyVersion = (root, versionFiles, version, ui) => {
 	}
 
 	versionFiles.forEach((spec) => {
-		let filePath;
-		try {
-			filePath = resolveWithin(root, spec.path);
-		} catch (err) {
-			ui.warn(err.message);
-			return;
-		}
+		const filePath = resolveWithin(root, spec.path);
 		if (!fs.existsSync(filePath)) {
 			return;
 		}
@@ -350,12 +398,17 @@ const applyVersion = (root, versionFiles, version, ui) => {
 			fs.writeFileSync(filePath, content, 'utf8');
 			ui.info(`version ${version} -> ${spec.path}`);
 		} catch (err) {
-			ui.warn(`Could not set version in ${spec.path}: ${err.message}`);
+			throw new Error(
+				`Could not set version in ${spec.path}: ${err.message}`,
+				{ cause: err }
+			);
 		}
 	});
 };
 
 module.exports = {
+	validateRelativePath,
+	planRenames,
 	resolveWithin,
 	collectFiles,
 	applyReplacements,

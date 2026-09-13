@@ -8,7 +8,7 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
+const { resolveWithin } = require('./transform');
 
 /** Name of the persisted identity file at the project root. */
 const IDENTITY_FILE = '.wp-scaffold.json';
@@ -37,7 +37,7 @@ class IdentityFileError extends Error {
  * @return {string} Absolute path written.
  */
 const writeIdentityFile = (root, payload, ui) => {
-	const filePath = path.join(root, IDENTITY_FILE);
+	const filePath = resolveWithin(root, IDENTITY_FILE);
 	fs.writeFileSync(
 		filePath,
 		`${JSON.stringify(payload, null, '\t')}\n`,
@@ -59,7 +59,7 @@ const writeIdentityFile = (root, payload, ui) => {
  *                             discard it).
  */
 const readIdentityFile = (root) => {
-	const filePath = path.join(root, IDENTITY_FILE);
+	const filePath = resolveWithin(root, IDENTITY_FILE);
 	if (!fs.existsSync(filePath)) {
 		return null;
 	}
@@ -77,7 +77,7 @@ const readIdentityFile = (root) => {
 	} catch (err) {
 		throw new IdentityFileError(
 			`${IDENTITY_FILE} exists but does not contain a valid identity object (${err.message}). ` +
-				'Fix or delete the file, or pass --reinit to discard it.',
+				'Restore a valid identity file or use a fresh starter.',
 			{ path: filePath }
 		);
 	}

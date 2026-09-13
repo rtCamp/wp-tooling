@@ -7,9 +7,9 @@
  * `run( config, { root } )` with a per-project `scaffold.config.js`. All terminal
  * I/O goes through `@rtcamp/wp-tooling/ui`.
  *
- * Flow: confirm -> name (validated) -> review identity -> rename + search-replace
- * -> apply version -> select features -> remove declined examples -> persist
- * `.wp-scaffold.json` -> composer dump-autoload -> cleanup -> optional git + Husky
+ * Flow: confirm -> name (validated) -> review identity -> select capabilities
+ * -> confirm changes -> apply identity/version/capabilities -> persist
+ * `.wp-scaffold.json` -> composer dump-autoload -> cleanup -> optional git + hooks
  * -> initial commit.
  */
 
@@ -27,11 +27,13 @@ const debug = require('../debug');
 const {
 	identityFromName,
 	validateName,
+	validateIdentity,
 	buildIdentityReplacements,
 	editIdentityFields,
 } = require('./identity');
 const {
 	collectFiles,
+	planRenames,
 	replaceInFiles,
 	renameFiles,
 	applyVersion,
@@ -46,12 +48,17 @@ const { runCleanup } = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
-	detectMap,
 	safeDetectMap,
 	retiredKeys,
 	toggleFeatures,
 } = require('./features');
+const {
+	usageError,
+	validateSetupFlags,
+	validatePaths,
+} = require('./validation');
 const { manageFlow, showStatus } = require('./manage');
+const { selectCapabilities } = require('./selection');
 const { applyExamples } = require('./examples');
 const { listCapabilities, showCapabilities } = require('./capabilities');
 const { formatErrorPayload } = require('../scaffolds/errors');
@@ -93,7 +100,7 @@ Scaffold options (first run):
   --features=a,b     Enable exactly these optional features (empty = none).
   --enable=a,b       Enable features (delta over defaults).
   --disable=a,b      Disable features (delta over defaults).
-  --reinit         Force a fresh scaffold even if already set up.
+  --reinit         Reapply identity/features; preserve one-shot example choices.
 
   Interactive runs show ONE grouped "Select the capabilities to include"
   prompt (by category); unchecking a capability removes it entirely.
@@ -180,17 +187,19 @@ const placeholderIdentity = (config) =>
 /**
  * Build replacement pairs + persisted payload for a chosen target identity.
  *
- * @param {Object} config   - Per-project scaffold config.
- * @param {Object} targetId - The full target identity (post-edit).
+ * @param {Object}      config   - Per-project scaffold config.
+ * @param {Object}      targetId - The full target identity (post-edit).
+ * @param {Object|null} existing - Current identity for reinitialization.
  * @return {Object} { replacements, persistPayload }
  */
-const contextFromIdentity = (config, targetId) => {
+const contextFromIdentity = (config, targetId, existing) => {
 	const replacements = buildIdentityReplacements(
-		placeholderIdentity(config),
+		existing || placeholderIdentity(config),
 		targetId
 	);
 
 	const persistPayload = {
+		...existing,
 		name: targetId.name,
 		kind: config.kind,
 		version: targetId.version,
@@ -201,7 +210,7 @@ const contextFromIdentity = (config, targetId) => {
 		functionPrefix: targetId.functionPrefix,
 		constantPrefix: targetId.constantPrefix,
 		cssPrefix: targetId.cssPrefix,
-		features: {},
+		features: existing?.features || {},
 		generatedBy: GENERATED_BY,
 	};
 
@@ -227,8 +236,8 @@ const composerDump = (root) => {
 		});
 		spin.succeed('Autoloader regenerated');
 	} catch (err) {
-		spin.fail('composer dump-autoload failed (continuing)');
-		ui.warn(err.message);
+		spin.fail('composer dump-autoload failed');
+		throw err;
 	}
 };
 
@@ -243,17 +252,14 @@ const composerDump = (root) => {
 const setupSteps = (config, root, flags) => {
 	const kind = config.kind || 'project';
 	const steps = config.steps || {};
-	// Corrupt identity reads as absent here: run() already refused to enter
-	// setup on corruption without --reinit, so reaching this point means the
-	// file may be discarded.
-	let existing = null;
-	try {
-		existing = readIdentityFile(root);
-	} catch (err) {
-		if (!(err instanceof IdentityFileError)) {
-			throw err;
-		}
-		existing = null;
+	const existing = readIdentityFile(root);
+	if (!existing && validateName(config.source?.name)) {
+		throw new Error(
+			'Expected config.source.name to contain a valid starter name.'
+		);
+	}
+	if (existing) {
+		validateIdentity(existing);
 	}
 
 	return [
@@ -314,7 +320,10 @@ const setupSteps = (config, root, flags) => {
 			async run(c) {
 				const start = identityFromName(c.name, config, {});
 				start.version =
-					flags.version || config.version || DEFAULT_VERSION;
+					flags.version ??
+					existing?.version ??
+					config.version ??
+					DEFAULT_VERSION;
 
 				const { id, confirmed } = await editIdentityFields(
 					config,
@@ -329,7 +338,7 @@ const setupSteps = (config, root, flags) => {
 					return;
 				}
 
-				const ctx = contextFromIdentity(config, id);
+				const ctx = contextFromIdentity(config, id, existing);
 				c.target = id;
 				c.version = id.version;
 				c.replacements = ctx.replacements;
@@ -337,9 +346,50 @@ const setupSteps = (config, root, flags) => {
 			},
 		},
 		{
+			name: 'Select capabilities',
+			skip: (c) => c.cancelled,
+			async run(c) {
+				const selection = await selectCapabilities(
+					config,
+					root,
+					flags,
+					existing || placeholderIdentity(config),
+					Boolean(existing),
+					ui
+				);
+				c.removeKeys = selection.removeKeys;
+				c.wantOn = selection.wantOn;
+			},
+		},
+		{
+			name: 'Confirm changes',
+			skip: (c) => c.cancelled,
+			async run(c) {
+				validatePaths(config, root, c.target);
+				planRenames(collectFiles(root), c.replacements);
+				ui.info(`Apply identity ${c.target.name} (${c.version}).`);
+				ui.info(
+					`Enabled features: ${[...(c.wantOn || [])].join(', ') || '(none)'}`
+				);
+				ui.info(
+					`Remove examples: ${[...(c.removeKeys || [])].join(', ') || '(none)'}`
+				);
+				if (
+					!flags.yes &&
+					!(await ui.confirm({
+						message: 'Apply these changes?',
+						defaultValue: true,
+					}))
+				) {
+					c.cancelled = true;
+				}
+			},
+		},
+		{
 			name: 'Apply identity',
 			skip: (c) => c.cancelled,
 			async run(c) {
+				c.applicationStarted = true;
 				const files = collectFiles(root);
 				const changed = replaceInFiles(files, c.replacements, ui);
 				const renamed = renameFiles(files, c.replacements, ui);
@@ -365,148 +415,29 @@ const setupSteps = (config, root, flags) => {
 			},
 		},
 		{
-			// One categorized prompt for BOTH example capabilities (keep/remove)
-			// and optional features (enable/disable). Non-interactive when any
-			// selection flag is present (AI/CI); otherwise a grouped "keep" tree.
-			name: 'Select capabilities',
-			skip: (c) =>
-				c.cancelled ||
-				(!(config.features || []).length &&
-					!(
-						config.examples && (config.examples.groups || []).length
-					)),
+			name: 'Apply capabilities',
+			skip: (c) => c.cancelled,
 			async run(c) {
-				const features = config.features || [];
-				const groups =
-					(config.examples && config.examples.groups) || [];
+				if (!existing && config.examples?.groups?.length) {
+					applyExamples(config, root, ui, c.removeKeys || new Set());
+					c.persistPayload.examples = {
+						removed: [...(c.removeKeys || [])].sort(),
+					};
+				}
 				const api = makeFeatureApi(root, c.persistPayload, ui);
-
-				let removeKeys; // example group keys to remove
-				let wantOn; // feature keys to enable
-
-				const interactive =
-					!flags.yes &&
-					undefined === flags.removeExamples &&
-					!flags.keepExamples &&
-					undefined === flags.features &&
-					!flags.enable &&
-					!flags.disable;
-
-				if (interactive) {
-					removeKeys = new Set();
-					wantOn = new Set();
-					if (features.length || groups.length) {
-						// Build capabilities (examples default-checked = kept;
-						// features checked iff defaultOn), grouped by category.
-						const caps = [
-							...groups.map((g) => ({
-								key: g.key,
-								label: g.label,
-								category: g.category || 'Other',
-								checked: true,
-							})),
-							...features.map((f) => ({
-								key: f.key,
-								label: f.label,
-								category: f.category || 'Other',
-								checked: !!f.defaultOn,
-							})),
-						];
-						const order = [];
-						const byCat = new Map();
-						for (const entry of caps) {
-							if (!byCat.has(entry.category)) {
-								byCat.set(entry.category, []);
-								order.push(entry.category);
-							}
-							byCat.get(entry.category).push(entry);
-						}
-						const treeGroups = order.map((category) => ({
-							label: category,
-							items: byCat.get(category).map((entry) => ({
-								label: entry.label,
-								checked: entry.checked,
-							})),
-						}));
-						const checked = new Set(
-							await ui.checkboxTree({
-								message:
-									'Select the capabilities to include in your plugin',
-								groups: treeGroups,
-							})
-						);
-						removeKeys = new Set(
-							groups
-								.filter((g) => !checked.has(g.label))
-								.map((g) => g.key)
-						);
-						wantOn = new Set(
-							features
-								.filter((f) => checked.has(f.label))
-								.map((f) => f.key)
-						);
-					}
-				} else {
-					// Examples from flags.
-					if (true === flags.removeExamples) {
-						removeKeys = new Set(groups.map((g) => g.key));
-					} else if (Array.isArray(flags.removeExamples)) {
-						const validKeys = new Set(groups.map((g) => g.key));
-						const unknownKeys = flags.removeExamples.filter(
-							(k) => !validKeys.has(k)
-						);
-						if (unknownKeys.length) {
-							throw usageError(
-								`Unknown --remove-examples key(s): ${unknownKeys.join(
-									', '
-								)}. Valid keys: ${
-									[...validKeys].sort().join(', ') ||
-									'(none declared)'
-								}`
-							);
-						}
-						removeKeys = new Set(flags.removeExamples);
-					} else {
-						removeKeys = new Set(); // --keep-examples / --yes default
-					}
-					// Features from flags (--features exact set, or --enable /
-					// --disable deltas over defaultOn + detected).
-					if (undefined !== flags.features) {
-						wantOn = new Set(flags.features);
-					} else {
-						const detected = detectMap(config, api);
-						wantOn = new Set(
-							features
-								.filter((f) => f.defaultOn || detected[f.key])
-								.map((f) => f.key)
-						);
-						(flags.enable || []).forEach((k) => wantOn.add(k));
-						(flags.disable || []).forEach((k) => wantOn.delete(k));
-					}
+				const result = await toggleFeatures(config, root, {
+					mode: 'scaffold',
+					wantOn: c.wantOn || new Set(),
+					flags: { ...flags, yes: true },
+					api,
+					ui,
+				});
+				if (result.failed.length) {
+					throw new Error(
+						`Feature setup failed: ${result.failed.join(', ')}`
+					);
 				}
-
-				// Remove declined example capabilities, then toggle features.
-				if (groups.length) {
-					applyExamples(config, root, ui, removeKeys);
-				}
-				// Record the selection: `--list` reconciles this intent against
-				// detected reality instead of re-deriving it from disk alone.
-				c.persistPayload.examples = {
-					removed: Array.from(removeKeys).sort(),
-				};
-				if (features.length) {
-					const result = await toggleFeatures(config, root, {
-						mode: 'scaffold',
-						wantOn,
-						flags,
-						api,
-						ui,
-					});
-					c.persistPayload.features =
-						(result && result.finalMap) || detectMap(config, api);
-				} else {
-					c.persistPayload.features = {};
-				}
+				c.persistPayload.features = result.finalMap;
 			},
 		},
 		{
@@ -599,13 +530,24 @@ const setupSteps = (config, root, flags) => {
  * @return {Promise<void>}
  */
 const setupFlow = async (config, root, flags) => {
+	validatePaths(config, root);
 	const kind = config.kind || 'project';
 	ui.heading(`${cap(kind)} setup`);
 
 	const ctx = { cancelled: false };
-	await new ui.Wizard(setupSteps(config, root, flags), ctx).run();
+	try {
+		await new ui.Wizard(setupSteps(config, root, flags), ctx).run();
+	} catch (error) {
+		if (ctx.applicationStarted) {
+			ui.warn(
+				'Setup stopped after application began. Some changes may remain; inspect the diff and restore your starter backup before retrying setup.'
+			);
+		}
+		throw error;
+	}
 
 	if (ctx.cancelled) {
+		process.exitCode = process.exitCode || 130;
 		ui.warn('\nNothing was changed.');
 		return;
 	}
@@ -652,15 +594,6 @@ const cleanFlow = async (config, root) => {
 const emitJsonError = (err) => {
 	process.stderr.write(`${JSON.stringify(formatErrorPayload(err))}\n`);
 };
-
-/**
- * Build a usage error carrying the stable `EUSAGE` machine code.
- *
- * @param {string} message - Human-readable message.
- * @return {Error} Coded error.
- */
-const usageError = (message) =>
-	Object.assign(new Error(message), { code: 'EUSAGE' });
 
 /**
  * `--list`: report the project's capabilities and optional features, in either
@@ -843,18 +776,17 @@ const run = async (config, options = {}) => {
 				try {
 					identity = readIdentityFile(root);
 				} catch (err) {
-					// Only an actual corrupt-identity error is discardable via
-					// --reinit; a filesystem error (EACCES, EIO, ...) must not be
-					// treated as "no identity, safe to overwrite".
+					// A corrupt identity permits read-only setup inspection with
+					// --reinit. Filesystem errors must still fail the query.
 					if (
 						!(err instanceof IdentityFileError) ||
 						!argv.includes('--reinit')
 					) {
 						throw err;
 					}
-					// --reinit means "discard what's there": report setup mode.
+					// Read-only inspection is allowed; mutation still requires valid source tokens.
 					seedWarnings.push(
-						'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
+						'.wp-scaffold.json is corrupt; restore a valid identity before running setup with --reinit.'
 					);
 				}
 				const mode =
@@ -901,27 +833,14 @@ const run = async (config, options = {}) => {
 				return;
 			}
 
-			// A corrupt identity file must not silently re-enter setup mode (that
-			// would re-run destructive scaffold steps on an initialized project).
-			// Only an explicit --reinit may discard it.
-			let identity = null;
+			// Mutating reinit needs the current tokens; a corrupt file cannot be guessed.
+			let identity;
 			try {
 				identity = readIdentityFile(root);
 			} catch (err) {
-				// Only an actual corrupt-identity error is discardable via
-				// --reinit; a filesystem error (EACCES, EIO, ...) must not be
-				// treated as "no identity, safe to overwrite".
-				if (
-					!(err instanceof IdentityFileError) ||
-					!argv.includes('--reinit')
-				) {
-					ui.error(err.message);
-					process.exitCode = 1;
-					return;
-				}
-				ui.warn(
-					'.wp-scaffold.json is corrupt; --reinit will overwrite it.'
-				);
+				ui.error(err.message);
+				process.exitCode = 1;
+				return;
 			}
 
 			// Manage mode: already scaffolded (unless forced to re-scaffold with --reinit).
@@ -946,6 +865,15 @@ const run = async (config, options = {}) => {
 				return;
 			}
 
+			validateSetupFlags(config, flags);
+			if (
+				identity &&
+				(flags.keepExamples || undefined !== flags.removeExamples)
+			) {
+				throw usageError(
+					'Examples are a one-shot setup choice; reinit preserves the original selection.'
+				);
+			}
 			await setupFlow(config, root, flags);
 		} catch (err) {
 			if (err instanceof ui.CancelledError) {
@@ -954,14 +882,15 @@ const run = async (config, options = {}) => {
 				process.exitCode = 130;
 				return;
 			}
-			if (err instanceof IdentityFileError) {
-				// Mid-flow corruption (e.g. a manage re-read): report, don't crash.
+			if (err instanceof IdentityFileError || 'EUSAGE' === err.code) {
+				// Usage errors and mid-flow identity corruption are reported to the caller.
 				result = 'error';
 				ui.error(err.message);
 				process.exitCode = 1;
 				return;
 			}
 			result = 'error';
+			process.exitCode = 1;
 			throw err;
 		}
 	} finally {

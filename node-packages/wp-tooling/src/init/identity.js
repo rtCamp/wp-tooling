@@ -8,6 +8,7 @@
 
 const {
 	collectFiles,
+	planRenames,
 	replaceInFiles,
 	renameFiles,
 	applyVersion,
@@ -295,6 +296,7 @@ const detailsOf = (config, id) =>
 const FIELD_VALIDATORS = {
 	name: validateName,
 	version: (v) =>
+		'string' === typeof v &&
 		/^\d+(\.\d+)*(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.test(v.trim())
 			? undefined
 			: 'Version must look like 1.2.3.',
@@ -324,6 +326,29 @@ const FIELD_VALIDATORS = {
 		/^[a-z][a-z0-9-]*$/.test(v.trim())
 			? undefined
 			: 'CSS prefix: lowercase letters, numbers, hyphens; start with a letter.',
+};
+
+/**
+ * Validate resolved identity fields before accepting or applying them.
+ *
+ * @param {Object} identity Resolved identity.
+ * @return {void}
+ */
+const validateIdentity = (identity) => {
+	for (const [field, validate] of Object.entries(FIELD_VALIDATORS)) {
+		const value = identity[field];
+		// A project without PHP namespacing may explicitly use the global namespace.
+		if ('namespace' === field && '' === value) {
+			continue;
+		}
+		const error =
+			'string' === typeof value ? validate(value) : 'Expected a string.';
+		if (error) {
+			throw new Error(
+				`Identity ${field}: ${error} Received ${JSON.stringify(value)}.`
+			);
+		}
+	}
 };
 
 /**
@@ -357,6 +382,8 @@ const editIdentityFields = async (
 		});
 
 		if (flags.yes) {
+			validateIdentity(id);
+			id.slug = id.textDomain;
 			return { id, confirmed: true };
 		}
 
@@ -365,6 +392,8 @@ const editIdentityFields = async (
 			gate &&
 			(await ui.confirm({ message: 'Looks good?', defaultValue: true }))
 		) {
+			validateIdentity(id);
+			id.slug = id.textDomain;
 			return { id, confirmed: true };
 		}
 
@@ -379,6 +408,8 @@ const editIdentityFields = async (
 		});
 
 		if ('Confirm' === choice) {
+			validateIdentity(id);
+			id.slug = id.textDomain;
 			return { id, confirmed: true };
 		}
 		if ('Cancel' === choice) {
@@ -403,6 +434,9 @@ const editIdentityFields = async (
 			id.version = value;
 		} else {
 			id[field] = value;
+			if ('textDomain' === field) {
+				id.slug = value;
+			}
 			overridden.add(field);
 		}
 	}
@@ -420,14 +454,16 @@ const editIdentityFields = async (
  * @return {boolean} Whether anything changed.
  */
 const applyIdentityEdit = (config, root, oldId, newId, ui) => {
+	validateIdentity(newId);
 	const replacements = buildIdentityReplacements(oldId, newId);
 
-	if (!replacements.length) {
+	if (!replacements.length && oldId.version === newId.version) {
 		ui.info('No identity changes to apply.');
 		return false;
 	}
 
 	const files = collectFiles(root);
+	planRenames(files, replacements);
 	const changed = replaceInFiles(files, replacements, ui);
 	const renamed = renameFiles(files, replacements, ui);
 	ui.success(`Updated ${changed} file(s), renamed ${renamed} file(s)`);
@@ -529,6 +565,8 @@ const editDetailsFlow = async (config, root, identity, ui, flags = {}) => {
 };
 
 module.exports = {
+	validateIdentity,
+	validateVersion: FIELD_VALIDATORS.version,
 	generateIdentity,
 	identityFromName,
 	CASE_KEYS,

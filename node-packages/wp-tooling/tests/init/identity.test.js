@@ -10,6 +10,14 @@ const {
 	validateName,
 	buildIdentityReplacements,
 } = require('../../src/init/identity');
+const fs = require('fs');
+const path = require('path');
+const { makeRoot, touch } = require('./_helpers');
+const {
+	applyIdentityEdit,
+	editIdentityFields,
+	editDetailsFlow,
+} = require('../../src/init/identity');
 
 const CONFIG = {
 	vendor: 'rtcamp',
@@ -83,6 +91,109 @@ describe('buildIdentityReplacements', () => {
 			expect(pairs[i - 1][0].length).toBeGreaterThanOrEqual(
 				pairs[i][0].length
 			);
+		}
+	});
+});
+
+describe('applyIdentityEdit', () => {
+	let root;
+	const ui = { info: jest.fn(), success: jest.fn() };
+	beforeEach(() => {
+		root = makeRoot();
+	});
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+		jest.restoreAllMocks();
+	});
+	test('version-only edit updates files and persisted identity', () => {
+		const config = {
+			kind: 'theme',
+			versionFiles: [{ path: 'package.json', kind: 'json' }],
+		};
+		const identity = {
+			...identityFromName('Acme Blog', config),
+			version: '1.0.0',
+			custom: true,
+		};
+		touch(root, 'package.json', '{"version":"1.0.0"}');
+		touch(root, '.wp-scaffold.json', JSON.stringify(identity));
+		expect(
+			applyIdentityEdit(
+				config,
+				root,
+				identity,
+				{ ...identity, version: '2.0.0' },
+				ui
+			)
+		).toBe(true);
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version
+		).toBe('2.0.0');
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, '.wp-scaffold.json')))
+		).toMatchObject({ version: '2.0.0', custom: true });
+	});
+});
+
+describe('interactive identity editor', () => {
+	const config = { kind: 'theme' };
+	const original = {
+		...identityFromName('Acme Blog', config),
+		version: '1.0.0',
+	};
+	const makeUi = (choices, values = []) => ({
+		radio: jest.fn(async () => choices.shift()),
+		text: jest.fn(async () => values.shift()),
+		table: jest.fn(),
+		confirm: jest.fn(async () => false),
+		warn: jest.fn(),
+		info: jest.fn(),
+		heading: jest.fn(),
+	});
+	test('name edits rederive defaults while retaining explicit overrides and version', async () => {
+		const ui = makeUi(
+			['Text Domain', 'Version', 'Name', 'Confirm'],
+			['custom-domain', '2.0.0', 'Cedar Blog']
+		);
+		const result = await editIdentityFields(config, original, ui);
+		expect(result.confirmed).toBe(true);
+		expect(result.id).toMatchObject({
+			name: 'Cedar Blog',
+			textDomain: 'custom-domain',
+			slug: 'custom-domain',
+			functionPrefix: 'cedar_blog_',
+			version: '2.0.0',
+		});
+		expect(original.textDomain).toBe('acme-blog');
+	});
+	test.each([
+		['cancel the editor', ['Name', 'Cancel'], ['Cedar Blog']],
+		['confirm without edits', ['Confirm'], []],
+		['decline application', ['Version', 'Confirm'], ['2.0.0']],
+	])('%s leaves the project untouched', async (_label, choices, values) => {
+		const root = makeRoot();
+		try {
+			const before = JSON.stringify(original);
+			touch(root, '.wp-scaffold.json', before);
+			touch(root, 'acme-blog.txt', 'Acme Blog');
+			await editDetailsFlow(
+				config,
+				root,
+				original,
+				makeUi([...choices], [...values])
+			);
+			expect(
+				fs.readFileSync(path.join(root, '.wp-scaffold.json'), 'utf8')
+			).toBe(before);
+			expect(
+				fs.readFileSync(path.join(root, 'acme-blog.txt'), 'utf8')
+			).toBe('Acme Blog');
+			expect(fs.readdirSync(root).sort()).toEqual([
+				'.wp-scaffold.json',
+				'acme-blog.txt',
+			]);
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true });
 		}
 	});
 });

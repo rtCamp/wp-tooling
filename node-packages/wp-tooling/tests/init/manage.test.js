@@ -6,6 +6,10 @@
 'use strict';
 
 const { manageFlow } = require('../../src/init/manage');
+const fs = require('fs');
+const path = require('path');
+const { makeRoot, touch } = require('./_helpers');
+const { identityFromName } = require('../../src/init/identity');
 
 afterEach(() => {
 	// manageFlow sets process.exitCode as a side effect on these paths.
@@ -44,5 +48,113 @@ describe('manageFlow unknown-argument handling', () => {
 		);
 		expect(calls.info).toHaveLength(0);
 		expect(calls.error).toEqual(['Unknown argument(s): --name=X --bogus']);
+	});
+});
+
+describe('interactive manage session', () => {
+	let root;
+	let identity;
+	let ui;
+	const config = { kind: 'theme' };
+	beforeEach(() => {
+		root = makeRoot();
+		identity = {
+			...identityFromName('Acme Blog', config),
+			version: '1.0.0',
+			features: { demo: false },
+		};
+		touch(root, '.wp-scaffold.json', JSON.stringify(identity));
+		ui = {
+			radio: jest.fn(),
+			text: jest.fn(),
+			confirm: jest.fn(async () => true),
+			table: jest.fn(),
+			info: jest.fn(),
+			warn: jest.fn(),
+			success: jest.fn(),
+			error: jest.fn(),
+			heading: jest.fn(),
+			spinner: () => ({ start() {}, succeed() {}, fail() {} }),
+		};
+	});
+	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	test('editing details refreshes the identity used by subsequent feature hooks', async () => {
+		const feature = {
+			key: 'demo',
+			label: 'Demo',
+			detect: (api) => api.exists(`${api.identity.slug}.flag`),
+			onEnable: (api) =>
+				api.write(`${api.identity.slug}.flag`, api.identity.name),
+			onDisable: (api) => api.remove(`${api.identity.slug}.flag`),
+		};
+		for (const choice of [
+			'Edit project details',
+			'Name',
+			'Confirm',
+			'Toggle features',
+			'[ ] Demo',
+			'Apply changes',
+			'Show status',
+			'Exit',
+		]) {
+			ui.radio.mockResolvedValueOnce(choice);
+		}
+		ui.text.mockResolvedValueOnce('Cedar Blog');
+		await manageFlow(
+			{ ...config, features: [feature] },
+			root,
+			[],
+			identity,
+			ui,
+			jest.fn()
+		);
+		expect(
+			fs.readFileSync(path.join(root, 'cedar-blog.flag'), 'utf8')
+		).toBe('Cedar Blog');
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, '.wp-scaffold.json')))
+		).toMatchObject({ name: 'Cedar Blog', features: { demo: true } });
+		expect(ui.table).toHaveBeenLastCalledWith([['Demo', 'enabled']], {
+			title: 'Feature status',
+		});
+		expect(ui.radio).toHaveBeenCalledTimes(8);
+	});
+
+	test('a failed interactive toggle exits the session without requesting another action', async () => {
+		for (const choice of ['Toggle features', '[ ] Demo', 'Apply changes']) {
+			ui.radio.mockResolvedValueOnce(choice);
+		}
+		const feature = {
+			key: 'demo',
+			label: 'Demo',
+			detect: () => false,
+			onEnable() {
+				throw new Error('failed hook');
+			},
+			onDisable() {},
+		};
+		await manageFlow(
+			{ ...config, features: [feature] },
+			root,
+			[],
+			identity,
+			ui,
+			jest.fn()
+		);
+		expect(ui.radio).toHaveBeenCalledTimes(3);
+		expect(process.exitCode).toBe(1);
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, '.wp-scaffold.json')))
+				.features.demo
+		).toBe(false);
+	});
+
+	test('re-run full setup invokes the callback once and leaves the menu', async () => {
+		const reinit = jest.fn();
+		ui.radio.mockResolvedValueOnce('Re-run full setup');
+		await manageFlow(config, root, [], identity, ui, reinit);
+		expect(reinit).toHaveBeenCalledTimes(1);
+		expect(ui.radio).toHaveBeenCalledTimes(1);
 	});
 });
