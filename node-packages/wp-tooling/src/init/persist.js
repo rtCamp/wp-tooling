@@ -31,18 +31,15 @@ class IdentityFileError extends Error {
 /**
  * Write the identity payload to `<root>/.wp-scaffold.json` (tab-indented).
  *
- * @param {string} root    - Project root.
- * @param {Object} payload - Identity payload to persist.
- * @param {Object} [ui]    - `@rtcamp/wp-tooling/ui` for an optional log line.
+ * @param {string}   root        - Project root.
+ * @param {Object}   payload     - Identity payload to persist.
+ * @param {Object}   [ui]        - `@rtcamp/wp-tooling/ui` for an optional log line.
+ * @param {Function} [writeFile] Synchronous writer (journaled during identity edits).
  * @return {string} Absolute path written.
  */
-const writeIdentityFile = (root, payload, ui) => {
+const writeIdentityFile = (root, payload, ui, writeFile = fs.writeFileSync) => {
 	const filePath = resolveWithin(root, IDENTITY_FILE);
-	fs.writeFileSync(
-		filePath,
-		`${JSON.stringify(payload, null, '\t')}\n`,
-		'utf8'
-	);
+	writeFile(filePath, `${JSON.stringify(payload, null, '\t')}\n`, 'utf8');
 	if (ui) {
 		ui.info(`wrote ${IDENTITY_FILE}`);
 	}

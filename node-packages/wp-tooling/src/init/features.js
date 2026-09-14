@@ -89,6 +89,13 @@ const validateFeatures = (config) => {
 					`Feature ${feature.key}: expected apply.${field} to be an object.`
 				);
 			}
+			for (const [name, value] of Object.entries(apply[field] || {})) {
+				if ('string' !== typeof value) {
+					throw new Error(
+						`Feature ${feature.key}: expected apply.${field}.${name} to be a string, received ${JSON.stringify(value)}.`
+					);
+				}
+			}
 		}
 
 		for (const hook of ['onEnable', 'onDisable', 'detect']) {
@@ -758,8 +765,8 @@ const toggleFeatures = async (config, root, opts) => {
 		unknown = r.unknown;
 	}
 
-	// Persist only an attempted transition. Cancellation and no-op requests
-	// must not rewrite identity merely because detection found drift.
+	// Persist only when at least one transition succeeded. Failed, cancelled,
+	// and no-op requests must not rewrite identity just to reconcile drift.
 	const finalize = (changed, failed) => {
 		const finalMap = detectMap(config, api);
 		if ('manage' === mode && changed) {
@@ -858,6 +865,7 @@ const toggleFeatures = async (config, root, opts) => {
 	);
 	const failed = [];
 	let depsChanged = false;
+	let changed = false;
 
 	// Disable before enable: frees files/deps before any re-add.
 	for (const r of toDisable) {
@@ -870,6 +878,7 @@ const toggleFeatures = async (config, root, opts) => {
 					(enabledKeys.has(feature.key) || wantOn.has(feature.key))
 			);
 			await disableFeature(r.feature, api, survivors);
+			changed = true;
 			enabledKeys.delete(r.key);
 			spin.succeed(`Disabled ${r.label}`);
 			depsChanged = depsChanged || touchesPackage(r.feature);
@@ -890,6 +899,7 @@ const toggleFeatures = async (config, root, opts) => {
 		spin.start();
 		try {
 			await enableFeature(r.feature, api, featuresDir);
+			changed = true;
 			spin.succeed(`Enabled ${r.label}`);
 			depsChanged = depsChanged || touchesPackage(r.feature);
 		} catch (err) {
@@ -912,7 +922,7 @@ const toggleFeatures = async (config, root, opts) => {
 		ui.success('Features updated.');
 	}
 
-	return finalize(true, failed);
+	return finalize(changed, failed);
 };
 
 module.exports = {

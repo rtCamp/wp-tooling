@@ -391,8 +391,8 @@ const setupSteps = (config, root, flags) => {
 			async run(c) {
 				c.applicationStarted = true;
 				const files = collectFiles(root);
-				const changed = replaceInFiles(files, c.replacements, ui);
-				const renamed = renameFiles(files, c.replacements, ui);
+				const changed = replaceInFiles(files, c.replacements);
+				const renamed = renameFiles(files, c.replacements);
 				ui.success(
 					`Updated ${changed} file(s), renamed ${renamed} file(s)`
 				);
@@ -476,6 +476,7 @@ const setupSteps = (config, root, flags) => {
 			name: 'Git',
 			skip: (c) => c.cancelled || !steps.git,
 			async run(c) {
+				c.projectSetupComplete = true;
 				const go = flags.yes
 					? false
 					: await ui.confirm({
@@ -538,7 +539,13 @@ const setupFlow = async (config, root, flags) => {
 	try {
 		await new ui.Wizard(setupSteps(config, root, flags), ctx).run();
 	} catch (error) {
-		if (ctx.applicationStarted) {
+		if (ctx.projectSetupComplete) {
+			ui.warn(
+				error instanceof ui.CancelledError
+					? 'Project setup completed. Git setup was cancelled; finish it manually when ready.'
+					: 'Project setup completed, but Git setup failed. Resolve the Git error and finish Git setup manually; do not rerun project setup.'
+			);
+		} else if (ctx.applicationStarted) {
 			ui.warn(
 				'Setup stopped after application began. Some changes may remain; inspect the diff and restore your starter backup before retrying setup.'
 			);

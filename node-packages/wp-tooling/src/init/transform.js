@@ -274,13 +274,62 @@ const applyReplacements = (text, replacements) => {
 };
 
 /**
+ * Run synchronous file edits with rollback on failure. Only written contents
+ * and completed renames are journaled; this is not a process-crash recovery log.
+ * Reverse order restores paths before earlier writes at those paths are undone.
+ *
+ * @param {Function} apply Callback receiving journaled writeFile and renameFile.
+ * @return {*} Callback result.
+ */
+const withFileRollback = (apply) => {
+	const undo = [];
+	const writeFile = (file, content, options) => {
+		const existed = fs.existsSync(file);
+		const original = existed ? fs.readFileSync(file) : null;
+		// Register before writing: a failed write may have truncated the file.
+		undo.push(() => {
+			if (existed) {
+				fs.writeFileSync(file, original);
+			} else {
+				fs.rmSync(file, { force: true });
+			}
+		});
+		fs.writeFileSync(file, content, options);
+	};
+	const renameFile = (from, to) => {
+		fs.renameSync(from, to);
+		undo.push(() => fs.renameSync(to, from));
+	};
+	try {
+		return apply({ writeFile, renameFile });
+	} catch (error) {
+		const rollbackErrors = [];
+		for (const restore of undo.reverse()) {
+			try {
+				restore();
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
+			}
+		}
+		if (rollbackErrors.length) {
+			throw new AggregateError(
+				[error, ...rollbackErrors],
+				`${error.message}; rollback failed: ${rollbackErrors.map((failure) => failure.message).join('; ')}. Inspect the project before retrying.`
+			);
+		}
+		throw error;
+	}
+};
+
+/**
  * Replace token content across files in place.
  *
  * @param {string[]}                files        - Absolute file paths.
  * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
+ * @param {Function}                [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {number} Count of files changed.
  */
-const replaceInFiles = (files, replacements) => {
+const replaceInFiles = (files, replacements, writeFile = fs.writeFileSync) => {
 	let changed = 0;
 	files.forEach((filePath) => {
 		try {
@@ -291,7 +340,7 @@ const replaceInFiles = (files, replacements) => {
 			const original = buffer.toString('utf8');
 			const updated = applyReplacements(original, replacements);
 			if (updated !== original) {
-				fs.writeFileSync(filePath, updated, 'utf8');
+				writeFile(filePath, updated, 'utf8');
 				changed++;
 			}
 		} catch (err) {
@@ -341,12 +390,13 @@ const planRenames = (files, replacements) => {
  *
  * @param {string[]}                files        - Absolute file paths.
  * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
+ * @param {Function}                [renameFile] Synchronous rename (journaled during identity edits).
  * @return {number} Count of files renamed.
  */
-const renameFiles = (files, replacements) => {
+const renameFiles = (files, replacements, renameFile = fs.renameSync) => {
 	const renames = planRenames(files, replacements);
 	for (const { from, to } of renames) {
-		fs.renameSync(from, to);
+		renameFile(from, to);
 	}
 	return renames.length;
 };
@@ -366,9 +416,16 @@ const renameFiles = (files, replacements) => {
  * @param {Array<{path: string, kind: string}>} versionFiles - Targets.
  * @param {string}                              version      - Version to apply.
  * @param {Object}                              ui           - `@rtcamp/wp-tooling/ui`.
+ * @param {Function}                            [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {void}
  */
-const applyVersion = (root, versionFiles, version, ui) => {
+const applyVersion = (
+	root,
+	versionFiles,
+	version,
+	ui,
+	writeFile = fs.writeFileSync
+) => {
 	if (!version || !Array.isArray(versionFiles)) {
 		return;
 	}
@@ -395,7 +452,7 @@ const applyVersion = (root, versionFiles, version, ui) => {
 				);
 			}
 
-			fs.writeFileSync(filePath, content, 'utf8');
+			writeFile(filePath, content, 'utf8');
 			ui.info(`version ${version} -> ${spec.path}`);
 		} catch (err) {
 			throw new Error(
@@ -407,6 +464,7 @@ const applyVersion = (root, versionFiles, version, ui) => {
 };
 
 module.exports = {
+	withFileRollback,
 	validateRelativePath,
 	planRenames,
 	resolveWithin,

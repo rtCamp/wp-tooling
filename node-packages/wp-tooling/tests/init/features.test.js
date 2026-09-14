@@ -621,6 +621,66 @@ describe('feature transitions', () => {
 		}
 	);
 
+	test.each([false, true])(
+		'persists only successful transitions (earlier success: %s)',
+		async (earlierSuccess) => {
+			const identity = {
+				name: 'Acme Blog',
+				features: {
+					first: false,
+					failing: false,
+					drift: false,
+					retired: true,
+				},
+			};
+			const original = JSON.stringify(identity);
+			touch(root, '.wp-scaffold.json', original);
+			const config = {
+				features: [
+					{
+						key: 'first',
+						label: 'First',
+						detect: (api) => api.exists('first.flag'),
+						onEnable: (api) => api.write('first.flag', 'enabled'),
+					},
+					{
+						key: 'failing',
+						label: 'Failing',
+						detect: (api) => api.exists('failing.flag'),
+						onEnable(api) {
+							api.write('failing.flag', 'enabled');
+							throw new Error('hook failed');
+						},
+					},
+					{ key: 'drift', label: 'Drift', detect: () => true },
+				],
+			};
+			const result = await toggleFeatures(config, root, {
+				mode: 'manage',
+				api: makeFeatureApi(root, identity, ui),
+				ui,
+				wantOn: new Set([
+					'failing',
+					'drift',
+					...(earlierSuccess ? ['first'] : []),
+				]),
+				flags: { yes: true },
+			});
+			expect(result.changed).toBe(earlierSuccess);
+			expect(result.failed).toEqual(['failing']);
+			expect(process.exitCode).toBe(1);
+			expect(fs.existsSync(path.join(root, 'failing.flag'))).toBe(false);
+			const saved = fs.readFileSync(
+				path.join(root, '.wp-scaffold.json'),
+				'utf8'
+			);
+			const expected = earlierSuccess
+				? `${JSON.stringify({ ...identity, features: { first: true, failing: false, drift: true } }, null, '\t')}\n`
+				: original;
+			expect(saved).toBe(expected);
+		}
+	);
+
 	test('rollback failures are reported alongside the original hook failure', async () => {
 		touch(root, 'file.txt', 'before');
 		const originalWrite = fs.writeFileSync;
@@ -722,6 +782,47 @@ describe('validateFeatures', () => {
 		{ examples: { groups: [{ key: 'a', label: 'A', strip: 'file.php' }] } },
 	])('rejects malformed manifest %j', (manifest) => {
 		expect(() => validateFeatures(manifest)).toThrow();
+	});
+
+	test.each([
+		['dependencies', null],
+		['devDependencies', 42],
+		['scripts', false],
+		['scripts', ['echo hi']],
+		['dependencies', {}],
+	])('rejects non-string apply.%s value %j', (field, value) => {
+		expect(() =>
+			validateFeatures({
+				features: [
+					{
+						key: 'demo',
+						label: 'Demo',
+						apply: { [field]: { example: value } },
+					},
+				],
+			})
+		).toThrow(`apply.${field}.example`);
+	});
+	test('accepts npm dependency references and empty script strings', () => {
+		expect(() =>
+			validateFeatures({
+				features: [
+					{
+						key: 'demo',
+						label: 'Demo',
+						apply: {
+							dependencies: {
+								local: 'file:../local',
+								remote: 'github:owner/repo#main',
+								range: '^1.0.0',
+							},
+							devDependencies: { any: '*' },
+							scripts: { disabled: '', build: 'node build.js' },
+						},
+					},
+				],
+			})
+		).not.toThrow();
 	});
 
 	test.each([[], { files: null }, { scripts: [] }])(

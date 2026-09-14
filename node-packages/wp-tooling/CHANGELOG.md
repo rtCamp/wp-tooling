@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Init validates shared setup/manage selections before mutation, confirms setup choices before applying identity, and uses current persisted tokens for reinitialization. Version-only edits now update files and identity; reinit preserves one-shot example choices and refuses corrupt identity.
 - Feature hooks are awaited inside their rollback journal. Cancellation/no-op manage calls leave persisted state unchanged; failed transitions stop, retain shared dependency ownership, and report rollback failures.
-- Init rejects rename collisions, unsafe configured paths and symlink escapes, propagates filesystem and external-step failures, and reports partial setup instead of unconditional success. Setup stops on failure; inspect partial changes and restore a starter backup before retrying.
+- Init rejects rename collisions, unsafe configured paths and symlink escapes, propagates filesystem and external-step failures, and reports partial setup instead of unconditional success. Identity edits roll back file changes on failure and preserve unrelated metadata. Fully rolled-back feature transitions leave saved state untouched, and dependency/script values must be strings. Git-step failures report that project setup completed; failures during project setup still require inspecting partial changes before retrying.
 
 ## [1.0.0] - 2026-07-30
 

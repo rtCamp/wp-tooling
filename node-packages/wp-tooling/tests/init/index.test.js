@@ -97,6 +97,25 @@ describe('setup sequencing and reinitialization', () => {
 		process.exitCode = undefined;
 	});
 
+	test('an unreadable project directory aborts before identity writes', async () => {
+		touch(root, 'inc/Module.php', 'Starter Theme');
+		const before = snapshot(root);
+		const readDirectory = fs.readdirSync;
+		jest.spyOn(fs, 'readdirSync').mockImplementation((dir, ...args) => {
+			if (dir === path.join(root, 'inc')) {
+				throw new Error('EACCES: inc');
+			}
+			return readDirectory(dir, ...args);
+		});
+		await capture(async () => {
+			await expect(
+				run(config, { root, argv: ['--yes', '--name=Acme Blog'] })
+			).rejects.toThrow('EACCES: inc');
+		});
+		expect(snapshot(root)).toEqual(before);
+		expect(process.exitCode).toBe(1);
+	});
+
 	test('cancelled capability confirmation leaves the entire tree unchanged', async () => {
 		jest.spyOn(ui, 'confirm')
 			.mockResolvedValueOnce(true)
@@ -111,6 +130,38 @@ describe('setup sequencing and reinitialization', () => {
 		);
 		expect(snapshot(root)).toEqual(before);
 		expect(process.exitCode).toBe(130);
+	});
+
+	test('setup detection uses source identity before rename and target identity after it', async () => {
+		touch(root, 'starter-theme.flag', 'enabled');
+		const seen = [];
+		const feature = {
+			key: 'demo',
+			label: 'Demo feature',
+			detect(api) {
+				seen.push(api.identity.slug);
+				return api.exists(`${api.identity.slug}.flag`);
+			},
+			onEnable: jest.fn(),
+			onDisable: jest.fn(),
+		};
+		await capture(() =>
+			run(
+				{ ...config, features: [feature] },
+				{
+					root,
+					argv: ['--yes', '--name=Acme Blog'],
+				}
+			)
+		);
+		expect(seen[0]).toBe('starter-theme');
+		expect(seen.slice(1)).toEqual(['acme-blog', 'acme-blog']);
+		expect(feature.onEnable).not.toHaveBeenCalled();
+		expect(feature.onDisable).not.toHaveBeenCalled();
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, '.wp-scaffold.json')))
+				.features
+		).toEqual({ demo: true });
 	});
 
 	test('reinit replaces the current identity and preserves unrelated metadata', async () => {
@@ -248,14 +299,46 @@ describe('setup step failures and optional steps', () => {
 			git[operation].mockImplementation(() => {
 				throw new Error(`${operation} failed`);
 			});
-			await capture(async () => {
+			const output = await capture(async () => {
 				await expect(
 					run(stepConfig, { root, argv: ['--name=Acme Blog'] })
 				).rejects.toThrow(/failed/);
 			});
 			expect(process.exitCode).toBe(1);
+			expect(output.stdout + output.stderr).toContain(
+				'Project setup completed'
+			);
+			expect(output.stdout + output.stderr).not.toContain(
+				'restore your starter backup'
+			);
+			expect(
+				JSON.parse(
+					fs.readFileSync(path.join(root, '.wp-scaffold.json'))
+				).name
+			).toBe('Acme Blog');
+			expect(fs.existsSync(path.join(root, 'keep.txt'))).toBe(false);
 		}
 	);
+
+	test('cancelling a Git prompt preserves completed project setup', async () => {
+		jest.spyOn(ui, 'confirm').mockImplementation(async ({ message }) => {
+			if (message.startsWith('Initialize a git')) {
+				throw new ui.CancelledError();
+			}
+			return true;
+		});
+		const output = await capture(() =>
+			run(stepConfig, { root, argv: ['--name=Acme Blog'] })
+		);
+		expect(process.exitCode).toBe(130);
+		expect(output.stdout + output.stderr).toContain(
+			'Git setup was cancelled'
+		);
+		expect(output.stdout + output.stderr).not.toContain(
+			'restore your starter backup'
+		);
+		expect(git.initRepo).not.toHaveBeenCalled();
+	});
 
 	test('declining optional Git initialization succeeds without invoking Git', async () => {
 		jest.spyOn(ui, 'confirm').mockImplementation(

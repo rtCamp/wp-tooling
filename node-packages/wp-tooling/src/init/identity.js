@@ -6,15 +6,21 @@
 
 'use strict';
 
+const path = require('path');
 const {
 	collectFiles,
+	withFileRollback,
 	planRenames,
 	replaceInFiles,
 	renameFiles,
 	applyVersion,
 	PHP_RESERVED_WORDS,
 } = require('./transform');
-const { writeIdentityFile, readIdentityFile } = require('./persist');
+const {
+	writeIdentityFile,
+	readIdentityFile,
+	IDENTITY_FILE,
+} = require('./persist');
 
 /**
  * Split a name into words on spaces/hyphens/underscores and camelCase,
@@ -462,38 +468,51 @@ const applyIdentityEdit = (config, root, oldId, newId, ui) => {
 		return false;
 	}
 
-	const files = collectFiles(root);
-	planRenames(files, replacements);
-	const changed = replaceInFiles(files, replacements, ui);
-	const renamed = renameFiles(files, replacements, ui);
-	ui.success(`Updated ${changed} file(s), renamed ${renamed} file(s)`);
-
-	if (oldId.version !== newId.version && Array.isArray(config.versionFiles)) {
-		const target = { ...newId, kebab: newId.textDomain };
-		const versionFiles = config.versionFiles.map((spec) => ({
-			...spec,
-			path:
-				'function' === typeof spec.path ? spec.path(target) : spec.path,
-		}));
-		applyVersion(root, versionFiles, newId.version, ui);
-	}
-
+	const identityPath = path.join(root, IDENTITY_FILE);
 	const current = readIdentityFile(root) || {};
-	writeIdentityFile(
-		root,
-		{
-			...current,
-			name: newId.name,
-			version: newId.version,
-			slug: newId.textDomain,
-			textDomain: newId.textDomain,
-			package: newId.package,
-			namespace: newId.namespace,
-			functionPrefix: newId.functionPrefix,
-			constantPrefix: newId.constantPrefix,
-			cssPrefix: newId.cssPrefix,
-		},
-		ui
+	// Persist explicit identity fields separately; metadata is not source code.
+	const files = collectFiles(root).filter((file) => file !== identityPath);
+	planRenames(files, replacements);
+	const result = withFileRollback(({ writeFile, renameFile }) => {
+		const changed = replaceInFiles(files, replacements, writeFile);
+		const renamed = renameFiles(files, replacements, renameFile);
+
+		if (
+			oldId.version !== newId.version &&
+			Array.isArray(config.versionFiles)
+		) {
+			const target = { ...newId, kebab: newId.textDomain };
+			const versionFiles = config.versionFiles.map((spec) => ({
+				...spec,
+				path:
+					'function' === typeof spec.path
+						? spec.path(target)
+						: spec.path,
+			}));
+			applyVersion(root, versionFiles, newId.version, ui, writeFile);
+		}
+
+		writeIdentityFile(
+			root,
+			{
+				...current,
+				name: newId.name,
+				version: newId.version,
+				slug: newId.textDomain,
+				textDomain: newId.textDomain,
+				package: newId.package,
+				namespace: newId.namespace,
+				functionPrefix: newId.functionPrefix,
+				constantPrefix: newId.constantPrefix,
+				cssPrefix: newId.cssPrefix,
+			},
+			ui,
+			writeFile
+		);
+		return { changed, renamed };
+	});
+	ui.success(
+		`Updated ${result.changed} file(s), renamed ${result.renamed} file(s)`
 	);
 
 	return true;

@@ -9,6 +9,7 @@ const os = require('os');
 const path = require('path');
 const {
 	applyReplacements,
+	withFileRollback,
 	resolveWithin,
 	applyVersion,
 } = require('../../src/init/transform');
@@ -118,6 +119,44 @@ describe('filesystem transforms', () => {
 		fs.rmSync(root, { recursive: true, force: true });
 		jest.restoreAllMocks();
 	});
+
+	test('rollback continues after an undo failure and reports both errors', () => {
+		const restored = path.join(root, 'restored.txt');
+		const failing = path.join(root, 'failing.txt');
+		const created = path.join(root, 'created.txt');
+		touch(root, 'restored.txt', 'original');
+		touch(root, 'failing.txt', 'original');
+		const write = fs.writeFileSync;
+		const originalError = new Error('edit failed');
+		const rollbackError = new Error('undo failed');
+		jest.spyOn(fs, 'writeFileSync').mockImplementation(
+			(file, body, ...args) => {
+				if (file === failing && String(body) === 'original') {
+					throw rollbackError;
+				}
+				return write(file, body, ...args);
+			}
+		);
+		let caught;
+		try {
+			withFileRollback(({ writeFile }) => {
+				writeFile(restored, 'changed');
+				writeFile(failing, 'changed');
+				writeFile(created, 'new');
+				throw originalError;
+			});
+		} catch (error) {
+			caught = error;
+		}
+		expect(caught).toBeInstanceOf(AggregateError);
+		expect(caught.errors).toEqual([originalError, rollbackError]);
+		expect(caught.message).toContain(
+			'edit failed; rollback failed: undo failed'
+		);
+		expect(fs.readFileSync(restored, 'utf8')).toBe('original');
+		expect(fs.existsSync(created)).toBe(false);
+	});
+
 	test('rename collision never overwrites an existing destination', () => {
 		touch(root, 'starter.txt', 'source');
 		touch(root, 'acme.txt', 'destination');
