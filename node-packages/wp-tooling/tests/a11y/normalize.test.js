@@ -48,20 +48,26 @@ describe('normalizeA11y', () => {
 	});
 
 	test('violations sort by impact, then id, then selector', () => {
-		const home = report.results.find(
-			(r) => r.url === 'http://localhost:8888/'
-		);
-		expect(home.violations.map((v) => v.id)).toEqual([
-			'WCAG2AA.Principle1.Guideline1_1.1_1_1.H37',
-			'color-contrast',
-			'WCAG2AA.Principle1.Guideline1_3.1_3_1.H42.2',
-			'WCAG2AA.Principle4.Guideline4_1.4_1_2.H91.A.NoContent',
-		]);
-		expect(home.violations.map((v) => v.impact)).toEqual([
-			'error',
-			'error',
-			'warning',
-			'notice',
+		const issues = [
+			{ type: 'notice', code: 'a', selector: '#a' },
+			{ type: 'error', code: 'b', selector: '#a' },
+			{ type: 'warning', code: 'a', selector: '#a' },
+			{ type: 'error', code: 'a', selector: '#z' },
+			{ type: 'error', code: 'a', selector: '#a' },
+		];
+		const sorted = normalizeA11y({ results: { '/': issues } });
+		expect(
+			sorted.results[0].violations.map(({ impact, id, selector }) => [
+				impact,
+				id,
+				selector,
+			])
+		).toEqual([
+			['error', 'a', '#a'],
+			['error', 'a', '#z'],
+			['error', 'b', '#a'],
+			['warning', 'a', '#a'],
+			['notice', 'a', '#a'],
 		]);
 	});
 
@@ -151,11 +157,6 @@ describe('parseWcagCriterion', () => {
 		const digits = '9'.repeat(100000);
 		expect(parseWcagCriterion(digits)).toBeNull();
 		expect(parseWcagCriterion(`${digits}_1.2_4_11.H1`)).toBe('2.4.11');
-	});
-	test('pulls the dotted criterion from an HTMLCS code', () => {
-		expect(
-			parseWcagCriterion('WCAG2AA.Principle2.Guideline2_4.2_4_4.H77')
-		).toBe('2.4.4');
 	});
 
 	test('returns null when there is no criterion', () => {

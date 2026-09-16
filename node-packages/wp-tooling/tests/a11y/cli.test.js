@@ -55,11 +55,11 @@ const FAILED_REPORT = {
 	},
 };
 
-/** Error text used by both the thrown Error and its `.stderr`, for the mocked "binary not found" probe. */
-const VERSION_PROBE_NOT_FOUND_ERROR = 'command not found';
+/** Error text used by both the thrown Error and its `.stderr`, for the mocked failing version probe. */
+const VERSION_PROBE_ERROR = 'Unsupported Node version';
 
 /** Version string the mocked `--version` probe returns when the binary is available. */
-const MOCK_VERSION = '3.1.0\n';
+const MOCK_VERSION = '4.1.1\n';
 
 /**
  * Drive the mocked pa11y-ci binary.
@@ -91,8 +91,8 @@ function mockBin(o = {}) {
  */
 function versionProbeResult(available) {
 	if (!available) {
-		const err = new Error(VERSION_PROBE_NOT_FOUND_ERROR);
-		err.stderr = VERSION_PROBE_NOT_FOUND_ERROR;
+		const err = new Error(VERSION_PROBE_ERROR);
+		err.stderr = VERSION_PROBE_ERROR;
 		throw err;
 	}
 	return MOCK_VERSION;
@@ -206,7 +206,7 @@ describe('a11y runCli', () => {
 			mockBin({ available: false });
 			expect(runCli([...flags, '--config', FIXTURE_CONFIG])).toBe(1);
 			expect(stderr.join('')).toContain(
-				`was found but could not run: ${VERSION_PROBE_NOT_FOUND_ERROR}`
+				`was found but could not run: ${VERSION_PROBE_ERROR}`
 			);
 			expect(execFileSync).toHaveBeenCalledTimes(1);
 		}
@@ -298,7 +298,7 @@ describe('a11y runCli', () => {
 		expect(out).toMatch(/1 failed to load/);
 	});
 
-	test('--dry-run prints the plan and runs pa11y-ci not at all', () => {
+	test('--dry-run prints the plan and only probes the version', () => {
 		mockBin();
 		const code = runCli(['--dry-run', '--config', FIXTURE_CONFIG]);
 		expect(code).toBe(0);
@@ -307,7 +307,7 @@ describe('a11y runCli', () => {
 		expect(out).toMatch(/http:\/\/localhost:8888\//);
 		expect(out).toContain(FIXTURE_CONFIG);
 		expect(out).toMatch(/pa11y-ci/);
-		// Only the --version probe ran; pa11y-ci itself was never invoked.
+		// Only the --version probe ran; no accessibility scan was started.
 		expect(execFileSync.mock.calls).toHaveLength(1);
 		expect(execFileSync.mock.calls[0][1]).toContain('--version');
 	});

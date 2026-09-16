@@ -44,7 +44,7 @@ describe('resolveUrls', () => {
 		expect(err.code).toBe('ENOURLS');
 	});
 
-	test('a missing config throws ENOURLS with the install hint', () => {
+	test('a missing config throws ENOURLS with the scaffold hint', () => {
 		const err = grab(() =>
 			resolveUrls({ cwd: FIXTURES, configPath: 'does-not-exist.json' })
 		);
@@ -68,21 +68,20 @@ describe('resolveUrls', () => {
 		expect(r.standard).toBeUndefined();
 	});
 
-	test('a .js config path is rejected as JSON-only, not parsed', () => {
-		const err = grab(() =>
-			resolveUrls({ cwd: FIXTURES, configPath: '.pa11yci.js' })
-		);
-		expect(err).toBeInstanceOf(RunnerError);
-		expect(err.code).toBe('ECONFIGJS');
-		expect(err.message).toMatch(/JavaScript pa11y-ci config/);
-	});
-
-	test('a .cjs config path is rejected as JSON-only, not parsed', () => {
-		const err = grab(() =>
-			resolveUrls({ cwd: FIXTURES, configPath: '.pa11yci.cjs' })
-		);
-		expect(err.code).toBe('ECONFIGJS');
-	});
+	test.each(['js', 'cjs', 'mjs'])(
+		'a .%s config path is rejected as JSON-only, not parsed',
+		(extension) => {
+			const err = grab(() =>
+				resolveUrls({
+					cwd: FIXTURES,
+					configPath: `.pa11yci.${extension}`,
+				})
+			);
+			expect(err).toBeInstanceOf(RunnerError);
+			expect(err.code).toBe('ECONFIGJS');
+			expect(err.message).toMatch(/JavaScript pa11y-ci config/);
+		}
+	);
 });
 
 describe('extractUrls', () => {
