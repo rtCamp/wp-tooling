@@ -12,7 +12,7 @@ const {
 	withFileRollback,
 	planRenames,
 	replaceInFiles,
-	renameFiles,
+	executeRenames,
 	applyVersion,
 	PHP_RESERVED_WORDS,
 } = require('./transform');
@@ -472,10 +472,10 @@ const applyIdentityEdit = (config, root, oldId, newId, ui) => {
 	const current = readIdentityFile(root) || {};
 	// Persist explicit identity fields separately; metadata is not source code.
 	const files = collectFiles(root).filter((file) => file !== identityPath);
-	planRenames(files, replacements);
+	const renames = planRenames(files, replacements);
 	const result = withFileRollback(({ writeFile, renameFile }) => {
 		const changed = replaceInFiles(files, replacements, writeFile);
-		const renamed = renameFiles(files, replacements, renameFile);
+		const renamed = executeRenames(renames, renameFile);
 
 		if (
 			oldId.version !== newId.version &&

@@ -228,3 +228,74 @@ describe('filesystem transforms', () => {
 		);
 	});
 });
+
+describe('batch rename staging', () => {
+	let root;
+	beforeEach(() => {
+		root = makeRoot();
+		touch(root, 'a.txt', 'A');
+		touch(root, 'b.txt', 'B');
+	});
+	afterEach(() => {
+		jest.restoreAllMocks();
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+	test.each(['a', 'c'])(
+		'supports a batch ending at %s.txt',
+		(destination) => {
+			renameFiles(
+				['a.txt', 'b.txt'].map((file) => path.join(root, file)),
+				[
+					['a', 'b'],
+					['b', destination],
+				]
+			);
+			expect(fs.readFileSync(path.join(root, 'b.txt'), 'utf8')).toBe('A');
+			expect(
+				fs.readFileSync(path.join(root, `${destination}.txt`), 'utf8')
+			).toBe('B');
+			expect(fs.readdirSync(root)).toHaveLength(2);
+		}
+	);
+	test.each([2, 4])(
+		'restores every source after rename number %s fails',
+		(failAt) => {
+			const rename = fs.renameSync;
+			let calls = 0;
+			jest.spyOn(fs, 'renameSync').mockImplementation((...args) => {
+				if (++calls === failAt) {
+					throw new Error('rename failed');
+				}
+				return rename(...args);
+			});
+			expect(() =>
+				renameFiles(
+					['a.txt', 'b.txt'].map((file) => path.join(root, file)),
+					[
+						['a', 'b'],
+						['b', 'a'],
+					]
+				)
+			).toThrow('rename failed');
+			expect(fs.readFileSync(path.join(root, 'a.txt'), 'utf8')).toBe('A');
+			expect(fs.readFileSync(path.join(root, 'b.txt'), 'utf8')).toBe('B');
+			expect(fs.readdirSync(root).sort()).toEqual(['a.txt', 'b.txt']);
+		}
+	);
+	test('rejects case-folded destinations on an insensitive filesystem', () => {
+		const exists = fs.existsSync;
+		jest.spyOn(fs, 'existsSync').mockImplementation(
+			(file) => path.basename(file) === 'PROBE' || exists(file)
+		);
+		expect(() =>
+			renameFiles(
+				['a.txt', 'b.txt'].map((file) => path.join(root, file)),
+				[
+					['a', 'x'],
+					['b', 'X'],
+				]
+			)
+		).toThrow(/collision/);
+		expect(fs.readdirSync(root).sort()).toEqual(['a.txt', 'b.txt']);
+	});
+});

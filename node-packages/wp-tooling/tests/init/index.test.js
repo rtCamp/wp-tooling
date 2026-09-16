@@ -439,20 +439,105 @@ describe('entry-point error reporting', () => {
 		expect(process.exitCode).toBe(1);
 		expect(detect).not.toHaveBeenCalled();
 	});
-	test('standalone cleanup rejects a malformed target list before deleting files', async () => {
-		touch(root, 'keep.txt', 'keep');
-		jest.spyOn(ui, 'confirm').mockResolvedValue(true);
-		await capture(async () => {
-			await expect(
-				run(
-					{ ...config, cleanup: { targets: 'keep.txt' } },
-					{ root, argv: ['--clean'] }
-				)
-			).rejects.toThrow(/Expected cleanup.targets to be an array/);
-		});
-		expect(fs.readFileSync(path.join(root, 'keep.txt'), 'utf8')).toBe(
-			'keep'
-		);
-		expect(process.exitCode).toBe(1);
+	test.each(['keep.txt', null, false, ''])(
+		'standalone cleanup rejects malformed targets %j before deleting files',
+		async (targets) => {
+			touch(root, 'keep.txt', 'keep');
+			jest.spyOn(ui, 'confirm').mockResolvedValue(true);
+			await capture(async () => {
+				await expect(
+					run(
+						{ ...config, cleanup: { targets } },
+						{ root, argv: ['--clean'] }
+					)
+				).rejects.toThrow(/Expected cleanup.targets to be an array/);
+			});
+			expect(fs.readFileSync(path.join(root, 'keep.txt'), 'utf8')).toBe(
+				'keep'
+			);
+			expect(process.exitCode).toBe(1);
+		}
+	);
+});
+
+describe('setup identity transaction', () => {
+	let root;
+	beforeEach(() => {
+		root = makeRoot();
+		process.exitCode = undefined;
 	});
+	afterEach(() => {
+		jest.restoreAllMocks();
+		fs.rmSync(root, { recursive: true, force: true });
+		process.exitCode = undefined;
+	});
+	test.each(
+		['replace', 'rename', 'version'].flatMap((phase) => [
+			[phase, false],
+			[phase, true],
+		])
+	)(
+		'restores identity files after %s fails (reinit: %s)',
+		async (phase, reinit) => {
+			touch(root, 'starter-theme.txt', 'Starter Theme');
+			touch(root, 'z.txt', 'Starter Theme');
+			touch(root, 'package.json', '{"version":"1.0.0"}');
+			if (reinit) {
+				await capture(() =>
+					run(config, {
+						root,
+						argv: ['--yes', '--name=First Project'],
+					})
+				);
+			}
+			const before = snapshot(root);
+			const write = fs.writeFileSync;
+			let failed = false;
+			jest.spyOn(fs, 'writeFileSync').mockImplementation(
+				(file, ...args) => {
+					if (
+						!failed &&
+						(('replace' === phase &&
+							path.basename(file) === 'z.txt') ||
+							('version' === phase &&
+								path.basename(file) === 'package.json'))
+					) {
+						failed = true;
+						write(file, 'partial');
+						throw new Error('injected failure');
+					}
+					return write(file, ...args);
+				}
+			);
+			const rename = fs.renameSync;
+			jest.spyOn(fs, 'renameSync').mockImplementation((...args) => {
+				if (!failed && 'rename' === phase) {
+					failed = true;
+					throw new Error('injected failure');
+				}
+				return rename(...args);
+			});
+			await capture(async () => {
+				await expect(
+					run(
+						{
+							...config,
+							versionFiles: [
+								{ path: 'package.json', kind: 'json' },
+							],
+						},
+						{
+							root,
+							argv: [
+								'--yes',
+								'--name=Acme Blog',
+								...(reinit ? ['--reinit'] : []),
+							],
+						}
+					)
+				).rejects.toThrow('injected failure');
+			});
+			expect(snapshot(root)).toEqual(before);
+		}
+	);
 });

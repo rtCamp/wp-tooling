@@ -114,12 +114,24 @@ const validateFeatures = (config) => {
 			);
 		}
 	});
+	const validateMarker = (marker, label) => {
+		if (
+			undefined !== marker &&
+			('string' !== typeof marker || !marker.trim())
+		) {
+			throw new Error(
+				`Expected ${label} to be a nonempty string, received ${JSON.stringify(marker)}`
+			);
+		}
+	};
+	validateMarker(config.examples?.marker, 'examples.marker');
 	const groups = config.examples?.groups || [];
 	if (!Array.isArray(groups)) {
 		throw new Error('Expected examples.groups to be an array.');
 	}
 	const groupKeys = new Set();
 	for (const group of groups) {
+		validateMarker(group?.marker, `example ${group?.key} marker`);
 		if (
 			!group ||
 			'string' !== typeof group.key ||
@@ -419,23 +431,29 @@ const makeFeatureApi = (root, identity, ui) => {
 
 /**
  * Run `fn` inside the api journal; on throw, replay undo entries in reverse to
- * restore exactly what `fn` mutated, then rethrow.
+ * restore exactly what `fn` mutated, then rethrow. Nested successes retain their
+ * undo entries until the outer transaction commits.
  *
  * @param {Object}   api - FeatureApi.
  * @param {Function} fn  - Synchronous or asynchronous mutation function.
- * @return {Promise<void>} Resolves after the mutation or rejects after rollback.
+ * @return {Promise<*>} Callback result, or rejection after rollback.
  */
 const runJournaled = async (api, fn) => {
 	const start = api._journal.length;
 	const notesStart = (api._notes || []).length;
+	const depth = api._transactionDepth || 0;
+	api._transactionDepth = depth + 1;
 	try {
-		await fn();
-		api._journal.length = start;
+		const result = await fn();
+		if (!depth) {
+			api._journal.length = start;
+		}
+		return result;
 	} catch (err) {
 		const rollbackErrors = [];
 		for (let i = api._journal.length - 1; i >= start; i--) {
 			try {
-				api._journal[i].undo();
+				await api._journal[i].undo();
 			} catch (rollbackError) {
 				rollbackErrors.push(rollbackError);
 			}
@@ -452,6 +470,8 @@ const runJournaled = async (api, fn) => {
 			);
 		}
 		throw err;
+	} finally {
+		api._transactionDepth = depth;
 	}
 };
 
@@ -770,7 +790,9 @@ const toggleFeatures = async (config, root, opts) => {
 	const finalize = (changed, failed) => {
 		const finalMap = detectMap(config, api);
 		if ('manage' === mode && changed) {
-			writeFeatures(root, finalMap, ui);
+			writeFeatures(root, finalMap, ui, (file, body) =>
+				api.write(path.relative(root, file), body)
+			);
 		}
 		if (failed && failed.length) {
 			process.exitCode = 1;
@@ -859,70 +881,74 @@ const toggleFeatures = async (config, root, opts) => {
 		}
 	}
 
-	const featuresDir = config.featuresDir || 'bin/features';
-	const enabledKeys = new Set(
-		rows.filter((row) => row.on).map((row) => row.key)
-	);
-	const failed = [];
-	let depsChanged = false;
-	let changed = false;
+	return runJournaled(api, async () => {
+		const featuresDir = config.featuresDir || 'bin/features';
+		const enabledKeys = new Set(
+			rows.filter((row) => row.on).map((row) => row.key)
+		);
+		const failed = [];
+		let depsChanged = false;
+		let changed = false;
 
-	// Disable before enable: frees files/deps before any re-add.
-	for (const r of toDisable) {
-		const spin = ui.spinner(`Disabling ${r.label}...`);
-		spin.start();
-		try {
-			const survivors = (config.features || []).filter(
-				(feature) =>
-					feature.key !== r.key &&
-					(enabledKeys.has(feature.key) || wantOn.has(feature.key))
-			);
-			await disableFeature(r.feature, api, survivors);
-			changed = true;
-			enabledKeys.delete(r.key);
-			spin.succeed(`Disabled ${r.label}`);
-			depsChanged = depsChanged || touchesPackage(r.feature);
-		} catch (err) {
-			spin.fail(`Failed to disable ${r.label}`);
-			ui.error(err.message);
-			failed.push(r.key);
+		// Disable before enable: frees files/deps before any re-add.
+		for (const r of toDisable) {
+			const spin = ui.spinner(`Disabling ${r.label}...`);
+			spin.start();
+			try {
+				const survivors = (config.features || []).filter(
+					(feature) =>
+						feature.key !== r.key &&
+						(enabledKeys.has(feature.key) ||
+							wantOn.has(feature.key))
+				);
+				await disableFeature(r.feature, api, survivors);
+				changed = true;
+				enabledKeys.delete(r.key);
+				spin.succeed(`Disabled ${r.label}`);
+				depsChanged = depsChanged || touchesPackage(r.feature);
+			} catch (err) {
+				spin.fail(`Failed to disable ${r.label}`);
+				ui.error(err.message);
+				failed.push(r.key);
+			}
+			if (failed.length) {
+				break;
+			}
 		}
-		if (failed.length) {
-			break;
+		for (const r of toEnable) {
+			if (failed.length) {
+				break;
+			}
+			const spin = ui.spinner(`Enabling ${r.label}...`);
+			spin.start();
+			try {
+				await enableFeature(r.feature, api, featuresDir);
+				changed = true;
+				spin.succeed(`Enabled ${r.label}`);
+				depsChanged = depsChanged || touchesPackage(r.feature);
+			} catch (err) {
+				spin.fail(`Failed to enable ${r.label}`);
+				ui.error(err.message);
+				failed.push(r.key);
+			}
 		}
-	}
-	for (const r of toEnable) {
-		if (failed.length) {
-			break;
-		}
-		const spin = ui.spinner(`Enabling ${r.label}...`);
-		spin.start();
-		try {
-			await enableFeature(r.feature, api, featuresDir);
-			changed = true;
-			spin.succeed(`Enabled ${r.label}`);
-			depsChanged = depsChanged || touchesPackage(r.feature);
-		} catch (err) {
-			spin.fail(`Failed to enable ${r.label}`);
-			ui.error(err.message);
-			failed.push(r.key);
-		}
-	}
 
-	if (depsChanged) {
-		ui.warn('Dependencies changed -- run `npm install` to sync.');
-	}
-	// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
-	const notes = api._notes || [];
-	if (notes.length) {
-		ui.heading('Next steps');
-		notes.splice(0).forEach((message) => ui.info(message));
-	}
-	if (!failed.length) {
-		ui.success('Features updated.');
-	}
+		const result = finalize(changed, failed);
+		if (depsChanged) {
+			ui.warn('Dependencies changed -- run `npm install` to sync.');
+		}
+		// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
+		const notes = api._notes || [];
+		if (notes.length) {
+			ui.heading('Next steps');
+			notes.splice(0).forEach((message) => ui.info(message));
+		}
+		if (!failed.length) {
+			ui.success('Features updated.');
+		}
 
-	return finalize(changed, failed);
+		return result;
+	});
 };
 
 module.exports = {

@@ -95,15 +95,16 @@ const readFeatures = (root) => {
  * Update only the `features` field of the persisted identity, preserving every
  * other field and the file's tab indentation.
  *
- * @param {string} root        - Project root.
- * @param {Object} featuresMap - Features map to persist.
- * @param {Object} [ui]        - UI for an optional log line.
+ * @param {string}   root        - Project root.
+ * @param {Object}   featuresMap - Features map to persist.
+ * @param {Object}   [ui]        - UI for an optional log line.
+ * @param {Function} [writeFile] Journaled synchronous writer.
  * @return {string} Absolute path written.
  */
-const writeFeatures = (root, featuresMap, ui) => {
+const writeFeatures = (root, featuresMap, ui, writeFile = fs.writeFileSync) => {
 	const identity = readIdentityFile(root) || {};
 	identity.features = featuresMap;
-	return writeIdentityFile(root, identity, ui);
+	return writeIdentityFile(root, identity, ui, writeFile);
 };
 
 module.exports = {

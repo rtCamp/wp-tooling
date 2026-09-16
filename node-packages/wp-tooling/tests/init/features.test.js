@@ -598,6 +598,71 @@ describe('feature transitions', () => {
 		process.exitCode = undefined;
 		jest.restoreAllMocks();
 	});
+	test.each(['persist', 'detect'])(
+		'rolls back the entire batch after %s failure',
+		async (failure) => {
+			const localUi = fakeUi();
+			const original = '{"features":{},"custom":"keep"}';
+			touch(root, '.wp-scaffold.json', original);
+			touch(root, 'shared.txt', 'before');
+			const api = makeFeatureApi(root, IDENTITY, localUi);
+			const features = ['first', 'second'].map((key) => ({
+				key,
+				label: key,
+				detect: () => {
+					if ('detect' === failure && api.exists('second.flag')) {
+						throw new Error('detect failed');
+					}
+					return api.exists(`${key}.flag`);
+				},
+				onEnable: () => {
+					api.write(`${key}.flag`, key);
+					api.write('shared.txt', key);
+					api.note('must not print');
+				},
+			}));
+			const write = fs.writeFileSync;
+			let failed = false;
+			const spy = jest
+				.spyOn(fs, 'writeFileSync')
+				.mockImplementation((file, ...args) => {
+					if (
+						'persist' === failure &&
+						path.basename(file) === '.wp-scaffold.json' &&
+						!failed
+					) {
+						failed = true;
+						write(file, 'truncated');
+						throw new Error('persist failed');
+					}
+					return write(file, ...args);
+				});
+			try {
+				await expect(
+					toggleFeatures({ features }, root, {
+						mode: 'manage',
+						api,
+						ui: localUi,
+						flags: { yes: true },
+						wantOn: new Set(['first', 'second']),
+					})
+				).rejects.toThrow(`${failure} failed`);
+				expect(raw(root, '.wp-scaffold.json')).toBe(original);
+				expect(raw(root, 'shared.txt')).toBe('before');
+				expect(api.exists('first.flag')).toBe(false);
+				expect(api.exists('second.flag')).toBe(false);
+				expect(api._journal).toHaveLength(0);
+				expect(api._notes).toHaveLength(0);
+				expect(localUi.calls.info).not.toContain('must not print');
+				expect(localUi.calls.success).not.toContain(
+					'Features updated.'
+				);
+			} finally {
+				spy.mockRestore();
+			}
+		}
+	);
+
 	test.each(['Cancel', 'Apply changes'])(
 		'%s without toggling does not persist drift',
 		async (choice) => {
@@ -872,5 +937,19 @@ test.each([
 		const result = safeDetectMap({ features: [feature] }, {});
 		expect(result.map.demo).toBeNull();
 		expect(result.errors[0].message).toMatch(/synchronous/);
+	}
+);
+
+test.each([null, false, 1, '', '   ', {}])(
+	'rejects explicit invalid marker %j',
+	(marker) => {
+		expect(() => validateFeatures({ examples: { marker } })).toThrow(
+			/nonempty string/
+		);
+		expect(() =>
+			validateFeatures({
+				examples: { groups: [{ key: 'demo', label: 'Demo', marker }] },
+			})
+		).toThrow(/nonempty string/);
 	}
 );

@@ -10,6 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('crypto');
 
 /**
  * Require a nonempty relative path without parent traversal.
@@ -360,45 +361,87 @@ const replaceInFiles = (files, replacements, writeFile = fs.writeFileSync) => {
  * @return {Array} Validated source/destination pairs.
  */
 const planRenames = (files, replacements) => {
+	const renames = files
+		.map((from) => ({
+			from,
+			to: path.join(
+				path.dirname(from),
+				applyReplacements(path.basename(from), replacements)
+			),
+		}))
+		.filter(({ from, to }) => from !== to);
+	const sources = new Set(
+		renames.map(({ from }) => fs.realpathSync.native(from))
+	);
 	const destinations = new Set();
-	const renames = [];
-	for (const from of files) {
-		const basename = applyReplacements(path.basename(from), replacements);
-		const to = path.join(path.dirname(from), basename);
-		if (from === to) {
-			continue;
+	const caseSensitive = new Map();
+	for (const { from, to } of renames) {
+		const dir = path.dirname(to);
+		if (!caseSensitive.has(dir)) {
+			// Probe the actual directory's filesystem, not the host OS default.
+			const probe = fs.mkdtempSync(path.join(dir, '.wp-init-case-'));
+			try {
+				fs.writeFileSync(path.join(probe, 'probe'), '');
+				caseSensitive.set(
+					dir,
+					!fs.existsSync(path.join(probe, 'PROBE'))
+				);
+			} finally {
+				fs.rmSync(probe, { recursive: true, force: true });
+			}
 		}
-		const destinationExists = fs.lstatSync(to, { throwIfNoEntry: false });
-		const isCaseOnlyRename =
-			destinationExists &&
-			!destinationExists.isSymbolicLink() &&
-			from.toLowerCase() === to.toLowerCase() &&
-			fs.realpathSync.native(from) === fs.realpathSync.native(to);
-		if (destinations.has(to) || (destinationExists && !isCaseOnlyRename)) {
+		const key = caseSensitive.get(dir) ? to : to.toLowerCase();
+		const existing = fs.lstatSync(to, { throwIfNoEntry: false });
+		const vacated =
+			existing &&
+			!existing.isSymbolicLink() &&
+			sources.has(fs.realpathSync.native(to));
+		if (destinations.has(key) || (existing && !vacated)) {
 			throw new Error(
 				`Rename collision: expected an unused destination for ${from}, received ${to}`
 			);
 		}
-		destinations.add(to);
-		renames.push({ from, to });
+		destinations.add(key);
 	}
 	return renames;
 };
 
 /**
- * Rename files whose basename contains any token.
+ * Execute a validated plan, staging sources so chains and swaps cannot overwrite.
  *
- * @param {string[]}                files        - Absolute file paths.
- * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Function}                [renameFile] Synchronous rename (journaled during identity edits).
- * @return {number} Count of files renamed.
+ * @param {Array}    renames    Validated source/destination pairs.
+ * @param {Function} renameFile Journaled synchronous rename.
+ * @return {number} Number of logical renames.
  */
-const renameFiles = (files, replacements, renameFile = fs.renameSync) => {
-	const renames = planRenames(files, replacements);
-	for (const { from, to } of renames) {
-		renameFile(from, to);
+const executeRenames = (renames, renameFile) => {
+	const staged = renames.map((entry) => ({
+		...entry,
+		temp: path.join(
+			path.dirname(entry.from),
+			`.wp-init-rename-${randomUUID()}`
+		),
+	}));
+	for (const { from, temp } of staged) {
+		renameFile(from, temp);
+	}
+	for (const { temp, to } of staged) {
+		renameFile(temp, to);
 	}
 	return renames.length;
+};
+
+/**
+ * Plan and atomically apply a batch of file renames on synchronous failure.
+ *
+ * @param {string[]} files        Source paths.
+ * @param {Array}    replacements Literal replacement pairs.
+ * @return {number} Number of renamed files.
+ */
+const renameFiles = (files, replacements) => {
+	const plan = planRenames(files, replacements);
+	return withFileRollback(({ renameFile }) =>
+		executeRenames(plan, renameFile)
+	);
 };
 
 /**
@@ -467,6 +510,7 @@ module.exports = {
 	withFileRollback,
 	validateRelativePath,
 	planRenames,
+	executeRenames,
 	resolveWithin,
 	collectFiles,
 	applyReplacements,

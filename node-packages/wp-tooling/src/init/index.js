@@ -35,16 +35,18 @@ const {
 	collectFiles,
 	planRenames,
 	replaceInFiles,
-	renameFiles,
+	executeRenames,
+	withFileRollback,
 	applyVersion,
 } = require('./transform');
 const {
 	writeIdentityFile,
 	readIdentityFile,
 	IdentityFileError,
+	IDENTITY_FILE,
 } = require('./persist');
 const { initRepo, commitAll, installGitHooks } = require('./git');
-const { runCleanup } = require('./cleanup');
+const { runCleanup, resolveCleanupTargets } = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
@@ -366,7 +368,10 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) => c.cancelled,
 			async run(c) {
 				validatePaths(config, root, c.target);
-				planRenames(collectFiles(root), c.replacements);
+				c.files = collectFiles(root).filter(
+					(file) => file !== path.join(root, IDENTITY_FILE)
+				);
+				c.renames = planRenames(c.files, c.replacements);
 				ui.info(`Apply identity ${c.target.name} (${c.version}).`);
 				ui.info(
 					`Enabled features: ${[...(c.wantOn || [])].join(', ') || '(none)'}`
@@ -390,28 +395,26 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) => c.cancelled,
 			async run(c) {
 				c.applicationStarted = true;
-				const files = collectFiles(root);
-				const changed = replaceInFiles(files, c.replacements);
-				const renamed = renameFiles(files, c.replacements);
-				ui.success(
-					`Updated ${changed} file(s), renamed ${renamed} file(s)`
-				);
-			},
-		},
-		{
-			name: 'Apply version',
-			skip: (c) => c.cancelled || !config.versionFiles,
-			async run(c) {
-				// Resolve function paths against the chosen identity; files may have just been renamed.
-				const target = { ...c.target, kebab: c.target.textDomain };
-				const files = config.versionFiles.map((spec) => ({
-					...spec,
-					path:
-						'function' === typeof spec.path
-							? spec.path(target)
-							: spec.path,
-				}));
-				applyVersion(root, files, c.version, ui);
+				withFileRollback(({ writeFile, renameFile }) => {
+					const changed = replaceInFiles(
+						c.files,
+						c.replacements,
+						writeFile
+					);
+					const renamed = executeRenames(c.renames, renameFile);
+					const target = { ...c.target, kebab: c.target.textDomain };
+					const files = (config.versionFiles || []).map((spec) => ({
+						...spec,
+						path:
+							'function' === typeof spec.path
+								? spec.path(target)
+								: spec.path,
+					}));
+					applyVersion(root, files, c.version, ui, writeFile);
+					ui.success(
+						`Updated ${changed} file(s), renamed ${renamed} file(s)`
+					);
+				});
 			},
 		},
 		{
@@ -465,11 +468,7 @@ const setupSteps = (config, root, flags) => {
 			name: 'Cleanup',
 			skip: (c) => c.cancelled || !steps.cleanup,
 			async run() {
-				runCleanup(
-					root,
-					(config.cleanup && config.cleanup.targets) || [],
-					ui
-				);
+				runCleanup(root, config.cleanup?.targets, ui);
 			},
 		},
 		{
@@ -574,6 +573,7 @@ const setupFlow = async (config, root, flags) => {
  * @return {Promise<void>}
  */
 const cleanFlow = async (config, root) => {
+	resolveCleanupTargets(root, config.cleanup?.targets);
 	const kind = config.kind || 'project';
 	const go = await ui.confirm({
 		message: `Run ${kind} cleanup now?`,
@@ -583,11 +583,7 @@ const cleanFlow = async (config, root) => {
 		ui.warn('Cleanup skipped.');
 		return;
 	}
-	const removed = runCleanup(
-		root,
-		(config.cleanup && config.cleanup.targets) || [],
-		ui
-	);
+	const removed = runCleanup(root, config.cleanup?.targets, ui);
 	ui.success(`Cleanup complete (${removed} removed).`);
 };
 
