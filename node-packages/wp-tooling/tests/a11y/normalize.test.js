@@ -194,6 +194,18 @@ describe('extractDomHints', () => {
 		});
 	});
 
+	test.each(['"', "'"])(
+		'preserves > inside %s-quoted values and subsequent attributes',
+		(quote) => {
+			const hints = extractDomHints(
+				`<div title=${quote}1 > 0${quote} id="target"><span id="child">`,
+				''
+			);
+			expect(hints.attrs.title).toBe('1 > 0');
+			expect(hints.idAttr).toBe('target');
+		}
+	);
+
 	test('ignores truncated quoted values without inventing nested attributes', () => {
 		expect(
 			extractDomHints("<div title=\"unfinished id='fake'>", '').idAttr

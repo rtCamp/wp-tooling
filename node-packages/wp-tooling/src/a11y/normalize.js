@@ -170,7 +170,7 @@ function parseWcagCriterion(code) {
 }
 
 /**
- * Regex-extract identifying tokens from the issue's context HTML + selector so
+ * Extract identifying tokens from the issue's context HTML + selector so
  * the skill can grep the repo for the source that rendered the node without
  * re-parsing HTML itself.
  *
@@ -189,7 +189,7 @@ function extractDomHints(context, selector) {
 
 	const html = context || '';
 	const start = html.indexOf('<');
-	const end = start === -1 ? -1 : html.indexOf('>', start + 1);
+	const end = start === -1 ? -1 : findTagEnd(html, start + 1);
 	if (end === -1) {
 		return hints;
 	}
@@ -197,6 +197,31 @@ function extractDomHints(context, selector) {
 	assignQuotedAttrs(hints, html.slice(start + 1, end));
 
 	return hints;
+}
+
+/**
+ * Find the opening tag's closing >, ignoring delimiters inside quoted values.
+ * A single forward scan also keeps malformed or truncated input linear.
+ *
+ * @param {string} html  Context HTML.
+ * @param {number} start Position after the opening <.
+ * @return {number} Closing delimiter index, or -1 for an incomplete tag.
+ */
+function findTagEnd(html, start) {
+	let quote = null;
+	for (let cursor = start; cursor < html.length; cursor++) {
+		const char = html[cursor];
+		if (quote) {
+			if (char === quote) {
+				quote = null;
+			}
+		} else if (char === '"' || char === "'") {
+			quote = char;
+		} else if (char === '>') {
+			return cursor;
+		}
+	}
+	return -1;
 }
 
 /**

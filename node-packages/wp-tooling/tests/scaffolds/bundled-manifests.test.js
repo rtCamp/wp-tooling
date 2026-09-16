@@ -18,13 +18,22 @@ const { ScaffoldRegistry } = require('../../src/scaffolds/registry');
 
 const DEFAULTS_DIR = path.join(__dirname, '..', '..', 'scaffolds');
 
+const tempDirs = [];
+
 function makeTmpDir() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	tempDirs.push(dir);
+	return dir;
 }
 
-// The bundled catalogue is immutable and these tests only dry-run execute(),
-// so a single scan is shared across the whole file rather than re-walking the
-// tree per test.
+afterEach(() => {
+	for (const dir of tempDirs.splice(0)) {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+// The bundled catalogue is immutable; executions write only to temporary
+// directories, so one catalogue scan can be shared across the file.
 let registry;
 beforeAll(async () => {
 	registry = new ScaffoldRegistry({ defaultsDir: DEFAULTS_DIR });
@@ -178,4 +187,36 @@ describe('setup/pa11y rendered config', () => {
 			'http://localhost:8765/about/',
 		]);
 	});
+});
+
+describe('setup/claude-skills accessibility distribution', () => {
+	it.each([
+		['default directory', {}, '.claude/skills'],
+		['custom directory', { skills_dir: 'custom/skills' }, 'custom/skills'],
+	])(
+		'copies the complete skill unchanged into the %s',
+		async (label, inputs, skillsDir) => {
+			const target = makeTmpDir();
+			await registry.execute('setup/claude-skills', inputs, {
+				cwd: target,
+			});
+			const files = [
+				'SKILL.md',
+				'evals/evals.json',
+				'evals/files/template-parts/hero.php',
+				'evals/files/theme.json',
+			];
+			for (const file of files) {
+				const copied = fs.readFileSync(
+					path.join(target, skillsDir, 'accessibility', file),
+					'utf8'
+				);
+				const original = fs.readFileSync(
+					path.join(__dirname, '../../skills/accessibility', file),
+					'utf8'
+				);
+				expect(copied).toBe(original);
+			}
+		}
+	);
 });
