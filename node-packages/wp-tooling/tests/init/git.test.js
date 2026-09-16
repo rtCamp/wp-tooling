@@ -4,12 +4,16 @@
  */
 'use strict';
 
+jest.mock('child_process', () => {
+	const actual = jest.requireActual('child_process');
+	return { ...actual, execFileSync: jest.fn(actual.execFileSync) };
+});
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { installGitHooks } = require('../../src/init/git');
+const { installGitHooks, initRepo, commitAll } = require('../../src/init/git');
 
 const noopUi = {
 	spinner: () => ({ start() {}, succeed() {}, fail() {} }),
@@ -99,5 +103,31 @@ describe('installGitHooks', () => {
 		register(dir);
 
 		expect(await installGitHooks(dir, noopUi)).toBe(false);
+	});
+});
+
+describe('Git operation failures', () => {
+	let root;
+	beforeEach(() => {
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'init-git-failure-'));
+	});
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+	test.each([
+		['init', (dir) => initRepo(dir, noopUi)],
+		['commit', (dir) => commitAll(dir, 'Initial commit', noopUi)],
+	])('%s propagates command failures', (_name, operation) => {
+		execFileSync.mockImplementationOnce(() => {
+			throw new Error('command failed');
+		});
+		expect(() => operation(root)).toThrow(/command failed/);
+	});
+	test('hook setup rejects when prepare cannot be written', async () => {
+		execFileSync('git', ['init', '--quiet', root]);
+		fs.writeFileSync(path.join(root, 'package.json'), '{broken');
+		await expect(installGitHooks(root, noopUi)).rejects.toThrow(
+			/Git hook installation failed/
+		);
 	});
 });
