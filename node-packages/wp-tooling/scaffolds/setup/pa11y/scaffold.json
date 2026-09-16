@@ -13,21 +13,25 @@
 	"inputs": [
 		{
 			"key": "base_url",
+			"transform": "json-escape",
 			"description": "Base URL of the WordPress environment to test against (e.g. http://localhost:8888).",
 			"required": true
 		},
 		{
 			"key": "sample_page",
+			"transform": "json-escape",
 			"description": "Path of a post or page to scan, appended to base_url (e.g. /hello-world/ or a permalink path).",
 			"default": "/?p=1"
 		},
 		{
 			"key": "search_page",
+			"transform": "json-escape",
 			"description": "Path of the search-results page to scan, appended to base_url.",
 			"default": "/?s=hello"
 		},
 		{
 			"key": "extra_page",
+			"transform": "json-escape",
 			"description": "Optional path of one more page to scan, appended to base_url. Omitted when empty; add further URLs directly in .pa11yci.json.",
 			"default": ""
 		}

@@ -25,8 +25,7 @@ const {
 	WCAG_CRITERION_RE,
 	TAG_FROM_CONTEXT_RE,
 	TAG_FROM_SELECTOR_RE,
-	OPEN_TAG_RE,
-	ATTR_RE,
+	ATTR_NAME_RE,
 } = require('./regex');
 
 /** pa11y `type` → normalised `impact`. */
@@ -161,11 +160,13 @@ function normalizeIssue(issue) {
  * @return {string|null} Dotted criterion, or null.
  */
 function parseWcagCriterion(code) {
-	const match = WCAG_CRITERION_RE.exec(code || '');
-	if (!match) {
-		return null;
+	for (const segment of (code || '').split('.')) {
+		const match = WCAG_CRITERION_RE.exec(segment);
+		if (match) {
+			return `${match[1]}.${match[2]}.${match[3]}`;
+		}
 	}
-	return `${match[1]}.${match[2]}.${match[3]}`;
+	return null;
 }
 
 /**
@@ -186,22 +187,47 @@ function extractDomHints(context, selector) {
 		attrs: {},
 	};
 
-	const openTag = OPEN_TAG_RE.exec(context || '');
-	if (!openTag) {
+	const html = context || '';
+	const start = html.indexOf('<');
+	const end = start === -1 ? -1 : html.indexOf('>', start + 1);
+	if (end === -1) {
 		return hints;
 	}
 
-	// Global regex shared across calls (see regex.js) — reset before every
-	// scan so a previous call's position doesn't cause missed attributes.
-	ATTR_RE.lastIndex = 0;
-	let attrMatch;
-	while ((attrMatch = ATTR_RE.exec(openTag[0])) !== null) {
-		const name = (attrMatch[1] || attrMatch[3]).toLowerCase();
-		const value = attrMatch[2] !== undefined ? attrMatch[2] : attrMatch[4];
-		assignAttr(hints, name, value);
-	}
+	assignQuotedAttrs(hints, html.slice(start + 1, end));
 
 	return hints;
+}
+
+/**
+ * Scan attributes once, consuming complete names even when they have no value.
+ * Stop at an unterminated quote: its contents cannot be separate attributes.
+ *
+ * @param {Object} hints Hints object being built.
+ * @param {string} tag   Opening tag contents.
+ * @return {void}
+ */
+function assignQuotedAttrs(hints, tag) {
+	let cursor = 0;
+	while (cursor < tag.length) {
+		ATTR_NAME_RE.lastIndex = cursor;
+		const match = ATTR_NAME_RE.exec(tag);
+		if (!match) {
+			cursor++;
+			continue;
+		}
+		cursor = ATTR_NAME_RE.lastIndex;
+		const quote = tag[cursor];
+		if (!match[2] || (quote !== '"' && quote !== "'")) {
+			continue;
+		}
+		const end = tag.indexOf(quote, cursor + 1);
+		if (end === -1) {
+			return;
+		}
+		assignAttr(hints, match[1].toLowerCase(), tag.slice(cursor + 1, end));
+		cursor = end + 1;
+	}
 }
 
 /**

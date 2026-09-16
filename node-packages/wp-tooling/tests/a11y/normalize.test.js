@@ -140,6 +140,18 @@ describe('normalizeA11y', () => {
 });
 
 describe('parseWcagCriterion', () => {
+	test('matches whole criterion segments, including multi-digit numbers', () => {
+		expect(
+			parseWcagCriterion('WCAG2AA.Principle2.Guideline2_4.2_4_11.H1')
+		).toBe('2.4.11');
+		expect(parseWcagCriterion('prefix1_2_3suffix')).toBeNull();
+	});
+
+	test('handles long failing digit sequences and finds a later criterion', () => {
+		const digits = '9'.repeat(100000);
+		expect(parseWcagCriterion(digits)).toBeNull();
+		expect(parseWcagCriterion(`${digits}_1.2_4_11.H1`)).toBe('2.4.11');
+	});
 	test('pulls the dotted criterion from an HTMLCS code', () => {
 		expect(
 			parseWcagCriterion('WCAG2AA.Principle2.Guideline2_4.2_4_4.H77')
@@ -154,6 +166,40 @@ describe('parseWcagCriterion', () => {
 });
 
 describe('extractDomHints', () => {
+	test('handles long incomplete tags and attribute names', () => {
+		expect(extractDomHints('<'.repeat(100000), '').attrs).toEqual({});
+		const name = ':'.repeat(100000);
+		expect(extractDomHints(`<div ${name} id="after">`, '').idAttr).toBe(
+			'after'
+		);
+		expect(extractDomHints(`<div ${name}="value">`, '').attrs[name]).toBe(
+			'value'
+		);
+	});
+
+	test('preserves quoted attributes and does not parse attribute-like values', () => {
+		const hints = extractDomHints(
+			'<input disabled ID="field" class=\'one two\' data-note="id=\'fake\'" aria-label="">',
+			''
+		);
+		expect(hints.idAttr).toBe('field');
+		expect(hints.classList).toEqual(['one', 'two']);
+		expect(hints.attrs).toEqual({
+			'data-note': "id='fake'",
+			'aria-label': '',
+		});
+		expect(extractDomHints('<img src="next">', '').attrs).toEqual({
+			src: 'next',
+		});
+	});
+
+	test('ignores truncated quoted values without inventing nested attributes', () => {
+		expect(
+			extractDomHints("<div title=\"unfinished id='fake'>", '').idAttr
+		).toBeNull();
+		expect(extractDomHints('<div id="unfinished...', '').idAttr).toBeNull();
+	});
+
 	test('falls back to the selector tag when context has no opening tag', () => {
 		const hints = extractDomHints('', 'html > body > main > button.cta');
 		expect(hints.tagName).toBe('button');

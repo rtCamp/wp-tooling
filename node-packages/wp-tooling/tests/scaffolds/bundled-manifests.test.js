@@ -115,6 +115,26 @@ describe('ci/test-measure rendering', () => {
 });
 
 describe('setup/pa11y rendered config', () => {
+	it('JSON-escapes every URL input while preserving its value', async () => {
+		const target = makeTmpDir();
+		const inputs = {
+			base_url: 'http://localhost:8888/"quoted"',
+			sample_page: '/path\\segment',
+			search_page: '/?s="hello"&page=2',
+			extra_page: '/line\nbreak',
+		};
+		await registry.execute('setup/pa11y', inputs, { cwd: target });
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			`${inputs.base_url}/`,
+			inputs.base_url + inputs.sample_page,
+			inputs.base_url + inputs.search_page,
+			inputs.base_url + inputs.extra_page,
+		]);
+	});
+
 	it('renders valid JSON with default page paths (extra_page omitted)', async () => {
 		const r = registry;
 		const target = makeTmpDir();
