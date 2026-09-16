@@ -20,7 +20,7 @@
 		{
 			"id": 2,
 			"prompt": "Check this project for accessibility issues.",
-			"expected_output": "The project has no pa11y config and no pa11y-ci installed, so the skill stops at preflight: it offers `npx wp-tooling add setup/pa11y` to scaffold .pa11yci.json and the pa11y-ci dev dependency, surfaces the npm install as a developer action, and does not run any package manager or invoke pa11y-ci by hand.",
+			"expected_output": "The project has no pa11y config and no pa11y-ci installed, so the skill stops at preflight: it offers `npx wp-tooling add setup/pa11y` to scaffold .pa11yci.json, presents the exact dev-dependency install and npm-script actions reported in developer.install.npmDev and developer.scripts.npm for the developer to apply, and does not run any package manager or invoke pa11y-ci by hand.",
 			"files": [],
 			"expectations": [
 				"The skill detects the missing pa11y config / pa11y-ci during preflight rather than failing mid-run.",

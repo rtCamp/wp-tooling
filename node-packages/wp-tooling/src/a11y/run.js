@@ -10,8 +10,8 @@
  * URLs and scan defaults come from the project's pa11y config
  * (`.pa11yci.json`, or an explicit `--config` path) — the config is the
  * single source of truth. Zero runtime dependencies: Node built-ins plus
- * the project-installed `pa11y-ci` binary (`wp-tooling add setup/pa11y`
- * scaffolds a config and the dev dependency for projects that need one).
+ * the project-installed `pa11y-ci` package (`wp-tooling add setup/pa11y`
+ * scaffolds a config and reports the required dependency install action).
  */
 
 'use strict';
@@ -24,7 +24,8 @@ const { normalizeA11y } = require('./normalize');
 const { requireFlagValue } = require('../scaffolds/cli-support');
 
 const BIN = 'pa11y-ci';
-const INSTALL_HINT = 'wp-tooling add setup/pa11y';
+const CONFIG_HINT = 'wp-tooling add setup/pa11y';
+const INSTALL_HINT = 'npm install --save-dev pa11y-ci';
 const MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
@@ -34,19 +35,19 @@ const MAX_BUFFER = 64 * 1024 * 1024;
  * @param {string} [options.configPath] Path to the pa11y config (default `.pa11yci.json`).
  * @param {string} [options.cwd]        Project root.
  * @return {Object} Normalized report (see normalize.js).
- * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / ECONFIGJS / ENOURLS.
+ * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / ECONFIGJSON / ECONFIGJS / ENOURLS.
  */
 function runA11y(options = {}) {
 	const cwd = options.cwd || process.cwd();
 	// resolveUrls both resolves and validates the config (throws ENOURLS /
-	// ECONFIGJS / EBADJSON on problems); only the path (and the standard, for
+	// ECONFIGJS / ECONFIGJSON on problems); only the path (and the standard, for
 	// labelling the report) is used below — pa11y-ci re-reads and re-parses
 	// the same config file itself.
 	const { configPath, standard } = resolveUrls(options);
 
 	const bin = detectBin(BIN, { cwd });
 	if (!bin.available) {
-		throw binMissingError();
+		throw binUnavailableError(bin);
 	}
 
 	const raw = execPa11y(bin.command, buildArgs(bin, configPath), cwd);
@@ -54,16 +55,24 @@ function runA11y(options = {}) {
 }
 
 /**
- * Build the RunnerError thrown/reported when `pa11y-ci` isn't installed.
+ * Classify an unavailable CLI as missing or installed but unable to run.
  * Shared by `runA11y` (throws it) and `runDryRun` (reports it after printing
  * the plan) so the message stays in one place.
  *
- * @return {RunnerError} EBINMISSING.
+ * @param {Object} bin Probe result from detectBin.
+ * @return {RunnerError} EBINMISSING or EBINFAIL.
  */
-function binMissingError() {
+function binUnavailableError(bin) {
+	if (bin.source !== 'missing') {
+		return new RunnerError(
+			'EBINFAIL',
+			`${BIN} was found but could not run: ${bin.error}`,
+			{ bin: BIN, detail: bin.error }
+		);
+	}
 	return new RunnerError(
 		'EBINMISSING',
-		`${BIN} not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`,
+		`${BIN} not found. Install it with \`${INSTALL_HINT}\`; \`${CONFIG_HINT}\` can scaffold the JSON config.`,
 		{ bin: BIN, install: INSTALL_HINT }
 	);
 }
@@ -370,9 +379,9 @@ function printUsage() {
 			'Usage: a11y [options]',
 			'',
 			'  Runs pa11y-ci against the URLs in the project pa11y config and',
-			'  prints normalized accessibility violations. Requires a pa11y config',
-			'  and the pa11y-ci dev dependency (`wp-tooling add setup/pa11y` sets',
-			'  both up for projects that have neither).',
+			'  prints normalized accessibility violations. Requires a JSON pa11y config',
+			'  and the pa11y-ci dev dependency. `wp-tooling add setup/pa11y` scaffolds',
+			'  the config; `npm install --save-dev pa11y-ci` installs the runner.',
 			'',
 			'  --config <path>        Path to the pa11y config (default: .pa11yci.json).',
 			'  --output <text|json>   Output format (default: text).',
@@ -403,7 +412,13 @@ function runDryRun(opts, cwd) {
 
 	const bin = detectBin(BIN, { cwd });
 	const args = buildArgs(bin, urlInfo.configPath);
-	const binState = bin.available ? bin.version : 'NOT FOUND';
+	const unavailableState =
+		bin.source === 'missing' ? 'NOT FOUND' : 'UNAVAILABLE';
+	const binState = bin.available ? bin.version : unavailableState;
+	const command =
+		bin.args.length > 0
+			? `${bin.command} ${args.join(' ')}`
+			: '(unresolved)';
 
 	process.stdout.write(
 		[
@@ -411,12 +426,12 @@ function runDryRun(opts, cwd) {
 			`  binary:  ${bin.command} (${bin.source}, ${binState})`,
 			`  config:  ${urlInfo.configPath}`,
 			`  urls:    ${urlInfo.urls.join(', ')}`,
-			`  command: ${bin.command} ${args.join(' ')}`,
+			`  command: ${command}`,
 			'',
 		].join('\n')
 	);
 	if (!bin.available) {
-		return handleError(binMissingError());
+		return handleError(binUnavailableError(bin));
 	}
 	return 0;
 }

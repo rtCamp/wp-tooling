@@ -3,6 +3,8 @@
 jest.mock('child_process');
 
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { execFileSync } = require('child_process');
 const { runCli } = require('../../src/a11y/run');
 
@@ -122,8 +124,18 @@ describe('a11y runCli', () => {
 	let stderr;
 	let outSpy;
 	let errSpy;
+	let cwdSpy;
+	let root;
 
 	beforeEach(() => {
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-cli-'));
+		const packageDir = path.join(root, 'node_modules', 'pa11y-ci');
+		fs.mkdirSync(packageDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(packageDir, 'package.json'),
+			JSON.stringify({ bin: './cli.js' })
+		);
+		cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
 		stdout = [];
 		stderr = [];
 		outSpy = jest.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -139,6 +151,8 @@ describe('a11y runCli', () => {
 	afterEach(() => {
 		outSpy.mockRestore();
 		errSpy.mockRestore();
+		cwdSpy.mockRestore();
+		fs.rmSync(root, { recursive: true, force: true });
 	});
 
 	test('--help prints usage and exits 0', () => {
@@ -179,11 +193,35 @@ describe('a11y runCli', () => {
 	});
 
 	test('missing pa11y-ci exits 2 with the install hint', () => {
-		mockBin({ available: false });
+		fs.rmSync(path.join(root, 'node_modules'), { recursive: true });
 		expect(runCli(['--config', FIXTURE_CONFIG])).toBe(2);
 		expect(stderr.join('')).toMatch(/pa11y-ci not found/);
+		expect(stderr.join('')).toContain('npm install --save-dev pa11y-ci');
 		expect(stderr.join('')).toMatch(/wp-tooling add setup\/pa11y/);
 	});
+
+	test.each([[[]], [['--dry-run']]])(
+		'installed probe failure exits 1 with detail (%j)',
+		(flags) => {
+			mockBin({ available: false });
+			expect(runCli([...flags, '--config', FIXTURE_CONFIG])).toBe(1);
+			expect(stderr.join('')).toContain(
+				`was found but could not run: ${VERSION_PROBE_NOT_FOUND_ERROR}`
+			);
+			expect(execFileSync).toHaveBeenCalledTimes(1);
+		}
+	);
+
+	test.each([[[]], [['--dry-run']]])(
+		'malformed config exits 2 before probing (%j)',
+		(flags) => {
+			const config = path.join(root, 'invalid.json');
+			fs.writeFileSync(config, '{');
+			expect(runCli([...flags, '--config', config])).toBe(2);
+			expect(stderr.join('')).toContain('invalid JSON');
+			expect(execFileSync).not.toHaveBeenCalled();
+		}
+	);
 
 	test('the resolved config path is handed to pa11y-ci via --config', () => {
 		let runArgs;
@@ -195,7 +233,7 @@ describe('a11y runCli', () => {
 			return JSON.stringify(CLEAN_REPORT);
 		});
 		expect(runCli(['--config', FIXTURE_CONFIG])).toBe(0);
-		// Leading args depend on how the binary resolved (direct vs npx);
+		// Leading args contain the installed Node entry point;
 		// the runner's own contribution is the tail.
 		expect(runArgs.slice(-3)).toEqual([
 			'--json',
@@ -275,12 +313,13 @@ describe('a11y runCli', () => {
 	});
 
 	test('--dry-run with pa11y-ci missing still exits 2, after printing the plan', () => {
-		mockBin({ available: false });
+		fs.rmSync(path.join(root, 'node_modules'), { recursive: true });
 		const code = runCli(['--dry-run', '--config', FIXTURE_CONFIG]);
 		expect(code).toBe(2);
 		expect(stdout.join('')).toMatch(/\[dry-run\] a11y would run:/);
 		expect(stdout.join('')).toMatch(/NOT FOUND/);
 		expect(stderr.join('')).toMatch(/pa11y-ci not found/);
+		expect(stderr.join('')).toContain('npm install --save-dev pa11y-ci');
 	});
 
 	test("a config's defaults.standard is propagated to the report", () => {

@@ -1,11 +1,8 @@
 /**
- * Consumer binary resolution for the a11y runner.
- *
- * `@rtcamp/wp-tooling` has zero runtime dependencies, so `pa11y-ci` is never
- * a dependency here — it lives in the CONSUMER project's own dev
- * dependencies. These helpers locate that consumer-installed binary
- * (a direct or workspace-hoisted `node_modules/.bin/<bin>`), falling back to
- * `npx --no-install` so we never silently fetch it from the network.
+ * Resolve the consumer's installed Node CLI, including workspace-hoisted copies.
+ * Launch its package.json bin entry with Node on every platform: npm's .bin
+ * shims are platform-specific and Windows .cmd files cannot use execFileSync.
+ * No npx fallback: a cached/global package is not the consumer's dependency.
  */
 
 'use strict';
@@ -17,66 +14,72 @@ const { execFileSync } = require('child_process');
 const VERSION_PROBE_TIMEOUT_MS = 20000;
 
 /**
- * Walk up from `cwd` looking for `node_modules/.bin/<binName>`.
+ * Find the nearest installed package without depending on its exports map.
  *
- * @param {string} binName Binary name (e.g. `pa11y-ci`).
- * @param {string} cwd     Directory to start the search from.
- * @return {{command: string, source: 'local'|'hoisted'}|null} The resolved
- *   binary, or `null` when no installed copy is found.
+ * @param {string} packageName Package whose Node CLI should run.
+ * @param {string} cwd         Directory to start the search from.
+ * @return {{packageDir: string, source: 'local'|'hoisted'}|null} Installation.
  */
-function findInNodeModules(binName, cwd) {
+function findInNodeModules(packageName, cwd) {
 	const start = path.resolve(cwd);
 	let dir = start;
-	while (dir) {
-		const candidate = path.join(dir, 'node_modules', '.bin', binName);
-		if (fs.existsSync(candidate)) {
-			return {
-				command: candidate,
-				source: dir === start ? 'local' : 'hoisted',
-			};
+	while (true) {
+		const packageDir = path.join(dir, 'node_modules', packageName);
+		if (fs.existsSync(packageDir)) {
+			return { packageDir, source: dir === start ? 'local' : 'hoisted' };
 		}
-		dir = parentDir(dir);
+		const parent = path.dirname(dir);
+		if (parent === dir) {
+			return null;
+		}
+		dir = parent;
 	}
-	return null;
 }
 
 /**
- * One directory up from `dir`, or `null` once `dir` is the filesystem root
- * (`path.dirname` of the root returns the root itself).
+ * Resolve a Node CLI's bin entry from its installed package manifest.
+ * Resolution errors retain the installation's source for EBINFAIL reporting.
  *
- * @param {string} dir Directory path.
- * @return {string|null} Parent directory, or `null` at the root.
- */
-function parentDir(dir) {
-	const parent = path.dirname(dir);
-	return parent === dir ? null : parent;
-}
-
-/**
- * Resolve how to invoke a consumer-installed binary.
- *
- * @param {string} binName       Binary name.
+ * @param {string} binName       Package and binary name (e.g. pa11y-ci).
  * @param {Object} [options]
  * @param {string} [options.cwd] Directory to resolve from.
- * @return {{command: string, args: string[], source: 'local'|'hoisted'|'npx'}}
- *   Command + leading args + how it was resolved.
+ * @return {{command: string, args: string[], source: string, error?: string}}
+ *   Node executable, entry-point argument, and installation status.
  */
 function resolveBin(binName, options = {}) {
-	const cwd = options.cwd || process.cwd();
-	const found = findInNodeModules(binName, cwd);
-	if (found) {
-		return { command: found.command, args: [], source: found.source };
+	const found = findInNodeModules(binName, options.cwd || process.cwd());
+	const result = {
+		command: process.execPath,
+		args: [],
+		source: found ? found.source : 'missing',
+	};
+	if (!found) {
+		return result;
 	}
-	// `--no-install` keeps npx from fetching the package: if the consumer has
-	// not installed it, the probe below simply reports it unavailable and the
-	// caller surfaces the install hint.
-	return { command: 'npx', args: ['--no-install', binName], source: 'npx' };
+	try {
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(found.packageDir, 'package.json'), 'utf8')
+		);
+		const entry =
+			typeof manifest.bin === 'string'
+				? manifest.bin
+				: manifest.bin?.[binName];
+		if (typeof entry !== 'string' || !entry.trim()) {
+			throw new Error(
+				`Expected a bin entry for ${binName} in ${found.packageDir}/package.json; received ${JSON.stringify(manifest.bin)}`
+			);
+		}
+		result.args = [path.resolve(found.packageDir, entry)];
+	} catch (err) {
+		result.error = err.message;
+	}
+	return result;
 }
 
 /**
- * Probe a binary's `--version` to confirm it is actually runnable.
+ * Probe the installed CLI's --version using the same invocation as the scan.
  *
- * @param {string} binName       Binary name.
+ * @param {string} binName       Package and binary name.
  * @param {Object} [options]
  * @param {string} [options.cwd] Directory to run in.
  * @return {{available: boolean, version: string|null, command: string,
@@ -84,29 +87,31 @@ function resolveBin(binName, options = {}) {
  */
 function detectBin(binName, options = {}) {
 	const cwd = options.cwd || process.cwd();
-	const { command, args, source } = resolveBin(binName, { cwd });
+	const resolved = resolveBin(binName, { cwd });
+	const result = { ...resolved, available: false, version: null };
+	if (resolved.source === 'missing' || resolved.error) {
+		return result;
+	}
 	try {
-		const out = execFileSync(command, [...args, '--version'], {
-			cwd,
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-			timeout: VERSION_PROBE_TIMEOUT_MS,
-		});
-		return {
-			available: true,
-			version: out.toString().trim(),
-			command,
-			args,
-			source,
-		};
+		const out = execFileSync(
+			resolved.command,
+			[...resolved.args, '--version'],
+			{
+				cwd,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+				timeout: VERSION_PROBE_TIMEOUT_MS,
+			}
+		);
+		return { ...result, available: true, version: out.toString().trim() };
 	} catch (err) {
 		return {
-			available: false,
-			version: null,
-			command,
-			args,
-			source,
-			error: (err.stderr || err.message || '').toString().trim(),
+			...result,
+			error: (
+				err.stderr?.toString().trim() ||
+				err.message ||
+				''
+			).toString(),
 		};
 	}
 }

@@ -28,7 +28,7 @@ const JS_CONFIG_RE = /\.(m?js|cjs)$/i;
  *   (undefined when the config doesn't set one).
  * @throws {RunnerError} `ENOURLS` when no URLs are available; `ECONFIGJS`
  *   when the config path is a .js/.cjs/.mjs file (this runner reads JSON
- *   configs only — see `JS_CONFIG_RE` below); `EBADJSON` when the config is
+ *   configs only — see `JS_CONFIG_RE` below); `ECONFIGJSON` when the config is
  *   JSON but malformed.
  */
 function resolveUrls(options = {}) {
@@ -106,14 +106,14 @@ function readConfigFile(configPath) {
  * @param {string} raw        Raw file contents.
  * @param {string} configPath Config path being parsed (for the error message).
  * @return {Object} Parsed config.
- * @throws {RunnerError} `EBADJSON` when the config is malformed JSON.
+ * @throws {RunnerError} `ECONFIGJSON` when the config is malformed JSON.
  */
 function parseConfigJson(raw, configPath) {
 	try {
 		return JSON.parse(raw);
 	} catch (err) {
 		throw new RunnerError(
-			'EBADJSON',
+			'ECONFIGJSON',
 			`invalid JSON in ${configPath}: ${err.message}`,
 			{ configPath }
 		);

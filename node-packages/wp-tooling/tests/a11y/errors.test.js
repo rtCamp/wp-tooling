@@ -3,10 +3,11 @@
 const { RunnerError, isUsageError } = require('../../src/a11y/errors');
 
 describe('isUsageError', () => {
-	test('is true for EBINMISSING, ENOURLS and ECONFIGJS', () => {
+	test('is true for EBINMISSING, ENOURLS, ECONFIGJS and ECONFIGJSON', () => {
 		expect(isUsageError(new RunnerError('EBINMISSING', 'x'))).toBe(true);
 		expect(isUsageError(new RunnerError('ENOURLS', 'x'))).toBe(true);
 		expect(isUsageError(new RunnerError('ECONFIGJS', 'x'))).toBe(true);
+		expect(isUsageError(new RunnerError('ECONFIGJSON', 'x'))).toBe(true);
 	});
 
 	test('is false for EBINFAIL and EBADJSON', () => {

@@ -1,12 +1,8 @@
 'use strict';
 
-jest.mock('child_process');
-
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
-
 const {
 	resolveBin,
 	detectBin,
@@ -14,100 +10,125 @@ const {
 } = require('../../src/a11y/resolve-bin');
 
 const BIN = 'pa11y-ci';
+let root;
 
-function tmpTree() {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-bin-'));
-	return root;
+function makePackage(dir, bin = { [BIN]: './bin/cli.js' }) {
+	const packageDir = path.join(dir, 'node_modules', BIN);
+	fs.mkdirSync(path.join(packageDir, 'bin'), { recursive: true });
+	fs.writeFileSync(
+		path.join(packageDir, 'package.json'),
+		JSON.stringify({ name: BIN, bin })
+	);
+	const entry = path.join(packageDir, 'bin', 'cli.js');
+	fs.writeFileSync(entry, 'console.log("4.1.1");\n');
+	return { packageDir, entry };
 }
 
-function makeBin(dir, binName) {
-	const binDir = path.join(dir, 'node_modules', '.bin');
-	fs.mkdirSync(binDir, { recursive: true });
-	const p = path.join(binDir, binName);
-	fs.writeFileSync(p, '#!/bin/sh\n');
-	return p;
-}
+beforeEach(() => {
+	root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y bin & spaces-'));
+});
 
-describe('findInNodeModules', () => {
-	let root;
+afterEach(() => {
+	fs.rmSync(root, { recursive: true, force: true });
+});
 
-	afterEach(() => {
-		if (root) {
-			fs.rmSync(root, { recursive: true, force: true });
-			root = null;
-		}
+describe('Node CLI resolution', () => {
+	test('resolves a local package entry, bypassing POSIX and Windows shims', () => {
+		const { entry } = makePackage(root);
+		const binDir = path.join(root, 'node_modules', '.bin');
+		fs.mkdirSync(binDir);
+		fs.writeFileSync(path.join(binDir, BIN), '#!/bin/sh\nexit 99\n');
+		fs.writeFileSync(path.join(binDir, `${BIN}.cmd`), '@exit /b 99\r\n');
+		expect(resolveBin(BIN, { cwd: root })).toEqual({
+			command: process.execPath,
+			args: [entry],
+			source: 'local',
+		});
+		expect(detectBin(BIN, { cwd: root })).toMatchObject({
+			available: true,
+			version: '4.1.1',
+			source: 'local',
+		});
 	});
 
-	test('finds a directly installed binary as local', () => {
-		root = tmpTree();
-		const p = makeBin(root, BIN);
-		const found = findInNodeModules(BIN, root);
-		expect(found).toEqual({ command: p, source: 'local' });
-	});
-
-	test('finds a hoisted binary in an ancestor as hoisted', () => {
-		root = tmpTree();
-		const p = makeBin(root, BIN);
+	test('resolves a hoisted package and a string bin declaration', () => {
+		const { entry, packageDir } = makePackage(root, './bin/cli.js');
 		const child = path.join(root, 'packages', 'app');
 		fs.mkdirSync(child, { recursive: true });
-		const found = findInNodeModules(BIN, child);
-		expect(found).toEqual({ command: p, source: 'hoisted' });
+		expect(findInNodeModules(BIN, child)).toEqual({
+			packageDir,
+			source: 'hoisted',
+		});
+		expect(resolveBin(BIN, { cwd: child })).toEqual({
+			command: process.execPath,
+			args: [entry],
+			source: 'hoisted',
+		});
+		expect(detectBin(BIN, { cwd: child }).available).toBe(true);
 	});
 
-	test('returns null when no installed copy exists', () => {
-		root = tmpTree();
+	test('uses the nearest package instead of a hoisted copy', () => {
+		makePackage(root);
+		const child = path.join(root, 'packages', 'app');
+		const { entry } = makePackage(child);
+		expect(resolveBin(BIN, { cwd: child }).args).toEqual([entry]);
+	});
+
+	test('reports a missing installation without probing Node or npx', () => {
 		expect(
 			findInNodeModules('definitely-not-installed-xyz', root)
 		).toBeNull();
-	});
-});
-
-describe('resolveBin', () => {
-	test('falls back to npx --no-install when nothing is installed', () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-bin-'));
-		try {
-			const r = resolveBin('definitely-not-installed-xyz', { cwd: root });
-			expect(r).toEqual({
-				command: 'npx',
-				args: ['--no-install', 'definitely-not-installed-xyz'],
-				source: 'npx',
-			});
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
-	});
-});
-
-describe('detectBin', () => {
-	test('reports available with a trimmed version when the probe succeeds', () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-bin-'));
-		try {
-			execFileSync.mockReturnValue('3.1.0\n');
-			const r = detectBin('definitely-not-installed-xyz', { cwd: root });
-			expect(r.available).toBe(true);
-			expect(r.version).toBe('3.1.0');
-			expect(r.source).toBe('npx');
-			const call = execFileSync.mock.calls[0];
-			expect(call[1]).toContain('--version');
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
+		expect(
+			detectBin('definitely-not-installed-xyz', { cwd: root })
+		).toEqual({
+			command: process.execPath,
+			args: [],
+			source: 'missing',
+			available: false,
+			version: null,
+		});
 	});
 
-	test('reports unavailable when the probe throws', () => {
-		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-bin-'));
-		try {
-			execFileSync.mockImplementation(() => {
-				const err = new Error('not found');
-				err.stderr = 'command not found';
-				throw err;
-			});
-			const r = detectBin('definitely-not-installed-xyz', { cwd: root });
-			expect(r.available).toBe(false);
-			expect(r.version).toBeNull();
-			expect(r.error).toMatch(/command not found/);
-		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
-		}
+	test('preserves stderr when an installed CLI cannot start', () => {
+		const { entry } = makePackage(root);
+		fs.writeFileSync(
+			entry,
+			'console.error("Unsupported Node version"); process.exit(1);'
+		);
+		expect(detectBin(BIN, { cwd: root })).toMatchObject({
+			available: false,
+			source: 'local',
+			error: 'Unsupported Node version',
+		});
+	});
+
+	test('reports a missing entry file as an installed package failure', () => {
+		makePackage(root, './missing.js');
+		expect(detectBin(BIN, { cwd: root })).toMatchObject({
+			available: false,
+			source: 'local',
+			error: expect.stringContaining('missing.js'),
+		});
+	});
+
+	test('does not fall back to a hoisted package when the local manifest is corrupt', () => {
+		makePackage(root);
+		const child = path.join(root, 'packages', 'app');
+		const { packageDir } = makePackage(child);
+		fs.writeFileSync(path.join(packageDir, 'package.json'), '{');
+		expect(detectBin(BIN, { cwd: child })).toMatchObject({
+			available: false,
+			source: 'local',
+			error: expect.any(String),
+		});
+	});
+
+	test('reports an invalid bin declaration as an installed package failure', () => {
+		makePackage(root, {});
+		expect(detectBin(BIN, { cwd: root })).toMatchObject({
+			available: false,
+			source: 'local',
+			error: expect.stringContaining('Expected a bin entry'),
+		});
 	});
 });

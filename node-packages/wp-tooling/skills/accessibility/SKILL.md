@@ -21,7 +21,7 @@ Find → fix → re-check accessibility violations. Run the project's pa11y scan
 
 ## The runner
 
-`npx wp-tooling a11y` shells out to the consumer project's own `pa11y-ci` dev dependency and prints a normalised report. URLs come from the pa11y config only — `.pa11yci.json` at the project root by default, or any config handed over with `--config <path>`. A project that already has its own pa11y setup works as-is; nothing here requires a particular scaffold.
+`npx wp-tooling a11y` shells out to the consumer project's own `pa11y-ci` dev dependency and prints a normalised report. URLs come from a JSON pa11y config only — `.pa11yci.json` at the project root by default, or another JSON config handed over with `--config <path>`. Existing JSON pa11y setups work without this scaffold. JavaScript configs (.js, .cjs, .mjs) are not supported; use pa11y-ci directly for those.
 
 | Flag | Meaning |
 |---|---|
@@ -55,7 +55,7 @@ Before any other work, write a TODO list covering steps 1–7 below and keep it 
 ### 1. Preflight
 
 - **Config.** Locate the pa11y config: `.pa11yci.json` at the project root is the default; if the project keeps one elsewhere, pass it with `--config`. Read it and note the `urls` list.
-- **Neither config nor pa11y-ci present?** Offer `npx wp-tooling add setup/pa11y --non-interactive --json --base-url=<dev url>` — it writes `.pa11yci.json` and adds `pa11y-ci` to `devDependencies`. Surface the `npm install` as a developer action; never run it yourself.
+- **Missing setup.** If the config is absent, offer `npx wp-tooling add setup/pa11y --non-interactive --json --base-url="<dev url>"`. It writes `.pa11yci.json` and reports dependencies under `developer.install.npmDev`; it does not edit `package.json` or install packages. Present the exact install action from that map (currently `npm install --save-dev pa11y-ci@^4.1.1`) and the reported `developer.scripts.npm` action (`"test:a11y": "pa11y-ci"`) for the developer to apply. If only the dependency is missing, present `npm install --save-dev pa11y-ci` without regenerating their config. Never run a package manager yourself.
 - **Both engines.** Check `defaults.runners` in the config. pa11y's default is htmlcs only; axe catches rules htmlcs misses. If absent, offer the one-line edit `"runners": ["axe", "htmlcs"]` with consent.
 - **Dev site up.** Probe the first configured URL (`curl -s -o /dev/null -w '%{http_code}'`). If it does not respond, surface how to start it (`npx wp-env start` or the project's own script) as a developer action, or run it with consent.
 - **Show the plan.** `npx wp-tooling a11y --dry-run` (plus `--config` if non-default) — confirm the resolved binary, config and URL list with the developer before scanning.
