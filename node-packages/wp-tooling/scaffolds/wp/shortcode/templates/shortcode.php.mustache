@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -22,8 +22,6 @@ class {{class}} extends AbstractShortcode {
 
 	/**
 	 * Get the shortcode tag.
-	 *
-	 * @return string
 	 */
 	public static function get_tag(): string {
 		return '{{tag}}';
@@ -43,8 +41,6 @@ class {{class}} extends AbstractShortcode {
 	 *
 	 * @param array<string,mixed> $atts    Parsed attributes.
 	 * @param string|null         $content Inner content for enclosing shortcodes.
-	 *
-	 * @return string
 	 */
 	public function render( array $atts, ?string $content ): string {
 		// Replace with your markup.

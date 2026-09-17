@@ -139,7 +139,13 @@ exactly as if `discover_from` were not set).
 
 - `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
 - `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** for ordinary inputs (first map key, trailing `\` stripped) and the **root directory** for path inputs (that same entry's value; the first element if it is a list). Either way the discovered root replaces only the *first segment* of the input's `default`, keeping the scaffold's sub-namespace or sub-directory: with a map of `Acme\Blog\` → `inc/`, a `namespace` default of `Inc\Cli` yields `Acme\Blog\Cli` and a `base_path` default of `includes/Cli` yields `inc/Cli`. Both come from the same map entry, so a class is never namespaced into the autoload root while being written outside it. A path input whose `default` has no sub-directory resolves to the root directory itself, and a PSR-4 target of `./` leaves just the sub-directory.
+- `composer.json:autoload-dev.psr-4` — the same graft against the **dev** autoload map, which is where a project declares its test tree. Use it for `tests_path`: a dev map of `Acme\Blog\Tests\` → `tests/php/` turns a default of `tests/Cli` into `tests/php/Cli`, so the generated test lands where the project's PHPUnit testsuite actually looks. Without it a test is written to the manifest default and is silently never collected.
+- `plugin-header:<header-name>` — a value from the project's WordPress entry header, named lowercased with spaces hyphenated: `plugin-header:text-domain` reads `Text Domain:`. The engine looks for a root-level `*.php` carrying `Plugin Name:` and falls back to a theme's `style.css` carrying `Theme Name:`, so this resolves for plugins and themes alike. Only the header comment is scanned, so a `Foo: bar` in the code below is never mistaken for a header.
 - `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
+
+`validate` rejects a `discover_from` whose prefix is not one of the above. An unrecognised
+source used to resolve to nothing and fall through to the `default` in silence, which is how
+seven scaffolds shipped for months declaring a text-domain lookup that never ran.
 
 Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
 
@@ -206,8 +212,8 @@ The engine never edits existing files. When a scaffold needs to register itself 
 
 Each entry:
 
-- `target_file`: path to the file. Placeholders allowed.
-- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling.
+- `target_file`: path to the file, relative to the project root. Placeholders allowed. The engine normalises the rendered path, so `{{base_path}}/../Modules/Cli.php` reaches the AI as `includes/Modules/Cli.php` — write the `..` form rather than duplicating a path input. An entry whose path still resolves outside the project after normalising is dropped with a warning.
+- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling. Either way it refuses to insert inside a `// wp:example:<key>` … `:end` region, since `wp-tooling init` deletes those body and all.
 - `snippet_template`: the snippet to insert. Mustache placeholders are rendered before the snippet is emitted.
 - `description`: explains intent. The AI uses this when asking the developer for consent.
 
@@ -220,6 +226,25 @@ Use sections inside `snippet_template` to vary the snippet by flag (e.g. the sin
 - `tests[]`: test stubs written alongside production output. Each entry has `src`, `dest`, `framework` (`phpunit`, `jest`, `playwright`, `pa11y`, `actionlint`, `yaml-parse`), and optional `command`.
 - `secrets[]`: declarations only — never values. Each entry has `key` (UPPER_SNAKE_CASE), `scope` (`github-actions`, `env`, `dotenv`), `description`, and optional `required`.
 - `scripts.npm` / `scripts.composer`: maps of `{ name: command }` the developer should add to their `package.json` / `composer.json`. The engine surfaces these in the report; nothing is auto-merged.
+
+---
+
+## Lens (`lens[]`)
+
+`lens` names the lens skills that should check a scaffold's output once its tests are green, most relevant first:
+
+```json
+"lens": ["vip-readiness", "performance", "security"]
+```
+
+- **Always an array**, even for one lens. A bare string is rejected, as are an empty array and duplicates.
+- **Lens skills only**, from a closed list: `accessibility`, `i18n`, `performance`, `security`, `seo`, `vip-readiness`. A lens is a skill (`skills/<name>/` in wp-dev-tools) that decides for itself which MCP abilities to read, so an ability name such as `runtime-health` is rejected — name the lens that reads it (`performance`) instead. A typo fails `validate` rather than silently skipping the check.
+- **A recommendation, not a dependency.** The list includes lenses a given project may not have installed; the orchestrating skill runs the ones it finds. That is also why the enum can name a lens before it ships, without a wp-tooling release for each new one.
+- **Optional.** Omit it and `execute()` and `list --json` report `lens: null`, leaving the choice to the orchestrating skill.
+
+Order by what the generated code most needs checked. `integration/vip-webhook` leads with `security` because signature verification is its riskiest code; `integration/vip-cron` leads with `vip-readiness` because Cron Control is what it exists to satisfy.
+
+To add a lens, extend `ALLOWED_LENSES` in `src/scaffolds/schema.js` — `validate.js` and the schema-parity test read it from there.
 
 ---
 
@@ -284,6 +309,8 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
 
 `wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8; `wp-api/block-bindings` and `wp-api/script-module`, both WP 6.5). Those pair with `"wizard_step": "wp-apis"`.
+
+`integration` holds opinionated integrations with a specific platform or service, where the value is encoding that platform's rules rather than a WordPress primitive (`integration/vip-search`, `integration/vip-remote-request`, `integration/vip-cron`, `integration/vip-webhook`). Each builds on a `wp` kind and reuses its wiring anchor — `vip-cron` wires where `wp/cron` does, `vip-webhook` where `wp/rest` does — and must degrade to working, standard behaviour off the platform instead of fataling. They pair with `"wizard_step": "integrations"`. Prefer a scaffold here only when the output is code the project owns and keeps; configuring an existing plugin, or an ongoing sync, is skill-shaped rather than scaffold-shaped.
 
 A block stays in `wp` even when its behaviour comes from a modern core API: `wp/block-interactive` uses the Interactivity API, but what it generates is a block directory, so it sits beside `wp/block-dynamic` and shares its wiring anchor rather than opening a `block` category.
 
@@ -396,6 +423,11 @@ Look at these existing scaffolds when authoring a new one:
 | Block with `block.json` + framework class | `wp/block-dynamic` |
 | Block with `render.php` + a `viewScriptModule` store | `wp/block-interactive` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
+| Platform-specific code that no-ops or falls back off the platform | `integration/vip-search`, `integration/vip-remote-request` |
+| Service class with no wiring, instantiated by its callers | `integration/vip-remote-request` |
+| Input constrained to values a coding standard accepts (`enum`) | `integration/vip-remote-request` (`timeout`, `cache_ttl`), `integration/vip-cron` (`schedule`) |
+| Hook and constant names prefixed from the project's text domain | `integration/vip-*` (`hook_prefix` / `secret_prefix` derived via `input:text_domain`) |
+| Extending a `wp` kind and reusing its wiring anchor | `integration/vip-cron` (`wp/cron`), `integration/vip-webhook` (`wp/rest`) |
 | Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 
 Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.

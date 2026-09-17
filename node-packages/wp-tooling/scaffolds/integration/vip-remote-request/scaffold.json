@@ -1,0 +1,86 @@
+{
+	"slug": "vip-remote-request",
+	"category": "integration",
+	"name": "VIP-safe remote request",
+	"description": "Adds a service that fetches remote data over GET without an uncached request on the page path. On WordPress VIP it delegates to wpcom_vip_file_get_contents(), which caches the body, serves a stale copy when the remote end fails and backs off a failing host; elsewhere it caches successful responses in the object cache and fetches with wp_safe_remote_get(). The timeout and cache TTL are constrained to values VIP's coding standards accept.",
+	"source": "template",
+	"wizard_step": "integrations",
+	"lens": ["vip-readiness", "performance", "security"],
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the service class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the service file. Default 'includes/Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "Logical client name, e.g. 'events-feed'. Normalised to a PascalCase class name and used as the cache group.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "cache_group",
+			"description": "Object cache group for responses fetched outside VIP, derived from name.",
+			"discover_from": "input:name",
+			"transform": "kebab-case"
+		},
+		{
+			"key": "text_domain",
+			"description": "Plugin or theme slug, used to namespace the object cache so another package cannot collide with it.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "timeout",
+			"enum": ["1", "2", "3"],
+			"description": "Request timeout in seconds, written into the TIMEOUT constant. Capped at 3, the most WordPressVIPMinimum.Performance.RemoteRequestTimeout accepts.",
+			"default": "3"
+		},
+		{
+			"key": "cache_ttl",
+			"enum": ["300", "900", "1800", "3600", "21600", "86400"],
+			"description": "Seconds a successful response is cached, written into the CACHE_TTL constant. No lower than 300, the least WordPressVIPMinimum.Performance.LowExpiryCacheTime accepts.",
+			"default": "900"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/remote-request.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

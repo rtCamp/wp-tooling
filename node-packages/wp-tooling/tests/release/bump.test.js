@@ -167,12 +167,33 @@ describe('release/bump - integration against fixture', () => {
 		);
 	});
 
-	test('exits non-zero (via thrown error) when plugin entry is missing', () => {
+	test('exits non-zero (via thrown error) when no entry file is present', () => {
 		tmp = copyFixture('plugin-a');
 		fs.unlinkSync(path.join(tmp, 'plugin-a.php'));
+		// bump resolves themes as well as plugins, so a directory with neither
+		// reports both shapes rather than only the plugin one.
 		expect(() => bump({ cwd: tmp, type: 'patch' })).toThrow(
-			/no plugin entry file/
+			/no plugin or theme entry file/
 		);
+	});
+
+	test('bumps the Version header of a theme style.css', () => {
+		tmp = copyFixture('plugin-a');
+		fs.unlinkSync(path.join(tmp, 'plugin-a.php'));
+		fs.writeFileSync(
+			path.join(tmp, 'style.css'),
+			'/*\nTheme Name: Plugin A\nVersion: 1.2.3\n*/\n'
+		);
+
+		bump({ cwd: tmp, type: 'minor' });
+
+		expect(fs.readFileSync(path.join(tmp, 'style.css'), 'utf8')).toContain(
+			'Version: 1.3.0'
+		);
+		expect(
+			JSON.parse(fs.readFileSync(path.join(tmp, 'package.json'), 'utf8'))
+				.version
+		).toBe('1.3.0');
 	});
 
 	test('rejects a malformed config.constantPrefix', () => {

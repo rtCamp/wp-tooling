@@ -130,6 +130,8 @@ describe('list command, --json output', () => {
 			category: 'wp',
 			kind: 'template',
 			origin: 'default',
+			// wp/cpt declares no lens, so the orchestrating skill chooses.
+			lens: null,
 		});
 		expect(typeof cpt.name).toBe('string');
 		expect(typeof cpt.description).toBe('string');
@@ -141,6 +143,23 @@ describe('list command, --json output', () => {
 		});
 		expect(cpt.counts.inputs).toBeGreaterThanOrEqual(2);
 		expect(cpt.counts.wiring).toBeGreaterThanOrEqual(1);
+	});
+
+	it('exposes a declared lens so an orchestrating skill can pick its check', async () => {
+		const cwd = makeTmpDir();
+		const { code, stdout } = await withStdoutCapture(() =>
+			list.runCli(['--cwd', cwd, '--json', '--category=integration'])
+		);
+		expect(code).toBe(0);
+		const parsed = JSON.parse(stdout.trim());
+		const webhook = parsed.scaffolds.find(
+			(s) => s.id === 'integration/vip-webhook'
+		);
+		expect(webhook.lens).toEqual([
+			'security',
+			'vip-readiness',
+			'performance',
+		]);
 	});
 
 	it('reports secrets for the WPORG workflow scaffold', async () => {

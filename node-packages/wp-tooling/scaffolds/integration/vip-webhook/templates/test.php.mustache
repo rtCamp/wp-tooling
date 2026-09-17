@@ -1,0 +1,152 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}WebhookController.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}}WebhookController;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_UnitTestCase;
+
+/**
+ * Class {{class}}WebhookControllerTest
+ *
+ * @covers \{{namespace}}\{{class}}WebhookController
+ */
+final class {{class}}WebhookControllerTest extends WP_UnitTestCase {
+
+	/**
+	 * Shared secret the test controller verifies against.
+	 */
+	public const SECRET = 'test-secret';
+
+	/**
+	 * The route is registered on rest_api_init and accepts POST only.
+	 */
+	public function test_route_accepts_post_only(): void {
+		( new {{class}}WebhookController() )->register_hooks();
+		do_action( 'rest_api_init' );
+
+		$routes = rest_get_server()->get_routes();
+		$route  = '/{{rest_namespace}}/v{{rest_version}}/webhooks/{{route}}';
+
+		$this->assertArrayHasKey( $route, $routes );
+		$this->assertSame( [ 'POST' => true ], $routes[ $route ][0]['methods'] );
+	}
+
+	/**
+	 * Until a secret is set, every delivery is refused, even a signed one.
+	 */
+	public function test_refuses_deliveries_until_a_secret_is_set(): void {
+		$request = $this->signed_request( '{"id":1}' );
+
+		$this->assertFalse( ( new {{class}}WebhookController() )->verify_signature( $request ) );
+	}
+
+	/**
+	 * A delivery signed with the secret is accepted; one whose body changed is not.
+	 */
+	public function test_verifies_the_signature_over_the_raw_body(): void {
+		$controller = $this->controller();
+		$request    = $this->signed_request( '{"id":1}' );
+
+		$this->assertTrue( $controller->verify_signature( $request ) );
+
+		$request->set_body( '{"id":2}' );
+
+		$this->assertFalse( $controller->verify_signature( $request ) );
+	}
+
+	/**
+	 * A body that is not a JSON object or array is rejected with a 400.
+	 */
+	public function test_rejects_a_body_that_is_not_a_json_object_or_array(): void {
+		foreach ( [ 'not json', '"a string"' ] as $body ) {
+			$response = $this->controller()->receive( $this->signed_request( $body ) );
+
+			$this->assertInstanceOf( \WP_Error::class, $response );
+			$this->assertSame( 400, $response->get_error_data()['status'] );
+		}
+	}
+
+	/**
+	 * A batch posted as a JSON array is queued like any other delivery.
+	 */
+	public function test_queues_a_batch_posted_as_a_json_array(): void {
+		$response = $this->controller()->receive( $this->signed_request( '[{"id":1},{"id":2}]' ) );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertSame( 202, $response->get_status() );
+	}
+
+	/**
+	 * A body over the size cap is rejected with a 413.
+	 */
+	public function test_rejects_an_oversized_body(): void {
+		$body     = '"' . str_repeat( 'a', {{class}}WebhookController::MAX_BODY_BYTES ) . '"';
+		$response = $this->controller()->receive( $this->signed_request( $body ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 413, $response->get_error_data()['status'] );
+	}
+
+	/**
+	 * A delivery is queued once; the same delivery again is acknowledged but not queued twice.
+	 */
+	public function test_queues_a_delivery_once(): void {
+		$controller = $this->controller();
+		$request    = $this->signed_request( '{"id":1}' );
+
+		$first  = $controller->receive( $request );
+		$second = $controller->receive( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $first );
+		$this->assertSame( 202, $first->get_status() );
+		$this->assertInstanceOf( WP_REST_Response::class, $second );
+		$this->assertSame( 200, $second->get_status() );
+
+		$in_wp_cron         = false !== wp_next_scheduled( {{class}}WebhookController::HOOK, [ [ 'id' => 1 ] ] );
+		$uses_wp_cron_queue = ! function_exists( 'as_enqueue_async_action' );
+
+		$this->assertSame( $uses_wp_cron_queue, $in_wp_cron );
+	}
+
+	/**
+	 * A controller whose shared secret is SECRET.
+	 */
+	private function controller(): {{class}}WebhookController {
+		return new class() extends {{class}}WebhookController {
+
+			/**
+			 * {@inheritDoc}
+			 */
+			protected function get_secret(): string {
+				return {{class}}WebhookControllerTest::SECRET;
+			}
+		};
+	}
+
+	/**
+	 * A POST delivery to the webhook route, signed with SECRET.
+	 *
+	 * @param string $body Raw request body.
+	 * @return \WP_REST_Request The signed request.
+	 */
+	private function signed_request( string $body ): WP_REST_Request {
+		$request = new WP_REST_Request( 'POST', '/{{rest_namespace}}/v{{rest_version}}/webhooks/{{route}}' );
+		$request->set_body( $body );
+		$request->set_header( {{class}}WebhookController::SIGNATURE_HEADER, hash_hmac( 'sha256', $body, self::SECRET ) );
+
+		return $request;
+	}
+}

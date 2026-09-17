@@ -247,6 +247,7 @@ describe('execute() result shape', () => {
 			id: 'wp/cli',
 			slug: 'cli',
 			kind: 'template',
+			lens: null,
 			dryRun: true,
 		});
 		expect(result.engine.wrote).toEqual(['includes/Cli/QmExport.php']);

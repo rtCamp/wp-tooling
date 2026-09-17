@@ -52,6 +52,67 @@ const DEFAULT_IGNORE_PATTERNS = [
 
 const ALWAYS_EXCLUDE = new Set(['.git', 'dist']);
 
+// Uncompressed payload above which a build is almost certainly shipping
+// something it should not. A production plugin -- code, assets, and the
+// no-dev vendor tree -- lands well under this; a vendor/ with dev requirements
+// in it (PHPUnit, PHP_CodeSniffer, the WordPress stubs) lands orders of
+// magnitude over. WordPress.org itself refuses uploads far smaller than this.
+const SIZE_WARN_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Flag a payload that is too big to be a real release.
+ *
+ * `vendor/` is deliberately not in DEFAULT_IGNORE_PATTERNS: a plugin that
+ * autoloads its Composer dependencies has to ship it, so excluding it by
+ * default would quietly produce a broken plugin. The failure worth catching is
+ * the opposite one -- shipping a vendor tree that still has dev requirements
+ * installed -- and that shows up as size, which is what this reports.
+ *
+ * @param {Array<{relPath: string, size: number}>} files Files that would ship.
+ * @return {string[]} Warnings, empty when the payload is a sane size.
+ */
+function sizeWarnings(files) {
+	const total = files.reduce((sum, f) => sum + (f.size || 0), 0);
+	if (total <= SIZE_WARN_BYTES) {
+		return [];
+	}
+
+	// Attribute the bulk to top-level directories, which is the granularity a
+	// .distignore entry works at.
+	const byTop = new Map();
+	for (const f of files) {
+		const top = f.relPath.split('/')[0];
+		byTop.set(top, (byTop.get(top) || 0) + (f.size || 0));
+	}
+	const biggest = [...byTop.entries()]
+		.sort((a, b) => b[1] - a[1])
+		.slice(0, 3)
+		.map(([name, bytes]) => `${name} (${formatBytes(bytes)})`)
+		.join(', ');
+
+	return [
+		`archive payload is ${formatBytes(total)} across ${files.length} files, which is far larger than a release should be. Largest: ${biggest}.`,
+		'If vendor/ is listed above, run `composer install --no-dev` before building, or exclude what you do not ship in .distignore.',
+	];
+}
+
+/**
+ * Render a byte count for a human.
+ *
+ * @param {number} bytes Byte count.
+ * @return {string} e.g. `2.3 GB`.
+ */
+function formatBytes(bytes) {
+	const units = ['B', 'KB', 'MB', 'GB'];
+	let value = bytes;
+	let unit = 0;
+	while (value >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit++;
+	}
+	return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  CRC-32                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -344,12 +405,15 @@ function walkProject(root, patterns) {
 					continue;
 				}
 				let executable = false;
+				let size = 0;
 				try {
-					executable = (fs.statSync(absPath).mode & 0o111) !== 0;
+					const st = fs.statSync(absPath);
+					executable = (st.mode & 0o111) !== 0;
+					size = st.size;
 				} catch {
 					executable = false;
 				}
-				out.push({ relPath, absPath, executable });
+				out.push({ relPath, absPath, executable, size });
 			}
 		}
 	}
@@ -397,7 +461,7 @@ function resolveEpoch(cwd, options) {
  * Build the zip plan (list of entries) without writing anything.
  *
  * @param {{ cwd?: string, epoch?: number }} options Plan options.
- * @return {Object} Plan describing slug, version, epoch, files, output path.
+ * @return {Object} Plan describing slug, version, epoch, files, output path, warnings.
  */
 function plan(options = {}) {
 	const cwd = options.cwd || process.cwd();
@@ -417,6 +481,7 @@ function plan(options = {}) {
 		files,
 		excludedSample: [],
 		outputPath,
+		warnings: sizeWarnings(files),
 	};
 }
 
@@ -424,7 +489,7 @@ function plan(options = {}) {
  * Build and write the zip.
  *
  * @param {{ cwd?: string, force?: boolean, dryRun?: boolean, epoch?: number }} options Run options.
- * @return {Object} Summary with outputPath, slug, version, fileCount, byteSize, dryRun.
+ * @return {Object} Summary with outputPath, slug, version, fileCount, byteSize, warnings, dryRun.
  */
 function zip(options = {}) {
 	const cwd = options.cwd || process.cwd();
@@ -458,6 +523,7 @@ function zip(options = {}) {
 		version: p.version,
 		fileCount: entries.length,
 		byteSize: archive.length,
+		warnings: p.warnings,
 		dryRun,
 	};
 }

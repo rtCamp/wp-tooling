@@ -27,6 +27,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Services"
 		},
 		{

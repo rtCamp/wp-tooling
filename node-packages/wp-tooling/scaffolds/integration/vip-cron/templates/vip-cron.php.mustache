@@ -1,0 +1,126 @@
+<?php
+/**
+ * {{class}}: recurring background job ({{schedule}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://docs.wpvip.com/technical-references/cron-control/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractJob;
+
+/**
+ * Runs handle() on a schedule, through Action Scheduler when it is loaded and
+ * through WP-Cron otherwise.
+ *
+ * AbstractJob's schedule_*() methods do nothing without Action Scheduler, so a
+ * job built on it alone would never run on a site without the library.
+ * ensure_scheduled() closes that gap with a WP-Cron event, which Cron Control
+ * runs on WordPress VIP, and clears the event once Action Scheduler is loaded
+ * so the job never runs on both. The schedule is checked on admin requests
+ * only, which keeps the lookup off front-end traffic.
+ *
+ * Cron Control, on VIP, runs one instance of an event at a time unless
+ * MAX_CONCURRENCY allows more, and stops a run that takes too long: split long
+ * work into batches that schedule the next one. WP_CLI::runcommand() does not
+ * work inside a cron event there.
+ */
+final class {{class}} extends AbstractJob {
+
+	/**
+	 * Action the job runs on.
+	 */
+	public const HOOK = '{{hook_prefix}}_{{hook_name}}';
+
+	/**
+	 * WP-Cron schedule the job recurs on: hourly, twicedaily, daily or weekly.
+	 */
+	public const SCHEDULE = '{{schedule}}';
+
+	/**
+	 * How many runs of this job Cron Control may execute at once on VIP.
+	 *
+	 * Raise it only for work that is safe to overlap. Runs that write to the
+	 * same option, autoloaded or not, can overwrite each other.
+	 */
+	public const MAX_CONCURRENCY = 1;
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public static function get_hook(): string {
+		return self::HOOK;
+	}
+
+	/**
+	 * Bind the job, its schedule check and its Cron Control concurrency. Called by the framework Loader.
+	 */
+	public function register_hooks(): void {
+		parent::register_hooks();
+
+		add_action( 'admin_init', [ $this, 'ensure_scheduled' ] );
+		add_filter( 'a8c_cron_control_concurrent_event_whitelist', [ $this, 'filter_concurrent_event_whitelist' ] );
+	}
+
+	/**
+	 * Schedule the job on exactly one runner.
+	 */
+	public function ensure_scheduled(): void {
+		if ( ! self::is_available() ) {
+			if ( false === wp_next_scheduled( self::HOOK ) ) {
+				wp_schedule_event( time(), self::SCHEDULE, self::HOOK );
+			}
+
+			return;
+		}
+
+		wp_clear_scheduled_hook( self::HOOK );
+
+		if ( ! $this->is_scheduled() ) {
+			$this->schedule_recurring( time(), $this->get_interval() );
+		}
+	}
+
+	/**
+	 * Tell Cron Control how many runs of this job may overlap.
+	 *
+	 * @param mixed $whitelist Hook => concurrency limit map.
+	 * @return mixed The map with this job's limit set. Anything but an array is returned untouched.
+	 */
+	public function filter_concurrent_event_whitelist( mixed $whitelist ): mixed {
+		if ( ! is_array( $whitelist ) ) {
+			return $whitelist;
+		}
+
+		$whitelist[ self::HOOK ] = self::MAX_CONCURRENCY;
+
+		return $whitelist;
+	}
+
+	/**
+	 * Do one run of the job.
+	 *
+	 * @param array<string, mixed> $args Arguments the run was scheduled with; empty for a recurring run.
+	 */
+	protected function handle( array $args ): void {
+		// Replace with the job's work. Keep a run short and batch anything long.
+	}
+
+	/**
+	 * Interval of the WP-Cron schedule, reused as the Action Scheduler recurrence.
+	 *
+	 * @return int Seconds between runs.
+	 */
+	private function get_interval(): int {
+		$schedules = wp_get_schedules();
+
+		return (int) ( $schedules[ self::SCHEDULE ]['interval'] ?? HOUR_IN_SECONDS );
+	}
+}

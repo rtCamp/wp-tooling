@@ -30,7 +30,7 @@ Each example shows: what the developer typed, the AI's clarifying questions and 
 Phase A — Project setup:
   1. setup/editorconfig       → .editorconfig
   2. setup/psr4               → composer.json wiring (Acme\InventoryManager → includes/)
-  3. lint/phpcs/full          → phpcs.xml.dist (rtCamp full standard)
+  3. lint/phpcs/full          → phpcs.xml.dist (rtCampWP) + composer.json wiring
   4. lint/phpstan             → phpstan.neon.dist (level 5)
   5. lint/eslint              → eslint.config.js
   6. setup/phpunit            → phpunit.xml.dist, tests/bootstrap.php
@@ -70,6 +70,12 @@ npx wp-tooling add wp/cli             --non-interactive --json --cwd . --name=im
 
 **Developer:** yes.
 
+> For `lint/phpcs/full`, `rtcamp/wp-phpcs` is not on Packagist, so I would add its GitHub repository to `repositories` and allow `dealerdirect/phpcodesniffer-composer-installer` under `config.allow-plugins` in `composer.json`.
+>
+> Apply? [yes / skip]
+
+**Developer:** yes.
+
 (AI applies wirings for `Plugin.php` for the CPT, taxonomy, CLI registrations one at a time.)
 
 **Final report:**
@@ -90,7 +96,7 @@ Developer actions:
   composer dump-autoload --optimize
 
   composer require rtcamp/wp-framework:^1.0
-  composer require --dev squizlabs/php_codesniffer:^3.7 wp-coding-standards/wpcs:^3.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
+  composer require --dev rtcamp/wp-phpcs:^1.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
   npm install --save-dev eslint@^10.0.0 @wordpress/eslint-plugin@^25.1.0 @rtcamp/eslint-config@^0.1.0
 
 Scripts to add to composer.json:
@@ -465,7 +471,7 @@ Files written (10), wiring applied (1 in Plugin.php for the CLI command).
 
 Outstanding developer actions:
   composer dump-autoload --optimize
-  composer require --dev automattic/vip-coding-standards:^3.0 wp-coding-standards/wpcs:^3.0 squizlabs/php_codesniffer:^3.7 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
+  composer require --dev automattic/vipwpcs:^3.0 wp-coding-standards/wpcs:^3.0 squizlabs/php_codesniffer:^3.7 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
 ```
 
 ---

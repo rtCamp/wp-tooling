@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,14 +17,22 @@ use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * The block name carries the vendor prefix core matches against block.json.
+	 */
 	public function test_block_name_matches_manifest(): void {
 		$this->assertSame( '{{vendor}}/{{slug}}', {{class}}::get_name() );
 	}
 
+	/**
+	 * Registration is deferred to init, the earliest hook a block type may register on.
+	 */
 	public function test_register_hooks_attaches_to_init(): void {
 		$instance = new {{class}}();
 		$instance->register_hooks();

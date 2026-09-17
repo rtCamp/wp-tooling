@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -22,8 +22,6 @@ class {{class}} extends AbstractTaxonomy {
 
 	/**
 	 * Get the taxonomy slug.
-	 *
-	 * @return string
 	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
@@ -40,27 +38,21 @@ class {{class}} extends AbstractTaxonomy {
 
 	/**
 	 * Get the singular label.
-	 *
-	 * @return string
 	 */
 	public function get_singular_label(): string {
-		return __( '{{singular}}', '{{text_domain}}' );
+		return __( '{{singular}}', '{{text_domain}}' ) ?: '{{singular}}';
 	}
 
 	/**
 	 * Get the plural label.
-	 *
-	 * @return string
 	 */
 	public function get_plural_label(): string {
-		return __( '{{plural}}', '{{text_domain}}' );
+		return __( '{{plural}}', '{{text_domain}}' ) ?: '{{plural}}';
 	}
 
 	/**
 	 * Hierarchical (true = like categories) or flat (false = like tags).
 	 * Override to switch behaviour.
-	 *
-	 * @return bool
 	 */
 	public function is_hierarchical(): bool {
 		return true;

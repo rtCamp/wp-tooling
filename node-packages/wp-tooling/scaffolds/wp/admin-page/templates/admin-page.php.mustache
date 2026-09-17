@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -22,8 +22,6 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Get the menu slug (page identifier).
-	 *
-	 * @return string
 	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
@@ -31,8 +29,6 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Get the page title (shown in the browser tab).
-	 *
-	 * @return string
 	 */
 	public function get_page_title(): string {
 		return __( '{{page_title}}', '{{text_domain}}' );
@@ -40,27 +36,22 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Get the menu title (shown in the admin sidebar).
-	 *
-	 * @return string
 	 */
 	public function get_menu_title(): string {
 		return __( '{{menu_title}}', '{{text_domain}}' );
 	}
 
 	/**
-	 * Parent menu slug. Return null for a top-level menu.
-	 *
-	 * @return string|null
+	 * Parent menu slug. Null means a top-level menu.
 	 */
 	public function get_parent_slug(): ?string {
-		$parent = '{{parent_slug}}';
-		return '' === $parent ? null : $parent;
-	}
+{{#parent_slug}}		return '{{parent_slug}}';
+{{/parent_slug}}{{^parent_slug}}		// Top-level menu. Return a slug such as 'options-general.php' to nest this page.
+		return null;
+{{/parent_slug}}	}
 
 	/**
 	 * Capability required to view the page.
-	 *
-	 * @return string
 	 */
 	public function get_capability(): string {
 		return 'manage_options';
@@ -68,8 +59,6 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Render the page body. Replace with your markup.
-	 *
-	 * @return void
 	 */
 	public function render(): void {
 		?>

@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,18 +17,29 @@ use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * The role key is the one capabilities are granted against.
+	 */
 	public function test_slug_matches_manifest(): void {
 		$this->assertSame( '{{slug}}', {{class}}::get_slug() );
 	}
 
+	/**
+	 * The capability map is an array add_role() can consume.
+	 */
 	public function test_capabilities_map_is_returned(): void {
 		$this->assertIsArray( ( new {{class}}() )->get_capabilities() );
 	}
 
+	/**
+	 * The role is created in the database, not just described in code.
+	 */
 	public function test_maybe_update_role_creates_role(): void {
 		$instance = new {{class}}();
 		$instance->maybe_update_role();

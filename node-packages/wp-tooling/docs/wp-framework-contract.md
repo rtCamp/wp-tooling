@@ -148,7 +148,7 @@ Wiring: `register_hooks()` attaches `register_routes()` to `rest_api_init`.
 
 ### `AbstractModule` (extended by `scaffolds/wp/module`)
 
-Required: `public get_classes(): array` returning a list of class strings.
+Required: `protected get_classes(): array` returning a list of class strings. The base declares it `abstract protected`; scaffolded modules match that visibility, so tests reach it through reflection.
 
 Wiring: the framework's `Loader` instantiates each listed class and calls `register_hooks()` if it implements `Registrable`.
 
@@ -201,7 +201,7 @@ interface CLICommand {
 
 ## Anchor convention
 
-Every scaffold that produces a class registers via the consumer's `AbstractModule` subclass. The module file contains a marker comment inside `get_classes()`; the scaffold's `wiring` block inserts the new class string immediately above the marker.
+Every scaffold that produces a class registers via the consumer's `AbstractModule` subclass. The module file contains a marker comment inside `get_classes()`; the scaffold's `wiring` block inserts the new class string immediately after the marker.
 
 Marker pattern: `// scaffold:<scaffold-id>:classes`. Examples:
 

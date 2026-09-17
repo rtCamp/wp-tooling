@@ -35,7 +35,7 @@ Result shape, in brief:
 
 ```json
 {
-    "scaffold":  { "id", "slug", "kind", "dryRun" },
+    "scaffold":  { "id", "slug", "kind", "lens", "dryRun" },
     "engine":    { "wrote": [...], "skipped": [...], "inputs": {...} },
     "developer": { "install": { "composer": {...}, "npm": {...} }, "secrets": [...] },
     "ai":        { "wiring": [...], "tests": [...] },
@@ -58,9 +58,10 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - The engine never reads or writes any path outside `--cwd`. This is enforced: a rendered `dest`, test path, or feature-owned path that resolves outside the target directory (e.g. via `..` in a path input or a third-party remote manifest) fails with `EWRITEFAIL` (`errno: "EOUTSIDE"`) before anything touches the filesystem.
 - The engine never invokes `gh`, `git`, `composer`, `npm`, or any other external CLI on behalf of the caller.
 - `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
+- `scaffold.lens` is the manifest's `lens` array, in the manifest's order (most relevant first), or `null` when the scaffold declares none. Each entry names a lens **skill** (`accessibility`, `i18n`, `performance`, `security`, `seo`, `vip-readiness`), never an MCP ability. It is a recommendation, not a dependency: after the scaffolded code's tests go green, run each named lens that is installed and report any that is not, rather than failing. `null` leaves the choice to the skill. `wp-tooling list --json` carries the same field, `null` for remote scaffolds, whose manifests `list` does not fetch.
 - `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds come from a repo's cached index (`sources.json` → each repo's `index.json`), so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`. `list` is online-preferred with a cache fallback: it reads the index (cached, ETag-validated), and a `warnings` array reports any source that was unreachable and uncached. The top-level `{ scaffolds, warnings }` shape carries those notes.
 - The engine core has zero dependency on the TTY UI kit. AI orchestration mode never loads any terminal-UI primitive. Skills can rely on the engine being usable from any context, including non-TTY containers, CI runners, and headless test harnesses.
-- File-based `discover_from` (`composer.json:<dot.path>`, `package.json:<dot.path>`, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` and `plugin-header:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
+- File-based `discover_from` (`composer.json:<dot.path>` including `autoload.psr-4` and `autoload-dev.psr-4`, `package.json:<dot.path>`, `plugin-header:<header-name>` from the plugin or theme entry header, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
 - A scaffold may carry an optional `feature` block, marking it a **toggleable feature** (the bundled example is `setup/tailwind`). This block is **invisible to `add`/`execute`**: it never appears in the result, and `add` behaves identically whether or not it is present. Turning features on and off is a separate surface (§13).
 
 ## 4. Skill responsibilities
@@ -265,6 +266,20 @@ Fall through these in order:
 3. **No anchor and no clear pattern neighbourhood.** The bootstrap method exists (from §6) but there are no prior examples of this scaffold type. Insert at a sensible position in the bootstrap method (typically just before the closing brace), and explicitly tell the developer this is a best-effort placement.
 4. **No bootstrap method either.** Skip wiring, surface the snippet as a manual instruction in the report, let the developer place it.
 
+Levels 2 and 3 place the snippet relative to code that may not survive. rtCamp
+skeletons wrap each optional capability in `// wp:example:<key>` … `//
+wp:example:<key>:end` markers, and `wp-tooling init` deletes a marked region
+**including its body** when the developer drops that capability
+(`src/init/examples.js`). The last sampled occurrence of a pattern is very often
+the last line inside such a region, so appending after it puts the newly wired
+class inside a block that later disappears — silently, and long after the run
+that placed it.
+
+**Never place the snippet between a `// wp:example:<key>` opener and its
+`:end`.** Insert after the last occurrence that sits outside every region
+instead, and say which line you chose and why. This holds at level 1 too: an
+anchor can itself sit inside a region.
+
 At every level the skill **shows the developer the snippet, the target file, the chosen line range, and the reason for the choice** before applying. The developer can apply, redirect to a different location, edit the snippet, or skip.
 
 ### Anchor restoration (optional, never automatic)
@@ -399,6 +414,7 @@ The JSON shape is part of `@rtcamp/wp-tooling`'s public API and follows semver:
 - **New error codes** may be added in a minor bump. Skills should handle unknown codes by surfacing the message and exiting non-zero rather than crashing.
 - **New `framework` values** (currently `phpunit`, `jest`, `playwright`, `pa11y`, `actionlint`, `yaml-parse`) may be added in a minor bump.
 - **New `scope` values** for secrets (currently `github-actions`, `env`, `dotenv`) may be added in a minor bump.
+- **New `lens` values** (currently `accessibility`, `i18n`, `performance`, `security`, `seo`, `vip-readiness`) may be added in a minor bump. Skills should skip a lens they do not recognise.
 
 Pinning `@rtcamp/wp-tooling` to a specific major in your skill's package manifest is the supported way to maintain forward compatibility.
 

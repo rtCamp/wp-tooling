@@ -1,0 +1,103 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractJob;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * Remove whatever a case scheduled, on either runner.
+	 */
+	public function tear_down(): void {
+		wp_clear_scheduled_hook( {{class}}::HOOK );
+		( new {{class}}() )->unschedule();
+
+		parent::tear_down();
+	}
+
+	/**
+	 * The job is an AbstractJob, so the framework Loader boots it.
+	 */
+	public function test_extends_abstract_job(): void {
+		$this->assertInstanceOf( AbstractJob::class, new {{class}}() );
+	}
+
+	/**
+	 * The job runs on its own hook.
+	 */
+	public function test_runs_on_its_hook(): void {
+		$this->assertSame( {{class}}::HOOK, {{class}}::get_hook() );
+	}
+
+	/**
+	 * The schedule is one WP-Cron knows, so the event is never rejected.
+	 */
+	public function test_schedule_is_registered(): void {
+		$this->assertArrayHasKey( {{class}}::SCHEDULE, wp_get_schedules() );
+	}
+
+	/**
+	 * Registering hooks binds the job, its schedule check and its concurrency filter.
+	 */
+	public function test_register_hooks_binds_the_job(): void {
+		$job = new {{class}}();
+		$job->register_hooks();
+
+		$this->assertTrue( has_action( {{class}}::HOOK ) );
+		$this->assertNotFalse( has_action( 'admin_init', [ $job, 'ensure_scheduled' ] ) );
+		$this->assertNotFalse( has_filter( 'a8c_cron_control_concurrent_event_whitelist', [ $job, 'filter_concurrent_event_whitelist' ] ) );
+	}
+
+	/**
+	 * The job ends up on exactly one runner: Action Scheduler when it is loaded, WP-Cron otherwise.
+	 *
+	 * Starts from a WP-Cron event, as a site has once Action Scheduler is
+	 * installed after the job was first scheduled, and checks twice to prove
+	 * the check does not schedule a second run.
+	 */
+	public function test_ensure_scheduled_uses_exactly_one_runner(): void {
+		wp_schedule_event( time(), {{class}}::SCHEDULE, {{class}}::HOOK );
+
+		$job = new {{class}}();
+		$job->ensure_scheduled();
+		$job->ensure_scheduled();
+
+		$via_action_scheduler = {{class}}::is_available();
+		$via_wp_cron          = false !== wp_next_scheduled( {{class}}::HOOK );
+
+		$this->assertSame( ! $via_action_scheduler, $via_wp_cron );
+		$this->assertSame( $via_action_scheduler, $job->is_scheduled() );
+	}
+
+	/**
+	 * The concurrency limit is added without dropping other plugins' entries.
+	 */
+	public function test_concurrency_limit_keeps_other_entries(): void {
+		$job       = new {{class}}();
+		$whitelist = $job->filter_concurrent_event_whitelist( [ 'other_hook' => 3 ] );
+
+		$this->assertIsArray( $whitelist );
+		$this->assertSame( 3, $whitelist['other_hook'] );
+		$this->assertSame( {{class}}::MAX_CONCURRENCY, $whitelist[ {{class}}::HOOK ] );
+		$this->assertSame( 'not-an-array', $job->filter_concurrent_event_whitelist( 'not-an-array' ) );
+	}
+}

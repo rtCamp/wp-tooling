@@ -1,0 +1,192 @@
+<?php
+/**
+ * {{class}}WebhookController: receives signed {{name}} webhooks.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use WP_REST_Request;
+use WP_REST_Response;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractRESTController;
+
+/**
+ * Accepts a signed JSON webhook, acknowledges it at once and queues the work.
+ *
+ * Doing the work inside the request is what breaks webhooks under load: the
+ * sender times out and retries, and on WordPress VIP long requests are cut
+ * off. So the handler only verifies, de-duplicates and queues the payload on
+ * HOOK, then answers 202. Process it in a job listening on HOOK, such as one
+ * from `wp-tooling add integration/vip-cron`, which receives the decoded
+ * payload as its $args.
+ *
+ * The shared secret is read from the VIP environment variable named by
+ * SECRET_NAME, or from a constant of that name elsewhere. Until one is set,
+ * every delivery is refused. The body is capped at MAX_BODY_BYTES because a
+ * queued payload is stored with its event, which outside Action Scheduler and
+ * VIP's Cron Control is WordPress's autoloaded cron option.
+ */
+class {{class}}WebhookController extends AbstractRESTController {
+
+	/**
+	 * Action the decoded payload is queued on.
+	 */
+	public const HOOK = '{{hook_prefix}}_{{hook_name}}_webhook';
+
+	/**
+	 * VIP environment variable, or constant, holding the shared secret.
+	 */
+	public const SECRET_NAME = '{{secret_prefix}}_{{secret_name}}_WEBHOOK_SECRET';
+
+	/**
+	 * Request header carrying the hex HMAC-SHA256 of the raw body.
+	 */
+	public const SIGNATURE_HEADER = '{{signature_header}}';
+
+	/**
+	 * Largest request body accepted, in bytes.
+	 */
+	public const MAX_BODY_BYTES = 65536;
+
+	/**
+	 * Object cache group remembering deliveries already queued.
+	 */
+	public const CACHE_GROUP = '{{hook_prefix}}_webhooks';
+
+	/**
+	 * REST route namespace (URL prefix before the version).
+	 *
+	 * @var string
+	 */
+	protected $namespace = '{{rest_namespace}}';
+
+	/**
+	 * REST API version segment.
+	 *
+	 * @var string
+	 */
+	protected string $version = '{{rest_version}}';
+
+	/**
+	 * The route segment after the namespace and version.
+	 *
+	 * @var string
+	 */
+	protected $rest_base = 'webhooks/{{route}}';
+
+	/**
+	 * Register the webhook route. Called by the framework on rest_api_init.
+	 */
+	public function register_routes(): void {
+		register_rest_route(
+			"{$this->namespace}/v{$this->version}",
+			'/' . $this->rest_base,
+			[
+				[
+					'methods'             => 'POST',
+					'callback'            => [ $this, 'receive' ],
+					'permission_callback' => [ $this, 'verify_signature' ],
+				],
+			]
+		);
+	}
+
+	/**
+	 * Accept only deliveries signed with the shared secret.
+	 *
+	 * The signature is compared in constant time. Adapt the parsing to your
+	 * sender: some prefix the digest, such as 'sha256=', or sign a timestamp
+	 * with the body so an old delivery cannot be replayed.
+	 *
+	 * @param \WP_REST_Request $request The incoming delivery.
+	 * @return bool True when the signature matches.
+	 */
+	public function verify_signature( WP_REST_Request $request ): bool {
+		$secret    = $this->get_secret();
+		$signature = (string) $request->get_header( self::SIGNATURE_HEADER );
+
+		if ( '' === $secret || '' === $signature ) {
+			return false;
+		}
+
+		return hash_equals( hash_hmac( 'sha256', $request->get_body(), $secret ), $signature );
+	}
+
+	/**
+	 * Queue a verified delivery and acknowledge it.
+	 *
+	 * A delivery already queued within the last day is acknowledged without
+	 * being queued again, since senders retry anything they did not see
+	 * acknowledged. A delivery is identified by HOOK and body, so another
+	 * webhook receiving the same body still queues it. That memory lasts as
+	 * long as the object cache keeps it, which without a persistent cache is
+	 * the current request only.
+	 *
+	 * @param \WP_REST_Request $request The verified delivery.
+	 * @return \WP_REST_Response|\WP_Error 202 when queued, 200 for a delivery already queued, or an error.
+	 */
+	public function receive( WP_REST_Request $request ): WP_REST_Response|\WP_Error {
+		$body = $request->get_body();
+
+		if ( strlen( $body ) > self::MAX_BODY_BYTES ) {
+			return new \WP_Error( 'rest_payload_too_large', __( 'The webhook payload is too large.', '{{text_domain}}' ), [ 'status' => 413 ] );
+		}
+
+		// An object, or an array for senders that post events in batches.
+		$payload = json_decode( $body, true );
+
+		if ( ! is_array( $payload ) ) {
+			return new \WP_Error( 'rest_invalid_json', __( 'The webhook payload is not a JSON object or array.', '{{text_domain}}' ), [ 'status' => 400 ] );
+		}
+
+		$delivery = hash( 'sha256', self::HOOK . ':' . $body );
+
+		if ( ! wp_cache_add( $delivery, true, self::CACHE_GROUP, DAY_IN_SECONDS ) ) {
+			return new WP_REST_Response( [ 'status' => 'duplicate' ], 200 );
+		}
+
+		if ( ! $this->queue( $payload ) ) {
+			wp_cache_delete( $delivery, self::CACHE_GROUP );
+
+			return new \WP_Error( 'rest_webhook_not_queued', __( 'The webhook could not be queued. Retry later.', '{{text_domain}}' ), [ 'status' => 503 ] );
+		}
+
+		return new WP_REST_Response( [ 'status' => 'queued' ], 202 );
+	}
+
+	/**
+	 * Queue the payload on HOOK, through Action Scheduler when it is loaded and WP-Cron otherwise.
+	 *
+	 * @param array<mixed> $payload The decoded payload.
+	 * @return bool True when the payload was queued.
+	 */
+	protected function queue( array $payload ): bool {
+		if ( function_exists( 'as_enqueue_async_action' ) ) {
+			return 0 < as_enqueue_async_action( self::HOOK, [ $payload ] );
+		}
+
+		return true === wp_schedule_single_event( time(), self::HOOK, [ $payload ] );
+	}
+
+	/**
+	 * Read the shared secret.
+	 *
+	 * @return string The secret, or an empty string when none is set.
+	 */
+	protected function get_secret(): string {
+		$secret = function_exists( 'vip_get_env_var' ) ? (string) vip_get_env_var( self::SECRET_NAME, '' ) : '';
+
+		if ( '' === $secret && defined( self::SECRET_NAME ) ) {
+			$secret = (string) constant( self::SECRET_NAME );
+		}
+
+		return $secret;
+	}
+}

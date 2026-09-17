@@ -61,8 +61,9 @@ grep -rl "Plugin Name:\|Theme Name:" . --include="*.php" --exclude-dir=vendor --
 **VIP indicators:**
 
 ```bash
-grep -rl "WordPress-VIP-Minimum\|automattic/vip-coding-standards\|VIP_GO_ENV" . \
-    --include="*.{php,xml,json,yml}" --exclude-dir=vendor --exclude-dir=node_modules | head -3
+grep -rlE "WordPressVIPMinimum|WordPress-VIP-Go|automattic/vipwpcs|VIP_GO_APP_ENVIRONMENT|VIP_GO_ENV" . \
+    --include="*.php" --include="*.xml" --include="*.dist" --include="*.json" --include="*.yml" \
+    --exclude-dir=vendor --exclude-dir=node_modules | head -3
 ```
 
 **Languages present:**
@@ -106,7 +107,7 @@ Construct the plan in two phases: **project setup** and **feature scaffolds**.
 | PHP present, no PSR-4 in `composer.json` | `setup/psr4` | `autoload.psr-4` already set |
 | VIP project | `lint/phpcs/vip` | `phpcs.xml.dist` exists |
 | Non-VIP project | `lint/phpcs/full` | `phpcs.xml.dist` exists |
-| Developer explicitly chose core-only PHPCS | `lint/phpcs/core` | `phpcs.xml.dist` exists |
+| Non-VIP project whose existing PHP does not declare strict types | `lint/phpcs/core` | `phpcs.xml.dist` exists |
 | PHP present | `lint/phpstan` | `phpstan.neon.dist` exists |
 | JS present | `lint/eslint` | `eslint.config.js` exists |
 | CSS or SCSS present | `lint/stylelint` | `.stylelintrc.js` exists |
@@ -141,7 +142,7 @@ Here is what I will do. Please confirm or adjust before I start.
 Phase A — Project setup:
   1. setup/editorconfig    → .editorconfig
   2. setup/psr4            → wiring in composer.json  (namespace: Acme\ImageOptimizer, path: includes/)
-  3. lint/phpcs/vip        → phpcs.xml.dist           (WordPress-VIP-Minimum + WordPress-Docs)
+  3. lint/phpcs/vip        → phpcs.xml.dist           (WordPressVIPMinimum + WordPress-Docs)
   4. lint/phpstan          → phpstan.neon.dist         (extends rtCamp wp-phpstan baseline)
   5. lint/eslint           → eslint.config.js
   6. setup/phpunit         → phpunit.xml.dist, tests/bootstrap.php
@@ -191,7 +192,7 @@ npx wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base-url=h
 Process each result before running the next:
 
 - Report files written and skipped.
-- Apply `setup/psr4` wiring to `composer.json` with explicit consent (see §Wiring below).
+- Apply `setup/psr4` and `lint/phpcs/*` wiring to `composer.json` with explicit consent (see §Wiring below).
 - Accumulate `developer.install.*` and `developer.scripts.*` across all scaffolds.
 
 ### 5. Execute Phase B
@@ -253,6 +254,15 @@ composer.json not found. I can create a minimal one:
 Create it? [yes / skip PSR-4 / give me the values to use]
 ```
 
+### Wiring: composer.json for PHPCS
+
+The `lint/phpcs/*` wiring entries must be in `composer.json` before the developer runs `composer require`, or the install fails:
+
+1. `repositories` (`full` and `core` only) — a `vcs` entry for `https://github.com/rtCamp/wp-phpcs.git`, since `rtcamp/wp-phpcs` is not on Packagist. Append it to an existing array; skip it if that URL is already listed. `vip` needs none: `automattic/vipwpcs` is on Packagist.
+2. `config.allow-plugins` (all three) — `dealerdirect/phpcodesniffer-composer-installer: true`, the plugin that registers the standards. Merge it into an existing `config` block.
+
+Show the changes together, ask once, and merge rather than replace existing keys.
+
 ### Wiring: feature scaffolds
 
 Same as `skills/scaffold.md` §5 — `ai.wiring`. Show diff, get consent, apply.
@@ -286,7 +296,7 @@ Developer actions (run these yourself):
   composer dump-autoload --optimize
 
   composer require --dev \
-    automattic/vip-coding-standards:^3.0 \
+    automattic/vipwpcs:^3.0 \
     wp-coding-standards/wpcs:^3.0 \
     squizlabs/php_codesniffer:^3.7 \
     phpunit/phpunit:^12.0 \
@@ -326,11 +336,11 @@ Deduplicate packages. Sort alphabetically within each block. Pinned packages use
 
 | Scaffold ID | When to use | Ruleset |
 |---|---|---|
-| `lint/phpcs/full` | Most rtCamp projects (recommended default) | `vendor/rtcamp/wp-framework/phpcs.xml.dist`, WordPress-Core + Extra + Docs + VIP-Go |
-| `lint/phpcs/vip` | WordPress VIP platform projects | `WordPress-VIP-Minimum` + `WordPress-Docs` |
-| `lint/phpcs/core` | Projects explicitly opting out of VIP-Go rules | `WordPress` — Core + Extra + Docs only |
+| `lint/phpcs/full` | Most rtCamp projects (recommended default) | `rtCampWP` from `rtcamp/wp-phpcs`: WordPress-Extra + Docs + VIP-Go + PHPCompatibilityWP, plus strict types, type hints and short arrays |
+| `lint/phpcs/vip` | WordPress VIP platform projects | `WordPressVIPMinimum` + `WordPress-Docs` |
+| `lint/phpcs/core` | Existing code not yet ready for strict types | `rtCampWP-Basic` from `rtcamp/wp-phpcs`: the same rules without the strict layer |
 
-Developers can add `<rule>` entries to `phpcs.xml.dist` to override or extend the selected standard.
+`full` and `core` read `testVersion` and `minimum_wp_version` from the `Requires PHP` and `Requires at least` headers, the text domain from `Text Domain`, and the namespace prefix from `composer.json` PSR-4 autoload. Cite the values in the plan. Developers can add `<rule>` entries to `phpcs.xml.dist` to override or extend the selected standard.
 
 ## Test scaffolds reference
 

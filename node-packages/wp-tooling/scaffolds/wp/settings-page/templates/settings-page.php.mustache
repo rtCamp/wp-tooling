@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -22,8 +22,6 @@ class {{class}} extends AbstractSettingsPage {
 
 	/**
 	 * Get the menu/page slug.
-	 *
-	 * @return string
 	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
@@ -31,8 +29,6 @@ class {{class}} extends AbstractSettingsPage {
 
 	/**
 	 * Get the page title (shown in the browser tab).
-	 *
-	 * @return string
 	 */
 	public function get_page_title(): string {
 		return __( '{{page_title}}', '{{text_domain}}' );
@@ -40,8 +36,6 @@ class {{class}} extends AbstractSettingsPage {
 
 	/**
 	 * Get the menu title (shown in the admin sidebar).
-	 *
-	 * @return string
 	 */
 	public function get_menu_title(): string {
 		return __( '{{menu_title}}', '{{text_domain}}' );
@@ -69,8 +63,6 @@ class {{class}} extends AbstractSettingsPage {
 
 	/**
 	 * Render the page form. Uses Settings API helpers.
-	 *
-	 * @return void
 	 */
 	public function render(): void {
 		?>

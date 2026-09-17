@@ -1,19 +1,63 @@
 {
 	"slug": "full",
 	"category": "lint/phpcs",
-	"name": "PHPCS - rtCamp full",
-	"description": "PHP_CodeSniffer with rtCamp's shared standard: WordPress-Core, Extra, Docs, and VIP-Go rules via wp-framework.",
+	"name": "PHPCS - rtCampWP",
+	"description": "PHP_CodeSniffer with rtCampWP, rtCamp's strict standard from rtcamp/wp-phpcs: WordPress-Extra, Docs, VIP-Go and PHP compatibility, plus strict types, type hints and short arrays. The default for new code.",
 	"source": "template",
+	"inputs": [
+		{
+			"key": "text_domain",
+			"description": "Text domain every translatable string must use. Read from the plugin or theme header.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "prefix",
+			"description": "Prefix required on global functions, hooks, constants and variables. Derived from text_domain.",
+			"discover_from": "input:text_domain",
+			"transform": "snake-case"
+		},
+		{
+			"key": "namespace",
+			"description": "Root PHP namespace, which PHPCS also accepts as a prefix. Read from composer.json PSR-4 autoload; left out when the project has none.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": ""
+		},
+		{
+			"key": "php_version",
+			"description": "Lowest PHP version the project supports, e.g. 8.2. Read from the Requires PHP header.",
+			"discover_from": "plugin-header:requires-php",
+			"default": "8.2"
+		},
+		{
+			"key": "wp_version",
+			"description": "Lowest WordPress version the project supports, e.g. 6.5. Read from the Requires at least header.",
+			"discover_from": "plugin-header:requires-at-least",
+			"default": "6.5"
+		}
+	],
 	"files": [
 		{
 			"src": "templates/phpcs.xml.dist.mustache",
 			"dest": "phpcs.xml.dist"
 		}
 	],
+	"wiring": [
+		{
+			"target_file": "composer.json",
+			"anchor": "\"repositories\"",
+			"snippet_template": "\"repositories\": [\n    {\n        \"type\": \"vcs\",\n        \"url\": \"https://github.com/rtCamp/wp-phpcs.git\",\n        \"no-api\": true\n    }\n]",
+			"description": "rtcamp/wp-phpcs is not on Packagist, so Composer only finds it through this repository. Add the entry to the existing repositories array unless the URL is already there, or create the array. Apply before installing the package."
+		},
+		{
+			"target_file": "composer.json",
+			"anchor": "\"allow-plugins\"",
+			"snippet_template": "\"config\": {\n    \"allow-plugins\": {\n        \"dealerdirect/phpcodesniffer-composer-installer\": true\n    }\n}",
+			"description": "rtcamp/wp-phpcs registers its standards through this Composer plugin, which Composer will not run until it is allowed. Merge the entry into the existing config.allow-plugins, or create it."
+		}
+	],
 	"composer_dev_dependencies": {
-		"squizlabs/php_codesniffer": "^3.7",
-		"wp-coding-standards/wpcs": "^3.0",
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-phpcs": "^1.0"
 	},
 	"scripts": {
 		"composer": {

@@ -5,25 +5,37 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
 use {{namespace}}\{{class}};
-use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
 	public function test_implements_registrable(): void {
 		$this->assertInstanceOf( Registrable::class, new {{class}}() );
 	}
 
+	/**
+	 * Booting the class is side-effect free while its hooks are still empty.
+	 *
+	 * Replace this with assertions on the hooks register_hooks() actually adds.
+	 */
 	public function test_register_hooks_runs_without_error(): void {
 		( new {{class}}() )->register_hooks();
 		$this->addToAssertionCount( 1 );

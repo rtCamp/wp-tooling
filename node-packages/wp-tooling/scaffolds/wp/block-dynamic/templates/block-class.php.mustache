@@ -9,12 +9,12 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Abstracts\AbstractBlock;
 use WP_Block;
+use rtCamp\WPFramework\Contracts\Abstracts\AbstractBlock;
 
 /**
  * Registers the {{vendor}}/{{slug}} dynamic block.
@@ -23,8 +23,6 @@ class {{class}} extends AbstractBlock {
 
 	/**
 	 * Get the block name (including namespace).
-	 *
-	 * @return string
 	 */
 	public static function get_name(): string {
 		return '{{vendor}}/{{slug}}';
@@ -36,9 +34,11 @@ class {{class}} extends AbstractBlock {
 	 * so the editor receives the bundled assets and not raw ES modules.
 	 * Run `npm run build` to populate this directory.
 	 *
-	 * @return string|null
+	 * Protected to match AbstractBlock, which declares it protected and calls it
+	 * internally; the body always returns a path, so the nullable half of the
+	 * inherited `?string` is dropped.
 	 */
-	public function get_block_dir(): ?string {
+	protected function get_block_dir(): string {
 		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
 	}
 
@@ -48,8 +48,6 @@ class {{class}} extends AbstractBlock {
 	 * @param array<string,mixed> $attributes Block attributes from block.json.
 	 * @param string              $content    Inner content rendered by Gutenberg.
 	 * @param WP_Block            $block      The block instance.
-	 *
-	 * @return string
 	 */
 	public function render( array $attributes, string $content, WP_Block $block ): string {
 		// Replace with your markup.

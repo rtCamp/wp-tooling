@@ -1,0 +1,103 @@
+<?php
+/**
+ * {{class}}: cached, VIP-safe remote GET requests.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://docs.wpvip.com/technical-references/code-quality-and-best-practices/retrieving-remote-data/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Utils\Cache;
+
+/**
+ * Fetches remote data without putting an uncached request on the page path.
+ *
+ * On WordPress VIP this delegates to wpcom_vip_file_get_contents(), which
+ * caches the body, serves a stale copy when the remote end fails, and stops
+ * calling a host that keeps failing. vip_safe_wp_remote_get() is deliberately
+ * not used: it backs off the same way but caches nothing, so every page view
+ * would still pay for the request. The helper fetches with wp_remote_get(),
+ * so the request asks core to refuse internal hosts, as wp_safe_remote_get()
+ * does. Core checks the URL only when a request is sent, so a cached or stale
+ * copy is still served without a DNS lookup.
+ *
+ * Everywhere else the body is kept in the object cache and fetched with
+ * wp_safe_remote_get(), which refuses internal hosts. Only successful
+ * responses are cached there, so a single failure is not served for the
+ * whole TTL.
+ */
+final class {{class}} {
+
+	/**
+	 * Request timeout in seconds. VIP accepts no more than 3.
+	 */
+	public const TIMEOUT = {{timeout}};
+
+	/**
+	 * Seconds a successful response is cached. VIP accepts no less than 300.
+	 */
+	public const CACHE_TTL = {{cache_ttl}};
+
+	/**
+	 * Object cache group for responses fetched outside VIP.
+	 */
+	public const CACHE_GROUP = '{{cache_group}}';
+
+	/**
+	 * Object cache, namespaced to this plugin or theme.
+	 *
+	 * @var Cache
+	 */
+	private Cache $cache;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param \rtCamp\WPFramework\Utils\Cache|null $cache Cache to store responses in. Defaults to one namespaced by text domain.
+	 */
+	public function __construct( ?Cache $cache = null ) {
+		$this->cache = $cache ?? new Cache( '{{text_domain}}' );
+	}
+
+	/**
+	 * Fetch a URL over GET and return its body.
+	 *
+	 * @param string               $url  Absolute URL to fetch.
+	 * @param array<string, mixed> $args Extra wp_remote_get() arguments, such as headers. The timeout is always TIMEOUT, and internal hosts are always refused.
+	 * @return string|null The response body, or null when the request failed and no cached copy exists.
+	 */
+	public function get( string $url, array $args = [] ): ?string {
+		if ( function_exists( 'wpcom_vip_file_get_contents' ) ) {
+			$http_api_args = array_merge( $args, [ 'reject_unsafe_urls' => true ] );
+			$body          = wpcom_vip_file_get_contents( $url, self::TIMEOUT, self::CACHE_TTL, [ 'http_api_args' => $http_api_args ] );
+
+			return is_string( $body ) ? $body : null;
+		}
+
+		$key   = md5( (string) wp_json_encode( [ $url, $args ] ) );
+		$found = false;
+		$body  = $this->cache->get( $key, self::CACHE_GROUP, false, $found );
+
+		if ( $found && is_string( $body ) ) {
+			return $body;
+		}
+
+		$response = wp_safe_remote_get( $url, array_merge( $args, [ 'timeout' => self::TIMEOUT ] ) );
+
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			return null;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$this->cache->set( $key, $body, self::CACHE_GROUP, self::CACHE_TTL );
+
+		return $body;
+	}
+}

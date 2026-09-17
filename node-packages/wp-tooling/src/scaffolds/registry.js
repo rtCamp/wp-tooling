@@ -45,6 +45,7 @@ const {
 	validateIndex,
 	indexEntryToRecord,
 } = require('./sources');
+const { normalisePhp } = require('./php-imports');
 
 class ScaffoldRegistry {
 	/**
@@ -377,7 +378,12 @@ class ScaffoldRegistry {
 			}
 			if (!dryRun) {
 				const tpl = await loadTemplate(file.src);
-				const out = file.raw === true ? tpl : render(tpl, resolved);
+				// `raw` files ship verbatim by contract, so they are never
+				// normalised — only rendered output is ours to reformat.
+				const out =
+					file.raw === true
+						? tpl
+						: normalisePhp(render(tpl, resolved), destRel);
 				await fs.mkdir(path.dirname(destAbs), { recursive: true });
 				await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
 					throw new ScaffoldError(
@@ -393,12 +399,30 @@ class ScaffoldRegistry {
 		// `target_file` templates often build on a path input (e.g.
 		// `{{base_path}}/../Modules/Cli.php`); normalise so the caller gets
 		// `includes/Modules/Cli.php`, not a `..` segment to clean up.
-		const aiWiring = (scaffold.wiring || []).map((w) => ({
-			targetFile: path.posix.normalize(render(w.target_file, resolved)),
-			anchor: w.anchor,
-			snippet: render(w.snippet_template, resolved),
-			description: w.description || '',
-		}));
+		//
+		// Normalising collapses interior `..` but keeps a leading one, so a
+		// short enough path input (`--base_path=.`) still resolves outside the
+		// project. Drop those instead of handing the AI a file to edit above
+		// the project root. Warn rather than throw: this runs after the files
+		// are on disk, and aborting here would leave a half-applied scaffold.
+		const aiWiring = [];
+		for (const w of scaffold.wiring || []) {
+			const targetFile = path.posix.normalize(
+				render(w.target_file, resolved)
+			);
+			if (targetFile.startsWith('../') || path.isAbsolute(targetFile)) {
+				warnings.push(
+					`wiring target resolves outside the project, skipped: ${targetFile}`
+				);
+				continue;
+			}
+			aiWiring.push({
+				targetFile,
+				anchor: w.anchor,
+				snippet: render(w.snippet_template, resolved),
+				description: w.description || '',
+			});
+		}
 
 		// Declarative tests (lint-only entries like actionlint on the YAML the
 		// files-loop just wrote) reuse a files[].dest. Track those so we don't
@@ -418,7 +442,7 @@ class ScaffoldRegistry {
 					);
 				} else if (!dryRun) {
 					const tpl = await loadTemplate(t.src);
-					const out = render(tpl, resolved);
+					const out = normalisePhp(render(tpl, resolved), destRel);
 					await fs.mkdir(path.dirname(destAbs), { recursive: true });
 					await fs.writeFile(destAbs, out, 'utf8').catch((err) => {
 						throw new ScaffoldError(
@@ -445,6 +469,9 @@ class ScaffoldRegistry {
 				// template scaffolds — the AI orchestrator doesn't need to
 				// branch on where the body came from; both render Mustache.
 				kind: scaffold.source === 'package' ? 'package' : 'template',
+				// Lens skills to run once the new code's tests are green, or
+				// `null` to leave the choice to the orchestrating skill.
+				lens: lensOf(scaffold),
 				dryRun,
 			},
 			engine: {
@@ -803,14 +830,98 @@ async function hydrateRemote(record, fetchOpts) {
 	};
 }
 
+// WordPress reads a plugin/theme header out of the first 8 KB of the entry
+// file; matching that bound keeps a large file cheap to scan and matches what
+// core would itself see.
+const HEADER_SCAN_BYTES = 8192;
+
+// One `Name: value` line inside a header comment, with the comment furniture
+// (` * `, `#`, `//`) stripped. Header names are letters and single spaces, which
+// is what keeps this from matching arbitrary colons in code.
+const HEADER_LINE_RE =
+	/^[ \t/*#]*([A-Za-z][A-Za-z ]*[A-Za-z]):[ \t]*(\S.*?)[ \t]*$/gm;
+
 /**
- * Load the project files `discover_from` can read, tolerantly. A missing or
- * malformed file becomes `null` (composer/package) or `{}` (config) so that
- * discovery silently falls back to each input's `default` — preserving the
- * behaviour of projects that have no composer.json / .wp-tooling.json.
+ * Read the WordPress header block of a project's entry file.
+ *
+ * Looks for a plugin first — any root-level `*.php` carrying a `Plugin Name:`
+ * header — then falls back to a theme's `style.css` with `Theme Name:`. Keys are
+ * the header name lowercased with spaces hyphenated, so `Text Domain:` is read
+ * as `text-domain`, which is how a manifest names it.
+ *
+ * Only the header comment is scanned: parsing stops at its closing `*\/`, so a
+ * `Foo: bar` in the code below can never be mistaken for a header.
  *
  * @param {string} cwd - Target project directory.
- * @return {Promise<Object>} `{ 'composer.json', 'package.json', config }`.
+ * @return {Promise<Object|null>} Header map, or null when there is no entry file.
+ */
+async function readEntryHeaders(cwd) {
+	const headerBlock = async (file) => {
+		let raw;
+		try {
+			const handle = await fs.open(path.join(cwd, file), 'r');
+			try {
+				const buf = Buffer.alloc(HEADER_SCAN_BYTES);
+				const { bytesRead } = await handle.read(
+					buf,
+					0,
+					HEADER_SCAN_BYTES,
+					0
+				);
+				raw = buf.subarray(0, bytesRead).toString('utf8');
+			} finally {
+				await handle.close();
+			}
+		} catch {
+			return null;
+		}
+		const close = raw.indexOf('*/');
+		return close === -1 ? raw : raw.slice(0, close);
+	};
+
+	const parse = (block) => {
+		const out = {};
+		HEADER_LINE_RE.lastIndex = 0;
+		let m;
+		while ((m = HEADER_LINE_RE.exec(block)) !== null) {
+			out[m[1].toLowerCase().replace(/ +/g, '-')] = m[2];
+		}
+		return out;
+	};
+
+	let entries = [];
+	try {
+		entries = await fs.readdir(cwd);
+	} catch {
+		return null;
+	}
+
+	// Sorted so a directory with more than one candidate resolves the same way
+	// on every platform rather than following readdir order.
+	for (const name of entries.filter((f) => f.endsWith('.php')).sort()) {
+		const block = await headerBlock(name);
+		if (block && /^[ \t/*#]*Plugin Name:[ \t]*\S/m.test(block)) {
+			return parse(block);
+		}
+	}
+
+	const style = await headerBlock('style.css');
+	if (style && /^[ \t/*#]*Theme Name:[ \t]*\S/m.test(style)) {
+		return parse(style);
+	}
+
+	return null;
+}
+
+/**
+ * Load the project files `discover_from` can read, tolerantly. A missing or
+ * malformed file becomes `null` (composer/package/plugin-header) or `{}`
+ * (config) so that discovery silently falls back to each input's `default` —
+ * preserving the behaviour of projects that have no composer.json /
+ * .wp-tooling.json / recognisable entry file.
+ *
+ * @param {string} cwd - Target project directory.
+ * @return {Promise<Object>} `{ 'composer.json', 'package.json', 'plugin-header', config }`.
  */
 async function loadDiscovery(cwd) {
 	const readJson = async (file) => {
@@ -830,6 +941,7 @@ async function loadDiscovery(cwd) {
 	return {
 		'composer.json': await readJson('composer.json'),
 		'package.json': await readJson('package.json'),
+		'plugin-header': await readEntryHeaders(cwd),
 		config: readConfig(cwd),
 	};
 }
@@ -842,15 +954,19 @@ async function loadDiscovery(cwd) {
  *
  * Supported sources:
  *   - `composer.json:<dot.path>` / `package.json:<dot.path>` — dotted lookup of
- *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0` reads the
- *     first map entry — its **namespace** (key, trailing `\\` stripped) for
- *     ordinary inputs, its **directory** (value) for path inputs — and grafts
- *     that root onto the input's `default`, keeping the default's sub-namespace
- *     or sub-directory.
+ *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0`, and
+ *     their `autoload-dev` counterparts, read the first map entry — its
+ *     **namespace** (key, trailing `\\` stripped) for ordinary inputs, its
+ *     **directory** (value) for path inputs — and graft that root onto the
+ *     input's `default`, keeping the default's sub-namespace or sub-directory.
+ *   - `plugin-header:<header-name>` — a value from the plugin's (or theme's)
+ *     entry-file header, named lowercased and hyphenated: `plugin-header:text-domain`
+ *     reads `Text Domain:`.
  *   - `config:<dot.path>` — string value from `.wp-tooling.json`.
  *
- * Unknown sources (e.g. `plugin-header:`, `input:` handled by the caller)
- * return `undefined`.
+ * Unknown sources (`input:` is handled by the caller) return `undefined`.
+ * `validate` rejects any other prefix at authoring time, so an unresolvable
+ * source cannot reach here unnoticed.
  *
  * @param {Object} decl      - The input declaration (its `key` disambiguates psr-4).
  * @param {Object} discovery - The object returned by {@link loadDiscovery}.
@@ -870,7 +986,7 @@ function discoverFromSource(decl, discovery) {
 			return undefined;
 		}
 		const selector = spec.slice(colon + 1);
-		if (selector === 'autoload.psr-4' || selector === 'autoload.psr-0') {
+		if (/^autoload(-dev)?\.psr-[04]$/.test(selector)) {
 			const map = getByPath(obj, selector);
 			const firstKey =
 				map && typeof map === 'object' && !Array.isArray(map)
@@ -896,6 +1012,14 @@ function discoverFromSource(decl, discovery) {
 		}
 		const value = getByPath(obj, selector);
 		return typeof value === 'string' ? value : undefined;
+	}
+	if (source === 'plugin-header') {
+		const headers = discovery['plugin-header'];
+		if (!headers) {
+			return undefined;
+		}
+		const value = headers[spec.slice(colon + 1)];
+		return typeof value === 'string' && value !== '' ? value : undefined;
 	}
 	if (source === 'config') {
 		const selector = spec.slice(colon + 1);
@@ -1134,6 +1258,10 @@ function makeId(scaffold) {
 	return scaffold.category
 		? `${scaffold.category}/${scaffold.slug}`
 		: scaffold.slug;
+}
+
+function lensOf(scaffold) {
+	return Array.isArray(scaffold.lens) ? [...scaffold.lens] : null;
 }
 
 function makeKey(scaffold) {

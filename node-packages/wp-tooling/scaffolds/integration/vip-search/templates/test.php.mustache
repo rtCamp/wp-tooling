@@ -1,0 +1,153 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_Query;
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
+	}
+
+	/**
+	 * The query hooks are bound if, and only if, an ElasticPress backend is loaded.
+	 */
+	public function test_register_hooks_binds_only_with_a_search_backend(): void {
+		$search = new {{class}}();
+		$search->register_hooks();
+
+		$backend_loaded  = defined( 'EP_VERSION' );
+		$offload_bound   = false !== has_action( 'pre_get_posts', [ $search, 'offload' ] );
+		$reporting_bound = false !== has_filter( 'posts_pre_query', [ $search, 'report_fallback' ] );
+
+		$this->assertSame( $backend_loaded, $offload_bound );
+		$this->assertSame( $backend_loaded, $reporting_bound );
+	}
+
+	/**
+	 * A main query on the post type that filters by meta is sent to the index.
+	 */
+	public function test_offloads_a_filtered_main_query(): void {
+		add_action(
+			'pre_get_posts',
+			static function ( WP_Query $query ): void {
+				if ( $query->is_main_query() ) {
+					self::filter_by_meta( $query, {{class}}::POST_TYPE );
+				}
+			},
+			9
+		);
+		add_action( 'pre_get_posts', [ new {{class}}(), 'offload' ] );
+
+		$this->go_to( home_url( '/' ) );
+
+		$this->assertTrue( $GLOBALS['wp_query']->get( 'ep_integrate' ) );
+	}
+
+	/**
+	 * A secondary query is never changed, however it is filtered: it opts in where it is built.
+	 */
+	public function test_leaves_secondary_queries_alone(): void {
+		$query = new WP_Query();
+		self::filter_by_meta( $query, {{class}}::POST_TYPE );
+
+		( new {{class}}() )->offload( $query );
+
+		$this->assertSame( '', $query->get( 'ep_integrate' ) );
+	}
+
+	/**
+	 * Only meta or taxonomy queries on the post type are picked.
+	 */
+	public function test_should_offload_picks_filtered_queries_on_the_post_type(): void {
+		$search     = new {{class}}();
+		$filtered   = new WP_Query();
+		$other_type = new WP_Query();
+		$unfiltered = new WP_Query();
+
+		self::filter_by_meta( $filtered, {{class}}::POST_TYPE );
+		self::filter_by_meta( $other_type, {{class}}::POST_TYPE . '-other' );
+		$unfiltered->set( 'post_type', {{class}}::POST_TYPE );
+
+		$this->assertTrue( $search->should_offload( $filtered ) );
+		$this->assertFalse( $search->should_offload( $other_type ) );
+		$this->assertFalse( $search->should_offload( $unfiltered ) );
+	}
+
+	/**
+	 * A query that asked for the index is announced only when the index did not answer.
+	 */
+	public function test_reports_only_a_real_fallback(): void {
+		$fallbacks = [];
+		add_action(
+			{{class}}::FALLBACK_ACTION,
+			static function ( WP_Query $query ) use ( &$fallbacks ): void {
+				$fallbacks[] = $query;
+			}
+		);
+
+		$search = new {{class}}();
+		$query  = new WP_Query();
+		$query->set( 'ep_integrate', true );
+
+		$this->assertSame( [], $search->report_fallback( [], $query ) );
+		$this->assertNull( $search->report_fallback( null, $query ) );
+		$this->assertSame( [ $query ], $fallbacks );
+	}
+
+	/**
+	 * META_KEYS are added in whichever format the allow list arrived in.
+	 */
+	public function test_meta_allow_list_keeps_its_format(): void {
+		$search = new {{class}}();
+
+		$as_list = $search->filter_meta_allow_list( [ 'existing_key' ] );
+		$as_map  = $search->filter_meta_allow_list( [ 'existing_key' => true ] );
+
+		$this->assertSame( array_values( array_unique( array_merge( [ 'existing_key' ], {{class}}::META_KEYS ) ) ), $as_list );
+		$this->assertSame( array_merge( [ 'existing_key' => true ], array_fill_keys( {{class}}::META_KEYS, true ) ), $as_map );
+		$this->assertSame( 'not-an-array', $search->filter_meta_allow_list( 'not-an-array' ) );
+	}
+
+	/**
+	 * Point a query at a post type and filter it by meta.
+	 *
+	 * @param \WP_Query $query     The query to change.
+	 * @param string    $post_type Post type to query.
+	 */
+	private static function filter_by_meta( WP_Query $query, string $post_type ): void {
+		$query->set( 'post_type', $post_type );
+		$query->set(
+			'meta_query',
+			[
+				[
+					'key'   => 'example_key',
+					'value' => 'example',
+				],
+			]
+		);
+	}
+}

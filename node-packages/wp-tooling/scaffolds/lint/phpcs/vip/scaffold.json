@@ -13,8 +13,16 @@
 	"composer_dev_dependencies": {
 		"squizlabs/php_codesniffer": "^3.7",
 		"wp-coding-standards/wpcs": "^3.0",
-		"automattic/vip-coding-standards": "^3.0"
+		"automattic/vipwpcs": "^3.0"
 	},
+	"wiring": [
+		{
+			"target_file": "composer.json",
+			"anchor": "\"allow-plugins\"",
+			"snippet_template": "\"config\": {\n    \"allow-plugins\": {\n        \"dealerdirect/phpcodesniffer-composer-installer\": true\n    }\n}",
+			"description": "WPCS and VIPCS depend on this Composer plugin to register their standards, and Composer will not install it until it is allowed. Merge the entry into the existing config.allow-plugins, or create it. Apply before installing the packages."
+		}
+	],
 	"scripts": {
 		"composer": {
 			"lint:php": "phpcs --standard=phpcs.xml.dist",
