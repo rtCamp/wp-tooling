@@ -74,6 +74,42 @@ describe('validate base scaffold', () => {
 	});
 });
 
+describe('validate lens', () => {
+	it('accepts an array of known lens skills', () => {
+		expect(
+			validate({ ...baseValid(), lens: ['performance', 'security'] })
+		).toEqual([]);
+	});
+
+	it('rejects a bare string, so a single lens is still an array', () => {
+		expect(validate({ ...baseValid(), lens: 'performance' })).toEqual([
+			'lens: must be a non-empty array of lens names',
+		]);
+	});
+
+	it('rejects an empty array', () => {
+		expect(validate({ ...baseValid(), lens: [] })).toEqual([
+			'lens: must be a non-empty array of lens names',
+		]);
+	});
+
+	it('rejects an MCP ability name, naming the offending position', () => {
+		// runtime-health is an ability a lens reads, not a lens itself.
+		const errors = validate({
+			...baseValid(),
+			lens: ['performance', 'runtime-health'],
+		});
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatch(/^lens\[1\]: must be one of /);
+	});
+
+	it('rejects duplicates', () => {
+		expect(
+			validate({ ...baseValid(), lens: ['security', 'security'] })
+		).toEqual(['lens: must not contain duplicates']);
+	});
+});
+
 describe('validate files block', () => {
 	it('rejects non-array files', () => {
 		const errors = validate({ ...baseValid(), files: 'nope' });

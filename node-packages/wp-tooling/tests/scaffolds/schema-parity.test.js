@@ -46,6 +46,7 @@ const everyKey = () => ({
 	description: 'Adds a CLI command.',
 	source: 'template',
 	wizard_step: null,
+	lens: ['performance'],
 	module_class: 'Inc\\Cli\\Command',
 	files: [{ src: 'a.mustache', dest: 'a.php', raw: false }],
 	inputs: [
