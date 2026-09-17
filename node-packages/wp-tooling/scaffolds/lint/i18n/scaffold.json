@@ -19,6 +19,7 @@
 		}
 	],
 	"composer_dev_dependencies": {
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
 		"squizlabs/php_codesniffer": "^3.7",
 		"wp-coding-standards/wpcs": "^3.0"
 	},
