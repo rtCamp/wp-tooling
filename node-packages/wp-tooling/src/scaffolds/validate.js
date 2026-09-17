@@ -29,6 +29,7 @@ const {
 	REQUIRED_FIELDS,
 	ALLOWED_SOURCES,
 	ALLOWED_WIZARD_STEPS,
+	ALLOWED_LENSES,
 	ALLOWED_TEST_FRAMEWORKS,
 	ALLOWED_SECRET_SCOPES,
 	ALLOWED_INPUT_TRANSFORMS,
@@ -167,6 +168,9 @@ function validate(scaffold) {
 			).join(', ')}`
 		);
 	}
+	if (scaffold.lens !== undefined) {
+		errors.push(...validateLens(scaffold.lens));
+	}
 
 	if (scaffold.files !== undefined) {
 		errors.push(...validateFiles(scaffold.files));
@@ -196,6 +200,24 @@ function validate(scaffold) {
 		}
 	}
 
+	return errors;
+}
+
+function validateLens(lens) {
+	if (!Array.isArray(lens) || lens.length === 0) {
+		return ['lens: must be a non-empty array of lens names'];
+	}
+	const errors = [];
+	lens.forEach((name, i) => {
+		if (!ALLOWED_LENSES.includes(name)) {
+			errors.push(
+				`lens[${i}]: must be one of ${ALLOWED_LENSES.join(', ')}`
+			);
+		}
+	});
+	if (new Set(lens).size !== lens.length) {
+		errors.push('lens: must not contain duplicates');
+	}
 	return errors;
 }
 

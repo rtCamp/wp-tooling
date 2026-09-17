@@ -1,0 +1,152 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_UnitTestCase;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * URL every case requests. No request leaves the test: pre_http_request answers it.
+	 */
+	private const URL = 'https://example.com/feed';
+
+	/**
+	 * The scaffolded limits stay inside what VIP's coding standards accept.
+	 */
+	public function test_limits_satisfy_vip_coding_standards(): void {
+		$this->assertGreaterThanOrEqual( 1, {{class}}::TIMEOUT );
+		$this->assertLessThanOrEqual( 3, {{class}}::TIMEOUT );
+		$this->assertGreaterThanOrEqual( 300, {{class}}::CACHE_TTL );
+	}
+
+	/**
+	 * A successful body is returned, then served from cache without a second request.
+	 */
+	public function test_caches_a_successful_response(): void {
+		$requests = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$requests ): array {
+				++$requests;
+
+				return self::response( 200 );
+			}
+		);
+
+		$client = new {{class}}();
+
+		$this->assertSame( 'payload', $client->get( self::URL ) );
+		$this->assertSame( 'payload', $client->get( self::URL ) );
+		$this->assertSame( 1, $requests );
+	}
+
+	/**
+	 * A failed request returns null and is not cached, so the next call tries again.
+	 */
+	public function test_does_not_cache_a_failure(): void {
+		if ( function_exists( 'wpcom_vip_file_get_contents' ) ) {
+			$this->markTestSkipped( 'On VIP a failing host is backed off by design; this covers the non-VIP path.' );
+		}
+
+		// The first request fails and the second succeeds.
+		$codes = [ 500, 200 ];
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$codes ): array {
+				return self::response( (int) array_shift( $codes ) );
+			}
+		);
+
+		$client = new {{class}}();
+
+		$this->assertNull( $client->get( self::URL ) );
+		$this->assertSame( 'payload', $client->get( self::URL ) );
+	}
+
+	/**
+	 * Every request carries the scaffolded timeout, even when the caller asks for a longer one.
+	 */
+	public function test_requests_use_the_scaffolded_timeout(): void {
+		$timeout = null;
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, array $args ) use ( &$timeout ) {
+				$timeout = $args['timeout'];
+
+				return false === $preempt ? self::response( 200 ) : $preempt;
+			},
+			10,
+			2
+		);
+
+		( new {{class}}() )->get( self::URL, [ 'timeout' => {{class}}::TIMEOUT * 10 ] );
+
+		$this->assertSame( {{class}}::TIMEOUT, $timeout );
+	}
+
+	/**
+	 * An internal host is refused before any connection is made, on VIP and off it.
+	 */
+	public function test_refuses_an_internal_host(): void {
+		$checked = [];
+		add_filter(
+			'http_request_host_is_external',
+			static function ( $external, string $host ) use ( &$checked ) {
+				$checked[] = $host;
+
+				return $external;
+			},
+			10,
+			2
+		);
+
+		// VIP's helper reports every failed request as a notice.
+		set_error_handler( static fn (): bool => true, E_USER_NOTICE ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- Silences only that notice, for this call.
+
+		try {
+			$body = ( new {{class}}() )->get( 'http://127.0.0.1/feed' );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertNull( $body );
+		$this->assertSame( [ '127.0.0.1' ], $checked );
+	}
+
+	/**
+	 * A response in the shape the HTTP API returns, carrying the body 'payload'.
+	 *
+	 * @param int $code HTTP status code.
+	 * @return array<string, mixed> The response.
+	 */
+	private static function response( int $code ): array {
+		return [
+			'headers'  => [],
+			'body'     => 'payload',
+			'response' => [
+				'code'    => $code,
+				'message' => '',
+			],
+			'cookies'  => [],
+			'filename' => null,
+		];
+	}
+}

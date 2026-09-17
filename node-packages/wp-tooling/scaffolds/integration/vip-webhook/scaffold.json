@@ -1,0 +1,127 @@
+{
+	"slug": "vip-webhook",
+	"category": "integration",
+	"name": "VIP-safe webhook receiver",
+	"description": "Adds a REST controller extending AbstractRESTController from rtcamp/wp-framework that receives signed JSON webhooks the way they survive at scale: it verifies an HMAC-SHA256 signature over the raw body in constant time, refuses every delivery until a shared secret is configured, caps the body size, acknowledges a retried delivery without queueing it twice, and hands the payload to a queue (Action Scheduler when loaded, WP-Cron otherwise) instead of doing the work inside the request. The secret is read from a VIP environment variable, or a constant of the same name elsewhere; it is never written by the scaffold.",
+	"source": "template",
+	"wizard_step": "integrations",
+	"lens": ["security", "vip-readiness", "performance"],
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the controller class. Default 'Inc\\Rest' matches the rtCamp skeleton and wp/rest.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Rest"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the controller file. Default 'includes/Rest'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Rest"
+		},
+		{
+			"key": "module_path",
+			"description": "REST module file the controller is listed in. Default 'includes/Modules/Rest.php', the file `wp/module --name=Rest` creates. Pass the project's own file with its exact case, e.g. 'inc/Modules/REST.php' in features-plugin-skeleton: on a case-sensitive filesystem Rest.php is a different file.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Modules/Rest.php"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Rest'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Rest"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Rest'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
+			"default": "tests/Rest"
+		},
+		{
+			"key": "name",
+			"description": "Webhook source, e.g. 'orders' or 'crm-contacts'. Used to derive the class, the route segment, the queued hook and the secret's name.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name prefix, derived from name. The controller is {class}WebhookController.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "route",
+			"description": "Route segment after /webhooks/, derived from name.",
+			"discover_from": "input:name",
+			"transform": "kebab-case"
+		},
+		{
+			"key": "rest_namespace",
+			"description": "REST namespace prefix, e.g. 'myplugin'. The route becomes /wp-json/{rest_namespace}/v{rest_version}/webhooks/{route}.",
+			"required": true
+		},
+		{
+			"key": "rest_version",
+			"description": "API version number, e.g. '1'.",
+			"default": "1"
+		},
+		{
+			"key": "signature_header",
+			"description": "Request header carrying the hex HMAC-SHA256 of the raw body. Match your sender; adapt verify_signature() if it prefixes the digest or signs a timestamp too.",
+			"default": "x-signature"
+		},
+		{
+			"key": "text_domain",
+			"description": "i18n text domain for error messages. Also prefixes the queued hook and the secret's name.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "hook_prefix",
+			"description": "Prefix for the queued hook, derived from text_domain.",
+			"discover_from": "input:text_domain",
+			"transform": "snake-case"
+		},
+		{
+			"key": "hook_name",
+			"description": "Source part of the queued hook, derived from name.",
+			"discover_from": "input:name",
+			"transform": "snake-case"
+		},
+		{
+			"key": "secret_prefix",
+			"description": "Prefix for the secret's environment variable or constant name, derived from text_domain.",
+			"discover_from": "input:text_domain",
+			"transform": "upper-snake-case"
+		},
+		{
+			"key": "secret_name",
+			"description": "Source part of the secret's name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "upper-snake-case"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/webhook.php.mustache",
+			"dest": "{{base_path}}/{{class}}WebhookController.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{module_path}}",
+			"anchor": "// scaffold:wp/rest:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}WebhookController::class,",
+			"description": "Add the controller to the REST module so the framework Loader registers its route on rest_api_init. Edit the module file that exists, matching its case; if the project has none, scaffold it first via `wp-tooling add wp/module --name=Rest --kind=rest`. Deliveries are refused until the secret named by the controller's SECRET_NAME constant is set: as a VIP environment variable on VIP, or a constant in wp-config.php elsewhere. Process payloads in a job on the controller's HOOK, e.g. one from `wp-tooling add integration/vip-cron`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}WebhookControllerTest.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

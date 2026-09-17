@@ -1,32 +1,87 @@
 <?xml version="1.0"?>
-<ruleset name="Project">
-	<description>Extends rtCamp shared standard: WordPress-Core, Extra, Docs, and VIP-Go rules.</description>
+<ruleset
+	name="Project"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
+>
+	<description>Extends rtCampWP, rtCamp's strict WordPress standard.</description>
 
 	<!--
-		Scaffolded by @rtcamp/wp-tooling. The shared rules live at
-		vendor/rtcamp/wp-framework/phpcs.xml.dist. Override a rule for
-		this project by adding it below the include line.
+		Scaffolded by @rtcamp/wp-tooling. rtCampWP (rtcamp/wp-phpcs) is
+		WordPress-Extra, WordPress-Docs, WordPress-VIP-Go and PHPCompatibilityWP,
+		plus strict types, type hints and short arrays. Swap it for
+		rtCampWP-Basic to adopt the same rules on existing code without the
+		strict layer.
 	-->
+	<rule ref="rtCampWP"/>
 
-	<rule ref="vendor/rtcamp/wp-framework/phpcs.xml.dist"/>
+	<!-- Lowest PHP and WordPress versions the project supports. PHPCompatibility cannot run without testVersion. -->
+	<config name="testVersion" value="{{php_version}}-"/>
+	<config name="minimum_wp_version" value="{{wp_version}}"/>
 
-	<file>./</file>
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="{{text_domain}}"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Prefixes match case-insensitively, so one entry also covers constants. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="{{prefix}}"/>
+{{#namespace}}				<element value="{{namespace}}"/>
+{{/namespace}}			</property>
+		</properties>
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+
+	<!-- PSR-4 class files are named after their class (Cli/ImportCommand.php). -->
+	<rule ref="WordPress.Files.FileName">
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+	</rule>
+
+	<!--
+		Core includes a block's render.php inside a function, so its variables
+		are not globals, and the block translates with block.json's textdomain.
+	-->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+		<exclude-pattern>src/blocks/*/render.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.I18n.TextDomainMismatch">
+		<exclude-pattern>src/blocks/*/render.php</exclude-pattern>
+	</rule>
+
+	<!--
+		Tests change runtime config and globals, read fixtures and write temp
+		files. Exclude sniffs by name: a standard referenced again here, such as
+		WordPress-Docs, adds no sniffs, so an exclude-pattern on it does nothing.
+	-->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.PHP.IniSet">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPressVIPMinimum.Functions.RestrictedFunctions">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPressVIPMinimum.Performance.FetchingRemoteData">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+
+	<arg value="s"/>
+	<arg name="basepath" value="./"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="20"/>
+
+	<file>.</file>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 	<exclude-pattern>*/build/*</exclude-pattern>
-	<exclude-pattern>*/tests/*</exclude-pattern>
 
 	<!-- Project-specific overrides go here. -->
-
-	<!--
-		Allow unused function parameters. WordPress hook/filter callbacks,
-		interface methods, and REST/CLI handlers routinely carry
-		signature-mandated parameters they do not use. Unused local variables
-		are still reported.
-	-->
-	<rule ref="VariableAnalysis.CodeAnalysis.VariableAnalysis">
-		<properties>
-			<property name="allowUnusedFunctionParameters" value="true"/>
-		</properties>
-	</rule>
 </ruleset>

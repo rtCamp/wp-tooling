@@ -34,6 +34,23 @@ const ALLOWED_SOURCES = ['template', 'package'];
  */
 const ALLOWED_WIZARD_STEPS = ['modules', 'integrations', 'wp-apis', null];
 
+/**
+ * Lens skills a scaffold's output can be checked with once its tests are
+ * green. Each names a lens *skill* (`skills/<name>/` in wp-dev-tools), never
+ * an MCP ability: a lens decides for itself which abilities to read. Closed,
+ * so a typo fails at authoring time instead of silently skipping the check.
+ * A lens named here need not be installed in every project; the orchestrating
+ * skill runs the ones it finds.
+ */
+const ALLOWED_LENSES = [
+	'accessibility',
+	'i18n',
+	'performance',
+	'security',
+	'seo',
+	'vip-readiness',
+];
+
 /** Test frameworks the engine recognises. Closed enum to catch typos. */
 const ALLOWED_TEST_FRAMEWORKS = [
 	'phpunit',
@@ -246,6 +263,14 @@ const SCAFFOLD_SCHEMA = {
 			description: 'Wizard group, or `null` for `add`-only invocation.',
 			enum: ALLOWED_WIZARD_STEPS,
 		},
+		lens: {
+			type: 'array',
+			description:
+				"Lens skills to check this scaffold's output with once its tests go green, most relevant first. Omit to let the orchestrating skill choose.",
+			items: { type: 'string', enum: ALLOWED_LENSES },
+			minItems: 1,
+			uniqueItems: true,
+		},
 		module_class: {
 			type: 'string',
 			description:
@@ -302,6 +327,7 @@ module.exports = {
 	REQUIRED_FIELDS,
 	ALLOWED_SOURCES,
 	ALLOWED_WIZARD_STEPS,
+	ALLOWED_LENSES,
 	ALLOWED_TEST_FRAMEWORKS,
 	ALLOWED_SECRET_SCOPES,
 	ALLOWED_INPUT_TRANSFORMS,

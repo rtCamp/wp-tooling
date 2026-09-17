@@ -469,6 +469,9 @@ class ScaffoldRegistry {
 				// template scaffolds — the AI orchestrator doesn't need to
 				// branch on where the body came from; both render Mustache.
 				kind: scaffold.source === 'package' ? 'package' : 'template',
+				// Lens skills to run once the new code's tests are green, or
+				// `null` to leave the choice to the orchestrating skill.
+				lens: lensOf(scaffold),
 				dryRun,
 			},
 			engine: {
@@ -1255,6 +1258,10 @@ function makeId(scaffold) {
 	return scaffold.category
 		? `${scaffold.category}/${scaffold.slug}`
 		: scaffold.slug;
+}
+
+function lensOf(scaffold) {
+	return Array.isArray(scaffold.lens) ? [...scaffold.lens] : null;
 }
 
 function makeKey(scaffold) {

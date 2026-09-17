@@ -1,0 +1,93 @@
+{
+	"slug": "vip-search",
+	"category": "integration",
+	"name": "VIP Search query offload",
+	"description": "Adds a Registrable that sends heavy meta and taxonomy queries on one post type to VIP Search (or any ElasticPress backend) through the 'ep_integrate' query var. Adds the queried meta keys to VIP Search's post meta allow list, which indexes none by default, and fires an action whenever an offloaded query silently falls back to MySQL: integration not enabled for the environment, VIP search rate limiting, or an index error. No-ops when no ElasticPress backend is loaded.",
+	"source": "template",
+	"wizard_step": "integrations",
+	"lens": ["vip-readiness", "performance"],
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the service class. Default 'Inc\\Services' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Services"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the service file. Default 'includes/Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Services"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Services'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Services"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
+			"default": "tests/Services"
+		},
+		{
+			"key": "name",
+			"description": "Logical service name, e.g. 'event-search'. Normalised to a PascalCase class name and used in the fallback action name.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "post_type",
+			"description": "Post type whose heavy queries are offloaded, written into the POST_TYPE constant.",
+			"default": "post"
+		},
+		{
+			"key": "text_domain",
+			"description": "Plugin or theme slug. Only used to prefix the fallback action name.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "hook_prefix",
+			"description": "Prefix for the fallback action name, derived from text_domain.",
+			"discover_from": "input:text_domain",
+			"transform": "snake-case"
+		},
+		{
+			"key": "hook_name",
+			"description": "Service part of the fallback action name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "snake-case"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/vip-search.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Services.php",
+			"anchor": "// scaffold:wp/registrable:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the class to a Services module so the framework Loader instantiates it and calls register_hooks(). If no suitable module exists, scaffold one first via `wp-tooling add wp/module --name=Services --kind=registrable`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

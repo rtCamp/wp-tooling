@@ -1,0 +1,146 @@
+<?php
+/**
+ * {{class}}: offload heavy {{post_type}} queries to VIP Search.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://docs.wpvip.com/vip-search/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use WP_Query;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Sends meta and taxonomy queries on one post type to the search index.
+ *
+ * VIP Search is built on ElasticPress, so the 'ep_integrate' query var works
+ * on VIP and on any ElasticPress host alike. A query reaches the index one of
+ * two ways: a secondary query opts in where it is built, with
+ * `new WP_Query( [ 'ep_integrate' => true, ... ] )`, and the main query is
+ * opted in here when should_offload() picks it. Three things make the offload
+ * quieter than it looks, and this class covers each:
+ *
+ * - Only the main query is changed from pre_get_posts. Changing every query
+ *   there would move admin screens, widgets and feeds with it.
+ * - VIP Search indexes no post meta by default, so a meta query against a key
+ *   missing from META_KEYS matches nothing in the index.
+ * - A query sent to the index can still run against MySQL: when query
+ *   integration is not enabled for the environment, when VIP rate-limits
+ *   search, or when the index errors. That happens silently, so it is
+ *   announced on FALLBACK_ACTION instead, for queries opted in either way.
+ */
+final class {{class}} implements Registrable {
+
+	/**
+	 * Post type whose heavy queries are offloaded.
+	 */
+	public const POST_TYPE = '{{post_type}}';
+
+	/**
+	 * Post meta keys the index must carry for meta queries to match, e.g. [ 'event_date' ].
+	 *
+	 * @var string[]
+	 */
+	public const META_KEYS = [];
+
+	/**
+	 * Action fired with the WP_Query when a query sent to the index falls back to MySQL.
+	 *
+	 * Listen on this constant. report_fallback() fires the same name as a
+	 * literal, so coding standards can check its prefix.
+	 */
+	public const FALLBACK_ACTION = '{{hook_prefix}}_{{hook_name}}_search_fallback';
+
+	/**
+	 * Bind the query hooks. Called by the framework Loader.
+	 *
+	 * No-ops without an ElasticPress backend, which VIP Search also loads.
+	 */
+	public function register_hooks(): void {
+		if ( ! defined( 'EP_VERSION' ) ) {
+			return;
+		}
+
+		add_action( 'pre_get_posts', [ $this, 'offload' ] );
+		add_filter( 'posts_pre_query', [ $this, 'report_fallback' ], 20, 2 );
+		add_filter( 'vip_search_post_meta_allow_list', [ $this, 'filter_meta_allow_list' ] );
+	}
+
+	/**
+	 * Whether the main query should be answered by the search index.
+	 *
+	 * Picks front-end queries on POST_TYPE that filter by meta or taxonomy, the
+	 * shape MySQL handles worst on large tables. Narrow it to your own archives.
+	 *
+	 * @param \WP_Query $query The query about to run.
+	 * @return bool True to send the query to the index.
+	 */
+	public function should_offload( WP_Query $query ): bool {
+		if ( is_admin() || self::POST_TYPE !== $query->get( 'post_type' ) ) {
+			return false;
+		}
+
+		return ! empty( $query->get( 'meta_query' ) ) || ! empty( $query->get( 'tax_query' ) );
+	}
+
+	/**
+	 * Send the main query to the index when should_offload() picks it.
+	 *
+	 * @param \WP_Query $query The query about to run.
+	 */
+	public function offload( WP_Query $query ): void {
+		if ( ! $query->is_main_query() || ! $this->should_offload( $query ) ) {
+			return;
+		}
+
+		$query->set( 'ep_integrate', true );
+	}
+
+	/**
+	 * Announce a query sent to the index that the index did not answer.
+	 *
+	 * Runs after ElasticPress, which hands the index's posts to this filter on
+	 * success and leaves them null when integration is skipped or the index
+	 * errors. A null here, for a query that asked for the index, means MySQL
+	 * runs it next.
+	 *
+	 * @param array<int, \WP_Post|int>|null $posts Posts supplied so far, or null to let MySQL run the query.
+	 * @param \WP_Query                     $query The query about to run.
+	 * @return array<int, \WP_Post|int>|null The posts, untouched.
+	 */
+	public function report_fallback( $posts, WP_Query $query ) {
+		if ( null === $posts && true === $query->get( 'ep_integrate' ) ) {
+			do_action( '{{hook_prefix}}_{{hook_name}}_search_fallback', $query );
+		}
+
+		return $posts;
+	}
+
+	/**
+	 * Add META_KEYS to the post meta VIP Search indexes.
+	 *
+	 * The allow list arrives either as a list of keys or as a key => true map,
+	 * and VIP discards entries that do not follow the format they arrived in.
+	 *
+	 * @param mixed $allow_list Meta keys already allowed.
+	 * @return mixed The allow list with META_KEYS added in the same format. Anything but an array is returned untouched.
+	 */
+	public function filter_meta_allow_list( mixed $allow_list ): mixed {
+		if ( ! is_array( $allow_list ) ) {
+			return $allow_list;
+		}
+
+		if ( array_is_list( $allow_list ) ) {
+			return array_values( array_unique( array_merge( $allow_list, self::META_KEYS ) ) );
+		}
+
+		return array_merge( $allow_list, array_fill_keys( self::META_KEYS, true ) );
+	}
+}

@@ -2,6 +2,8 @@
 /**
  * PHPUnit bootstrap: loads Composer autoloader and optionally the
  * WordPress test suite when WP_TESTS_DIR is set.
+ *
+ * @package {{tests_namespace}}
  */
 
 declare( strict_types = 1 );
@@ -16,8 +18,7 @@ if ( $wp_tests_dir ) {
 	tests_add_filter(
 		'muplugins_loaded',
 		static function () {
-			// Load the plugin under test here.
-			// require dirname( __DIR__ ) . '/plugin-name.php';
+			// Require the plugin under test here, e.g. dirname( __DIR__ ) . '/plugin-name.php'.
 		}
 	);
 

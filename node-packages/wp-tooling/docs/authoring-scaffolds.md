@@ -229,6 +229,25 @@ Use sections inside `snippet_template` to vary the snippet by flag (e.g. the sin
 
 ---
 
+## Lens (`lens[]`)
+
+`lens` names the lens skills that should check a scaffold's output once its tests are green, most relevant first:
+
+```json
+"lens": ["vip-readiness", "performance", "security"]
+```
+
+- **Always an array**, even for one lens. A bare string is rejected, as are an empty array and duplicates.
+- **Lens skills only**, from a closed list: `accessibility`, `i18n`, `performance`, `security`, `seo`, `vip-readiness`. A lens is a skill (`skills/<name>/` in wp-dev-tools) that decides for itself which MCP abilities to read, so an ability name such as `runtime-health` is rejected — name the lens that reads it (`performance`) instead. A typo fails `validate` rather than silently skipping the check.
+- **A recommendation, not a dependency.** The list includes lenses a given project may not have installed; the orchestrating skill runs the ones it finds. That is also why the enum can name a lens before it ships, without a wp-tooling release for each new one.
+- **Optional.** Omit it and `execute()` and `list --json` report `lens: null`, leaving the choice to the orchestrating skill.
+
+Order by what the generated code most needs checked. `integration/vip-webhook` leads with `security` because signature verification is its riskiest code; `integration/vip-cron` leads with `vip-readiness` because Cron Control is what it exists to satisfy.
+
+To add a lens, extend `ALLOWED_LENSES` in `src/scaffolds/schema.js` — `validate.js` and the schema-parity test read it from there.
+
+---
+
 ## Features (`feature{}`) — toggleable scaffolds
 
 An optional `feature` block turns a scaffold into something `wp-tooling features` can switch on and
@@ -290,6 +309,8 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
 
 `wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8; `wp-api/block-bindings` and `wp-api/script-module`, both WP 6.5). Those pair with `"wizard_step": "wp-apis"`.
+
+`integration` holds opinionated integrations with a specific platform or service, where the value is encoding that platform's rules rather than a WordPress primitive (`integration/vip-search`, `integration/vip-remote-request`, `integration/vip-cron`, `integration/vip-webhook`). Each builds on a `wp` kind and reuses its wiring anchor — `vip-cron` wires where `wp/cron` does, `vip-webhook` where `wp/rest` does — and must degrade to working, standard behaviour off the platform instead of fataling. They pair with `"wizard_step": "integrations"`. Prefer a scaffold here only when the output is code the project owns and keeps; configuring an existing plugin, or an ongoing sync, is skill-shaped rather than scaffold-shaped.
 
 A block stays in `wp` even when its behaviour comes from a modern core API: `wp/block-interactive` uses the Interactivity API, but what it generates is a block directory, so it sits beside `wp/block-dynamic` and shares its wiring anchor rather than opening a `block` category.
 
@@ -402,6 +423,11 @@ Look at these existing scaffolds when authoring a new one:
 | Block with `block.json` + framework class | `wp/block-dynamic` |
 | Block with `render.php` + a `viewScriptModule` store | `wp/block-interactive` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
+| Platform-specific code that no-ops or falls back off the platform | `integration/vip-search`, `integration/vip-remote-request` |
+| Service class with no wiring, instantiated by its callers | `integration/vip-remote-request` |
+| Input constrained to values a coding standard accepts (`enum`) | `integration/vip-remote-request` (`timeout`, `cache_ttl`), `integration/vip-cron` (`schedule`) |
+| Hook and constant names prefixed from the project's text domain | `integration/vip-*` (`hook_prefix` / `secret_prefix` derived via `input:text_domain`) |
+| Extending a `wp` kind and reusing its wiring anchor | `integration/vip-cron` (`wp/cron`), `integration/vip-webhook` (`wp/rest`) |
 | Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 
 Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.

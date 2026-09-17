@@ -80,6 +80,10 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp-api/block-bindings` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 | `wp-api/script-module` | `includes/Services/` + `src/js/modules/` + `build/js/modules/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 | `wp/block-interactive` | `includes/Blocks/` + `src/blocks/<slug>/` + `build/blocks/<slug>/` | `<Root>\Blocks` | `tests/Blocks/` | `<Root>\Tests\Blocks` | `<Root>\Modules\Blocks` |
+| `integration/vip-search` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `integration/vip-remote-request` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | none - a service its callers instantiate |
+| `integration/vip-cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
+| `integration/vip-webhook` | `includes/Rest/` | `<Root>\Rest` | `tests/Rest/` | `<Root>\Tests\Rest` | `<Root>\Modules\Rest` - pass `--module_path` when the project names the file differently, e.g. `REST.php` |
 
 **Modules host one kind each. No `Modules/<Feature>/...`.** A multi-kind feature (e.g. Testimonials = CPT + taxonomy + block + REST) spans the per-kind directories and wires into each kind's module.
 
@@ -103,6 +107,10 @@ Write a test-case checklist covering:
   - `wp/block-interactive`: `register_hooks()` defers to `init`, the block dir points at the build output (never the source tree), and registration no-ops before WP 6.5 or before a build. Do **not** assert the block is registered - the build output is gitignored, so that fails on a clean checkout. Also confirm `block.json` still declares `supports.interactivity`: without it core never processes the `data-wp-*` directives and the block silently does nothing.
   - `wp-api/block-bindings`: the source registers on `init` only when the API exists, `SOURCE_NAME` is a name core accepts (namespace prefix, lowercase alphanumerics and dashes), `WP_Block_Bindings_Registry` reports it registered, and `get_value()` returns `null` - not an empty string - when there is nothing to resolve. Context-dependent cases need a block type declaring the source's `uses_context`, since `WP_Block` exposes nothing else.
   - `wp-api/script-module`: both hooks bound only when the API exists, `MODULE_ID` follows core's `@vendor/name` import-map convention, string dependencies normalise to `[ 'id' => ... ]` form, and the enqueued module prints with a URL inside the build directory.
+  - `integration/vip-search`: hooks bound only when an ElasticPress backend is loaded (`EP_VERSION`), only the **main** query is changed from `pre_get_posts` (secondary queries opt in with `'ep_integrate' => true` where they are built), `should_offload()` picks only meta or taxonomy queries on the post type, the fallback action fires for a null result and never for posts the index returned, and `META_KEYS` join VIP's meta allow list in the format it arrived in. The fallback is the point: without query integration enabled for the environment, or under VIP search rate limiting, `ep_integrate` silently runs on MySQL.
+  - `integration/vip-remote-request`: `TIMEOUT` stays within 1-3 and `CACHE_TTL` at 300 or more, a successful body is served from cache without a second request, a failure is never cached, and the scaffolded timeout wins over a caller's. Mock with `pre_http_request`; do not hook `http_request_args` (a VIP restricted hook) or pass a literal timeout above 3, both of which fail `WordPress-VIP-Go`.
+  - `integration/vip-cron`: the job runs on exactly **one** runner - starting from an existing WP-Cron event, `ensure_scheduled()` keeps it without Action Scheduler and clears it for a single Action Scheduler action with it - checking twice schedules nothing extra, the schedule is one `wp_get_schedules()` knows, and the Cron Control concurrency filter keeps other plugins' entries. Assert the runner from `is_available()` rather than assuming one, so the case holds on both.
+  - `integration/vip-webhook`: the route accepts POST only, a delivery is refused until a secret is set, the signature is checked over the raw body (a changed body fails), a body that is neither a JSON object nor an array gets 400 and an oversized one 413, and a repeated delivery to the same webhook is acknowledged with 200 without being queued twice. Override `get_secret()` in an anonymous subclass rather than defining the real constant.
 
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 
@@ -167,7 +175,7 @@ Frameworks per kind:
 
 | Kind | Framework |
 |---|---|
-| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation`, `wp-api/block-bindings`, `wp-api/script-module` | PHPUnit |
+| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation`, `wp-api/block-bindings`, `wp-api/script-module`, `integration/vip-search`, `integration/vip-remote-request`, `integration/vip-cron`, `integration/vip-webhook` | PHPUnit |
 | `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
 | `wp/block-interactive` | PHPUnit (registrar). The `view.js` store is not unit-tested: `@wordpress/interactivity` ships ESM only, which the `@wordpress/jest-preset-default` CJS setup cannot resolve. |
 | `ci/*` | actionlint + yaml-parse |

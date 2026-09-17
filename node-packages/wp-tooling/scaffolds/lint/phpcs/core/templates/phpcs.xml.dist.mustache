@@ -1,19 +1,86 @@
 <?xml version="1.0"?>
-<ruleset name="Project">
-	<description>WordPress combined standard: Core, Extra, and Docs rules from wp-coding-standards/wpcs.</description>
+<ruleset
+	name="Project"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd"
+>
+	<description>Extends rtCampWP-Basic, rtCamp's WordPress standard without strict typing.</description>
 
 	<!--
-		Scaffolded by @rtcamp/wp-tooling. Extend or override rules below.
-		Switch to lint/phpcs/full if your project needs VIP-Go rules.
+		Scaffolded by @rtcamp/wp-tooling. rtCampWP-Basic (rtcamp/wp-phpcs) is
+		WordPress-Extra, WordPress-Docs, WordPress-VIP-Go and PHPCompatibilityWP,
+		allowing [] and ?:. Once the code is ready for strict types, type hints
+		and short arrays, swap it for rtCampWP.
 	-->
+	<rule ref="rtCampWP-Basic"/>
 
-	<rule ref="WordPress"/>
+	<!-- Lowest PHP and WordPress versions the project supports. PHPCompatibility cannot run without testVersion. -->
+	<config name="testVersion" value="{{php_version}}-"/>
+	<config name="minimum_wp_version" value="{{wp_version}}"/>
 
-	<file>./</file>
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="{{text_domain}}"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Prefixes match case-insensitively, so one entry also covers constants. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="{{prefix}}"/>
+{{#namespace}}				<element value="{{namespace}}"/>
+{{/namespace}}			</property>
+		</properties>
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+
+	<!-- PSR-4 class files are named after their class (Cli/ImportCommand.php). -->
+	<rule ref="WordPress.Files.FileName">
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+	</rule>
+
+	<!--
+		Core includes a block's render.php inside a function, so its variables
+		are not globals, and the block translates with block.json's textdomain.
+	-->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+		<exclude-pattern>src/blocks/*/render.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.I18n.TextDomainMismatch">
+		<exclude-pattern>src/blocks/*/render.php</exclude-pattern>
+	</rule>
+
+	<!--
+		Tests change runtime config and globals, read fixtures and write temp
+		files. Exclude sniffs by name: a standard referenced again here, such as
+		WordPress-Docs, adds no sniffs, so an exclude-pattern on it does nothing.
+	-->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.PHP.IniSet">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPressVIPMinimum.Functions.RestrictedFunctions">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPressVIPMinimum.Performance.FetchingRemoteData">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+
+	<arg value="s"/>
+	<arg name="basepath" value="./"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="20"/>
+
+	<file>.</file>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 	<exclude-pattern>*/build/*</exclude-pattern>
-	<exclude-pattern>*/tests/*</exclude-pattern>
 
 	<!-- Project-specific overrides go here. -->
 </ruleset>

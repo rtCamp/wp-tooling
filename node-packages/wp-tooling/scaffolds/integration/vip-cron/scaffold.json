@@ -1,0 +1,94 @@
+{
+	"slug": "vip-cron",
+	"category": "integration",
+	"name": "VIP-aware recurring job",
+	"description": "Adds a recurring background job on AbstractJob from rtcamp/wp-framework that runs through Action Scheduler when it is loaded and through a WP-Cron event otherwise, which Cron Control runs on WordPress VIP. AbstractJob alone schedules nothing without Action Scheduler; this job falls back to WP-Cron and clears that event once Action Scheduler appears, so it always runs on exactly one runner. Checks its schedule on admin requests only and declares its Cron Control concurrency. Distinct from wp/cron, which is a bare wp_schedule_event() Registrable.",
+	"source": "template",
+	"wizard_step": "integrations",
+	"lens": ["vip-readiness", "performance"],
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the job class. Default 'Inc\\Cron' matches the rtCamp skeleton and wp/cron.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Cron"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the job file. Default 'includes/Cron'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Cron"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Cron'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Cron"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Cron'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
+			"default": "tests/Cron"
+		},
+		{
+			"key": "name",
+			"description": "Job slug, kebab- or snake-case, e.g. 'sync-feed'. Used to derive the class and the hook name.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "text_domain",
+			"description": "Plugin or theme slug. Only used to prefix the hook name.",
+			"discover_from": "plugin-header:text-domain",
+			"default": "my-plugin"
+		},
+		{
+			"key": "hook_prefix",
+			"description": "Prefix for the hook name, derived from text_domain.",
+			"discover_from": "input:text_domain",
+			"transform": "snake-case"
+		},
+		{
+			"key": "hook_name",
+			"description": "Job part of the hook name, derived from name.",
+			"discover_from": "input:name",
+			"transform": "snake-case"
+		},
+		{
+			"key": "schedule",
+			"enum": ["hourly", "twicedaily", "daily", "weekly"],
+			"description": "How often the job runs: a WP-Cron schedule core registers, whose interval is also used for Action Scheduler.",
+			"default": "hourly"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/vip-cron.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Cron.php",
+			"anchor": "// scaffold:wp/cron:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the job to the Cron module so the framework Loader calls register_hooks() during boot. If the Cron module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cron --kind=cron`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}
