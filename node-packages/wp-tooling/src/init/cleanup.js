@@ -5,39 +5,52 @@
 'use strict';
 
 const fs = require('fs');
-const { resolveWithin } = require('./transform');
+const path = require('path');
+const { resolveWithin, validateRelativePath } = require('./transform');
 
 /**
- * Delete each target (file or directory) under `root` if it exists. Targets that
- * resolve outside the project root are refused, never deleted.
+ * Validate every cleanup target before deletion starts.
  *
  * @param {string}   root    - Project root.
  * @param {string[]} targets - Project-relative paths to remove.
- * @param {Object}   ui      - `@rtcamp/wp-tooling/ui`.
- * @return {number} Count of targets removed.
+ * @return {Object[]} Validated relative and absolute paths.
+ */
+const resolveCleanupTargets = (root, targets = []) => {
+	if (!Array.isArray(targets)) {
+		throw new Error(
+			`Expected cleanup.targets to be an array, received ${JSON.stringify(targets)}`
+		);
+	}
+	return targets.map((target) => {
+		validateRelativePath(target);
+		const full = resolveWithin(root, target);
+		if (full === path.resolve(root)) {
+			throw new Error(`Refusing to remove the project root: ${target}`);
+		}
+		return { target, full };
+	});
+};
+
+/**
+ * Delete validated cleanup targets, skipping paths that no longer exist.
+ *
+ * @param {string}   root    Project root.
+ * @param {string[]} targets Relative paths to remove.
+ * @param {Object}   ui      Status output.
+ * @return {number} Number of targets removed.
  */
 const runCleanup = (root, targets, ui) => {
+	const resolved = resolveCleanupTargets(root, targets);
 	let removed = 0;
-	(targets || []).forEach((target) => {
-		let full;
-		try {
-			full = resolveWithin(root, target);
-		} catch (err) {
-			ui.warn(err.message);
-			return;
-		}
+	for (const { target, full } of resolved) {
 		if (!fs.existsSync(full)) {
-			return;
+			continue;
 		}
-		try {
-			fs.rmSync(full, { recursive: true, force: true });
-			ui.info(`removed ${target}`);
-			removed++;
-		} catch (err) {
-			ui.warn(`Could not remove ${target}: ${err.message}`);
-		}
-	});
+		fs.rmSync(full, { recursive: true, force: true });
+		ui.info(`removed ${target}`);
+		removed++;
+	}
 	return removed;
 };
 
-module.exports = { runCleanup };
+module.exports = { runCleanup, resolveCleanupTargets };

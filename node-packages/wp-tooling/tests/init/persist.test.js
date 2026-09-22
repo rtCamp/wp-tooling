@@ -51,7 +51,7 @@ describe('readIdentityFile', () => {
 		expect(caught).toBeInstanceOf(IdentityFileError);
 		expect(caught.code).toBe('EIDENTITYCORRUPT');
 		expect(caught.path).toBe(path.join(root, IDENTITY_FILE));
-		expect(caught.message).toMatch(/--reinit/);
+		expect(caught.message).toMatch(/Restore a valid identity/);
 	});
 
 	it.each([
