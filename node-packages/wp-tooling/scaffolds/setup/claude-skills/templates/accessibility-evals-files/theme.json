@@ -1,0 +1,12 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 2,
+	"settings": {
+		"color": {
+			"palette": [
+				{ "slug": "cyan-bluish-gray", "color": "#abb8c3", "name": "Cyan bluish gray" },
+				{ "slug": "vivid-cyan-blue", "color": "#0693e3", "name": "Vivid cyan blue" }
+			]
+		}
+	}
+}

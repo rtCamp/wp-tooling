@@ -157,6 +157,13 @@ describe('render — sections', () => {
 });
 
 describe('applyTransform', () => {
+	it('json-escape round-trips quotes, backslashes and control characters', () => {
+		const value = '"quoted"\\path\n\t\r\u0000';
+		expect(JSON.parse(`"${applyTransform(value, 'json-escape')}"`)).toBe(
+			value
+		);
+	});
+
 	it('pascal-case from kebab', () => {
 		expect(applyTransform('qm-export', 'pascal-case')).toBe('QmExport');
 	});
