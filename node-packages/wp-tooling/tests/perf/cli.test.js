@@ -89,7 +89,7 @@ describe('perf runCli', () => {
 			return true;
 		});
 
-		resolveModule.requireModule.mockReturnValue({
+		resolveModule.requirePuppeteer.mockReturnValue({
 			launch: jest.fn(),
 			executablePath: jest.fn(() => '/chrome-for-testing'),
 		});
@@ -141,7 +141,7 @@ describe('perf runCli', () => {
 	});
 
 	test('missing puppeteer exits 2 with the install hint', async () => {
-		resolveModule.requireModule.mockReturnValue(null);
+		resolveModule.requirePuppeteer.mockReturnValue(null);
 		expect(await runCli(['--config', FIXTURE_CONFIG])).toBe(2);
 		expect(stderr.join('')).toMatch(/puppeteer not found/);
 		expect(stderr.join('')).toMatch(/wp-tooling add setup\/perf/);
@@ -237,7 +237,7 @@ describe('perf runCli', () => {
 		expect(code).toBe(1);
 		const parsed = JSON.parse(stdout.join(''));
 		expect(parsed.summary.failedUrls).toBeGreaterThan(0);
-		expect(stderr.join('')).toMatch(/failed to load/);
+		expect(stderr.join('')).toMatch(/incomplete/);
 
 		// Lighthouse needs the same reachability as puppeteer, so it must be
 		// skipped for a failed URL: only the initial --version probe ran, no

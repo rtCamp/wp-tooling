@@ -74,25 +74,23 @@ function resolveModuleFile(moduleName, relFile, options = {}) {
 }
 
 /**
- * Resolve AND `require` a consumer-installed module, returning the loaded
- * module (never a path) so callers — and their tests — depend only on this
- * function's return value, not on Node's real module resolution. `run.js`
- * uses this exclusively to obtain `puppeteer`; tests substitute a fake
- * module by mocking this file, no real puppeteer install required.
+ * Resolve AND `require` the consumer-installed `puppeteer`, returning the
+ * loaded module (never a path) so `run.js` — and its tests — depend only on
+ * this function's return value, not on Node's real module resolution; tests
+ * substitute a fake module by mocking this file, no real puppeteer install
+ * required.
  *
- * @param {string} moduleName    Package name.
  * @param {Object} [options]
  * @param {string} [options.cwd] Directory to resolve from.
  * @return {*} The loaded module, or `null` when not installed.
  */
-function requireModule(moduleName, options = {}) {
-	const dir = resolveModuleDir(moduleName, options);
+function requirePuppeteer(options = {}) {
+	const dir = resolveModuleDir('puppeteer', options);
 	if (!dir) {
 		return null;
 	}
-	// Load by package name through Node's resolver, anchored in the consumer's
-	// tree, rather than requiring a computed path.
-	return createRequire(path.join(dir, 'package.json'))(moduleName);
+	// Literal specifier through Node's resolver, anchored in the consumer's tree.
+	return createRequire(path.join(dir, 'package.json'))('puppeteer');
 }
 
 /**
@@ -131,6 +129,6 @@ module.exports = {
 	findModuleDir,
 	resolveModuleDir,
 	resolveModuleFile,
-	requireModule,
+	requirePuppeteer,
 	detectModule,
 };

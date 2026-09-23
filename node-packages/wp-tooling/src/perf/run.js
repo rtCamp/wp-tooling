@@ -24,7 +24,7 @@ const { RunnerError } = require('./errors');
 const { resolveConfig } = require('./config');
 const {
 	resolveModuleFile,
-	requireModule,
+	requirePuppeteer,
 	detectModule,
 } = require('./resolve-module');
 const { detectBin, resolveBin } = require('./resolve-bin');
@@ -77,7 +77,7 @@ async function runPerf(options = {}) {
 		cwd,
 	});
 
-	const puppeteer = requireModule('puppeteer', { cwd });
+	const puppeteer = requirePuppeteer({ cwd });
 	requireInstalled(
 		puppeteer,
 		`puppeteer not found. Install it in the project (\`${INSTALL_HINT}\` sets it up).`
@@ -291,7 +291,7 @@ function emit(report, mode) {
 	}
 	const summary = report.summary;
 	const failed =
-		summary.failedUrls > 0 ? `, ${summary.failedUrls} failed to load` : '';
+		summary.failedUrls > 0 ? `, ${summary.failedUrls} incomplete` : '';
 	const lines = [
 		`${report.tool}: ${summary.issues} issue(s) across ${summary.urls} URL(s); ${summary.passedUrls} clean${failed}.`,
 	];
@@ -502,7 +502,7 @@ async function runCli(argv) {
 	emit(report, opts.output);
 	if (report.summary.failedUrls > 0) {
 		process.stderr.write(
-			`perf: ${report.summary.failedUrls} URL(s) failed to load — treating as a run failure.\n`
+			`perf: ${report.summary.failedUrls} URL(s) incomplete (failed to load or measure) — treating as a run failure.\n`
 		);
 		return 1;
 	}

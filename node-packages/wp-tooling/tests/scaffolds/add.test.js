@@ -232,6 +232,9 @@ describe('add command human report', () => {
 				source: 'template',
 				files: [{ src: 'templates/out.txt.mustache', dest: 'out.txt' }],
 				npm_dev_dependencies: { 'pa11y-ci': '^6.0.0' },
+				scripts: {
+					npm: { 'profile:server': `run --cwd='my "odd" dir'` },
+				},
 			}),
 			'utf8'
 		);
@@ -261,6 +264,31 @@ describe('add command human report', () => {
 		expect(code).toBe(0);
 		expect(captured).toContain('Install (npm dev):');
 		expect(captured).toContain('npm install --save-dev pa11y-ci@^6.0.0');
+	});
+
+	it('prints package.json script entries as valid JSON, escaping quotes', async () => {
+		const cwd = makeTmpDir();
+		await buildProjectWithDevDeps(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		let captured = '';
+		process.stdout.write = (chunk) => {
+			captured += chunk;
+			return true;
+		};
+		const code = await add.runCli([
+			'test/devdeps',
+			'--non-interactive',
+			'--cwd',
+			cwd,
+		]);
+		process.stdout.write = originalOut;
+		expect(code).toBe(0);
+		const entry = captured
+			.split('\n')
+			.find((l) => l.trim().startsWith('"profile:server"'));
+		expect(JSON.parse(`{${entry}}`)).toEqual({
+			'profile:server': `run --cwd='my "odd" dir'`,
+		});
 	});
 });
 

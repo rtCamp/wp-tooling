@@ -188,13 +188,17 @@ function printHumanReport(result) {
 		if (npmScripts.length) {
 			lines.push('  Add to package.json "scripts":');
 			for (const [name, cmd] of npmScripts) {
-				lines.push(`    "${name}": "${cmd}"`);
+				lines.push(
+					`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}`
+				);
 			}
 		}
 		if (composerScripts.length) {
 			lines.push('  Add to composer.json "scripts":');
 			for (const [name, cmd] of composerScripts) {
-				lines.push(`    "${name}": "${cmd}"`);
+				lines.push(
+					`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}`
+				);
 			}
 		}
 		if (developer.secrets.length) {

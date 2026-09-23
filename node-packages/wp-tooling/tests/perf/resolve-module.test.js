@@ -8,7 +8,7 @@ const {
 	findModuleDir,
 	resolveModuleDir,
 	resolveModuleFile,
-	requireModule,
+	requirePuppeteer,
 	detectModule,
 } = require('../../src/perf/resolve-module');
 
@@ -116,7 +116,7 @@ describe('resolveModuleDir / resolveModuleFile', () => {
 	});
 });
 
-describe('requireModule', () => {
+describe('requirePuppeteer', () => {
 	let root;
 
 	afterEach(() => {
@@ -126,23 +126,21 @@ describe('requireModule', () => {
 		}
 	});
 
-	test('requires and returns the resolved module', () => {
+	test('requires and returns the installed puppeteer', () => {
 		root = tmpTree();
-		const dir = makeModule(root, MODULE_NAME, { main: 'index.js' });
+		const dir = makeModule(root, 'puppeteer', { main: 'index.js' });
 		fs.writeFileSync(
 			path.join(dir, 'index.js'),
 			'module.exports = { marker: "fixture-loaded" };'
 		);
-		expect(requireModule(MODULE_NAME, { cwd: root })).toEqual({
+		expect(requirePuppeteer({ cwd: root })).toEqual({
 			marker: 'fixture-loaded',
 		});
 	});
 
 	test('returns null when not installed', () => {
 		root = tmpTree();
-		expect(
-			requireModule('definitely-not-installed-xyz', { cwd: root })
-		).toBeNull();
+		expect(requirePuppeteer({ cwd: root })).toBeNull();
 	});
 });
 
