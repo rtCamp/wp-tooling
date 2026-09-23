@@ -3,7 +3,7 @@
  *
  * Spawns the consumer's `server-profile.php` shim (installed by
  * `wp-tooling add setup/perf`) through the configured WP-CLI command prefix
- * — typically `npx wp-env run cli --env-cwd=<path> -- wp`. The URL's origin
+ * — typically `npx --no-install wp-env run cli --env-cwd=<path> -- wp`. The URL's origin
  * is passed as WP-CLI's `--url` (site context; also what arms
  * `redirect_canonical()` in the shim's render, which is why the shim removes
  * that hook) and the path+query is passed positionally (the shim reads it
@@ -14,6 +14,10 @@
  * auxiliary cause-data, so a broken WP-CLI invocation must not take down
  * the frontend layers or affect the run's exit code. Callers read
  * `result.error` to detect it.
+ *
+ * POSIX only: the command is spawned without a shell, so on Windows npm's
+ * `.cmd` shims (including `npx`) will not launch. Point `server.command` at a
+ * directly executable WP-CLI for other environments.
  */
 
 'use strict';
@@ -69,7 +73,7 @@ function tryParse(text) {
  * Run the consumer's `server-profile.php` shim over WP-CLI for one URL.
  *
  * @param {Object}   server         Resolved `server` config section.
- * @param {string[]} server.command WP-CLI invocation prefix (e.g. `['npx','wp-env','run','cli','--env-cwd=...','--','wp']`).
+ * @param {string[]} server.command WP-CLI invocation prefix (e.g. `['npx','--no-install','wp-env','run','cli','--env-cwd=...','--','wp']`).
  * @param {string}   server.shim    Shim path, as WP-CLI sees it.
  * @param {number}   server.top     Top-N functions to request.
  * @param {string}   url            Target URL (origin used for `--url`; path+query passed positionally).

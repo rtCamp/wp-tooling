@@ -195,6 +195,16 @@ describe('applyTransform', () => {
 		);
 	});
 
+	it('shell-escape leaves safe values bare and single-quotes the rest', () => {
+		expect(applyTransform('wp-content/plugins/x', 'shell-escape')).toBe(
+			'wp-content/plugins/x'
+		);
+		expect(applyTransform('.', 'shell-escape')).toBe('.');
+		expect(applyTransform('my plugin', 'shell-escape')).toBe("'my plugin'");
+		expect(applyTransform("it's", 'shell-escape')).toBe("'it'\\''s'");
+		expect(applyTransform('', 'shell-escape')).toBe("''");
+	});
+
 	it('returns value unchanged when no transform', () => {
 		expect(applyTransform('Foo', undefined)).toBe('Foo');
 	});

@@ -82,7 +82,8 @@ async function launchBrowser(puppeteer, options = {}) {
  * @param {number} [options.settleMs=3000]   Time to wait after load before harvesting.
  * @param {number} [options.timeoutMs=30000] Navigation timeout.
  * @return {Promise<{metrics: Object, attribution: Object}>} Collected metrics + attribution.
- *   Rejects when the page fails to load (the caller records this as a per-URL scan error).
+ *   Rejects when the page fails to load (the caller records this as a per-URL scan error);
+ *   a navigation failure specifically rejects with a `RunnerError` coded `ENAVFAIL`.
  */
 async function collectVitals(browser, scriptSource, url, options = {}) {
 	const settleMs = options.settleMs ?? 3000;
@@ -93,7 +94,17 @@ async function collectVitals(browser, scriptSource, url, options = {}) {
 		await page.evaluateOnNewDocument(
 			`${scriptSource}\n${REGISTER_SNIPPET}`
 		);
-		await page.goto(url, { waitUntil: 'networkidle2', timeout: timeoutMs });
+		try {
+			await page.goto(url, {
+				waitUntil: 'networkidle2',
+				timeout: timeoutMs,
+			});
+		} catch (err) {
+			const detail = (err && err.message ? err.message : '').toString();
+			throw new RunnerError('ENAVFAIL', `navigation failed: ${detail}`, {
+				detail,
+			});
+		}
 		await new Promise((resolve) => {
 			setTimeout(resolve, settleMs);
 		});

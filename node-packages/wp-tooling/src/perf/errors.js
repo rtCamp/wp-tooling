@@ -16,6 +16,8 @@
  *                is a directory, or permission was denied (distinct from a
  *                simply-absent config, which is not an error)
  *   ENOURLS      no URLs could be resolved from the perf config or --url
+ *   ENAVFAIL     a URL failed to load in the browser (per-URL, recorded as
+ *                that URL's `scanError`; never thrown out of the run)
  */
 
 'use strict';

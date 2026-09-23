@@ -9,6 +9,7 @@ const { execFileSync, spawnSync } = require('child_process');
 const resolveModule = require('../../src/perf/resolve-module');
 const collectVitalsModule = require('../../src/perf/collect-vitals');
 const { runCli } = require('../../src/perf/run');
+const { RunnerError } = require('../../src/perf/errors');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
 const FIXTURE_CONFIG = path.join(FIXTURES, '.perfrc.json');
@@ -222,7 +223,10 @@ describe('perf runCli', () => {
 
 	test('a page load failure is a run failure (exit 1), not an issue', async () => {
 		collectVitalsModule.collectVitals.mockRejectedValue(
-			new Error('net::ERR_CONNECTION_REFUSED')
+			new RunnerError(
+				'ENAVFAIL',
+				'navigation failed: net::ERR_CONNECTION_REFUSED'
+			)
 		);
 		const code = await runCli([
 			'--config',
@@ -273,6 +277,34 @@ describe('perf runCli', () => {
 		expect(nonProbeCalls.length).toBeGreaterThan(0);
 	});
 
+	test('a collector failure after navigation is a run failure (exit 1), and lighthouse still runs for it', async () => {
+		collectVitalsModule.collectVitals.mockRejectedValue(
+			new Error('Execution context was destroyed')
+		);
+		const code = await runCli([
+			'--config',
+			FIXTURE_CONFIG,
+			'--output',
+			'json',
+		]);
+		expect(code).toBe(1);
+		const parsed = JSON.parse(stdout.join(''));
+		expect(parsed.summary.failedUrls).toBeGreaterThan(0);
+
+		// Only a navigation failure is a scanError; this page loaded, so its
+		// lighthouse result survives into the report.
+		const result = parsed.results[0];
+		expect(result.scanError).toBeNull();
+		expect(result.lighthouse.scores.performance).toBe(0.95);
+		expect(result.notes.join('')).toMatch(
+			/web-vitals collection failed — Execution context was destroyed/
+		);
+		const nonProbeCalls = execFileSync.mock.calls.filter(
+			(call) => !call[1].includes('--version')
+		);
+		expect(nonProbeCalls.length).toBeGreaterThan(0);
+	});
+
 	test('--output text still renders the server section for a URL that failed to scan', async () => {
 		mockChildProcess({
 			serverResult: {
@@ -290,7 +322,10 @@ describe('perf runCli', () => {
 			},
 		});
 		collectVitalsModule.collectVitals.mockRejectedValue(
-			new Error('net::ERR_CONNECTION_REFUSED')
+			new RunnerError(
+				'ENAVFAIL',
+				'navigation failed: net::ERR_CONNECTION_REFUSED'
+			)
 		);
 		const code = await runCli([
 			'--config',

@@ -4,7 +4,7 @@
 	"lighthouse": { "enabled": true, "categories": ["performance"], "topAudits": 5 },
 	"server": {
 		"enabled": true,
-		"command": ["npx", "wp-env", "run", "cli", "--env-cwd=wp-content/plugins/dummy-plugin", "--", "wp"],
+		"command": ["npx", "--no-install", "wp-env", "run", "cli", "--env-cwd=wp-content/plugins/dummy-plugin", "--", "wp"],
 		"shim": "server-profile.php",
 		"top": 15
 	},

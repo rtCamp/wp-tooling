@@ -149,6 +149,7 @@ describe('setup/perf rendered config', () => {
 		expect(config.server.enabled).toBe(false);
 		expect(config.server.command).toEqual([
 			'npx',
+			'--no-install',
 			'wp-env',
 			'run',
 			'cli',
@@ -185,6 +186,7 @@ describe('setup/perf rendered config', () => {
 		expect(config.server.enabled).toBe(true);
 		expect(config.server.command).toEqual([
 			'npx',
+			'--no-install',
 			'wp-env',
 			'run',
 			'cli',
@@ -212,6 +214,7 @@ describe('setup/perf rendered config', () => {
 		expect(config.server.enabled).toBe(true);
 		expect(config.server.command).toEqual([
 			'npx',
+			'--no-install',
 			'wp-env',
 			'run',
 			'cli',
@@ -243,6 +246,44 @@ describe('setup/perf rendered config', () => {
 		);
 		expect(rootResult.developer.scripts.npm['profile:server']).toBe(
 			'wp-env run cli --env-cwd=. -- wp eval-file server-profile.php'
+		);
+	});
+
+	it('JSON-escapes every URL input while preserving its value', async () => {
+		const target = makeTmpDir();
+		const inputs = {
+			base_url: 'http://localhost:8888/"quoted"',
+			sample_page: '/path\\segment',
+			search_page: '/?s="hello"&page=2',
+			extra_page: '/line\nbreak',
+			server_env_cwd: '.',
+		};
+		await registry.execute('setup/perf', inputs, { cwd: target });
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			`${inputs.base_url}/`,
+			inputs.base_url + inputs.sample_page,
+			inputs.base_url + inputs.search_page,
+			inputs.base_url + inputs.extra_page,
+		]);
+	});
+
+	it('escapes server_env_cwd separately for the JSON config and the shell script', async () => {
+		const target = makeTmpDir();
+		const envCwd = 'wp-content/plugins/my "odd" plugin';
+		const result = await registry.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: envCwd },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.server.command).toContain(`--env-cwd=${envCwd}`);
+		expect(result.developer.scripts.npm['profile:server']).toBe(
+			`wp-env run cli --env-cwd='${envCwd}' -- wp eval-file server-profile.php`
 		);
 	});
 

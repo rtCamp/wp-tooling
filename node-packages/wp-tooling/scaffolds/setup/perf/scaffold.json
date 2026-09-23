@@ -2,7 +2,7 @@
 	"slug": "perf",
 	"category": "setup",
 	"name": "perf (web-vitals + lighthouse + server xhprof)",
-	"description": "Adds .perfrc.json and server-profile.php for two-layer performance testing against a running WordPress environment: lab Core Web Vitals (web-vitals attribution build under headless Chromium) + Lighthouse performance scores, and optional server-side xhprof function profiling via WP-CLI. The server layer needs `composer require --dev rtcamp/wp-dev-tools` (not on Packagist — add it via a path or VCS repository) and the xhprof or tideways_xhprof PHP extension in the WP-CLI environment; without either it degrades gracefully rather than erroring.",
+	"description": "Adds .perfrc.json and server-profile.php for two-layer performance testing against a running WordPress environment: lab Core Web Vitals (web-vitals attribution build under headless Chromium) + Lighthouse performance scores, and optional server-side xhprof function profiling via WP-CLI. The server layer needs `composer require --dev rtcamp/wp-dev-tools` (not on Packagist — add it via a path or VCS repository) and the xhprof or tideways_xhprof PHP extension in the WP-CLI environment; without either it degrades gracefully rather than erroring. The server command defaults to wp-env; edit `server.command` in .perfrc.json if your WordPress environment runs WP-CLI some other way (Local, DDEV, a remote SSH host, etc.).",
 	"source": "template",
 	"files": [
 		{
@@ -19,22 +19,26 @@
 		{
 			"key": "base_url",
 			"description": "Base URL of the WordPress environment to test against (e.g. http://localhost:8888).",
-			"required": true
+			"required": true,
+			"transform": "json-escape"
 		},
 		{
 			"key": "sample_page",
 			"description": "Path of a post or page to test, appended to base_url (e.g. /hello-world/ or a permalink path).",
-			"default": "/?p=1"
+			"default": "/?p=1",
+			"transform": "json-escape"
 		},
 		{
 			"key": "search_page",
 			"description": "Path of the search-results page to test, appended to base_url.",
-			"default": "/?s=hello"
+			"default": "/?s=hello",
+			"transform": "json-escape"
 		},
 		{
 			"key": "extra_page",
 			"description": "Optional path of one more page to test, appended to base_url. Omitted when empty; add further URLs directly in .perfrc.json.",
-			"default": ""
+			"default": "",
+			"transform": "json-escape"
 		},
 		{
 			"key": "server_enabled",
@@ -45,6 +49,18 @@
 			"key": "server_env_cwd",
 			"description": "Project path inside the WP-CLI environment, as `wp-env run cli --env-cwd` expects it. Must match where this scaffold just installed server-profile.php — e.g. wp-content/plugins/my-plugin for a plugin, wp-content/themes/my-theme for a theme — or `.` only if this project IS the WordPress root. There's no safe default: guessing wrong means the server layer can't find its own shim.",
 			"required": true
+		},
+		{
+			"key": "server_env_cwd_json",
+			"description": "server_env_cwd, JSON-escaped for .perfrc.json.",
+			"discover_from": "input:server_env_cwd",
+			"transform": "json-escape"
+		},
+		{
+			"key": "server_env_cwd_shell",
+			"description": "server_env_cwd, shell-quoted for the profile:server script.",
+			"discover_from": "input:server_env_cwd",
+			"transform": "shell-escape"
 		}
 	],
 	"npm_dev_dependencies": {
@@ -55,7 +71,7 @@
 	"scripts": {
 		"npm": {
 			"test:perf": "wp-tooling perf",
-			"profile:server": "wp-env run cli --env-cwd={{server_env_cwd}} -- wp eval-file server-profile.php"
+			"profile:server": "wp-env run cli --env-cwd={{server_env_cwd_shell}} -- wp eval-file server-profile.php"
 		}
 	}
 }

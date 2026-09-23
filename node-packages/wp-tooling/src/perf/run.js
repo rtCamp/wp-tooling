@@ -137,11 +137,12 @@ async function runPerf(options = {}) {
 }
 
 /**
- * Run every layer for one URL. Frontend load failure becomes a per-URL
- * `scanError` (the caller's run continues); lighthouse and server failures
- * degrade to `null` + a note without affecting the overall run. A page that
- * loads but harvests no metric is a separate `vitalsError` — Lighthouse
- * navigates independently, so it still runs for it.
+ * Run every layer for one URL. A navigation failure (`ENAVFAIL`) becomes a
+ * per-URL `scanError` (the caller's run continues); lighthouse and server
+ * failures degrade to `null` + a note without affecting the overall run. A
+ * page that loads but whose collector throws or harvests no metric is a
+ * separate `vitalsError` — Lighthouse navigates independently, so it still
+ * runs for it.
  *
  * @param {string}      url               Target URL.
  * @param {Object}      ctx               Shared context for the run.
@@ -173,13 +174,20 @@ async function collectOne(url, ctx) {
 				'web-vitals harvest returned no metrics — the injected collector may not have registered (e.g. the page never became interactive, or CSP blocked the injected script).';
 		}
 	} catch (err) {
-		scanError = (err && err.message ? err.message : '').toString();
+		const detail = (err && err.message ? err.message : '').toString();
+		// Only a navigation failure is a scan error; a collector failure after
+		// a good load keeps the URL's other layers (e.g. Lighthouse) in the report.
+		if (err instanceof RunnerError && err.code === 'ENAVFAIL') {
+			scanError = detail;
+		} else {
+			vitalsError = `web-vitals collection failed — ${detail}`;
+		}
 	}
 
 	let lighthouse = null;
 	// Lighthouse needs the same network reachability as puppeteer -- skip it
-	// once the page already failed to load, rather than spend its own timeout
-	// on a dead URL.
+	// once navigation already failed, rather than spend its own timeout on a
+	// dead URL. A collector failure after a good load still gets its pass.
 	if (!scanError && config.lighthouse.enabled && lighthouseBin) {
 		try {
 			const lhr = runLighthouse(lighthouseBin, url, config.lighthouse, {

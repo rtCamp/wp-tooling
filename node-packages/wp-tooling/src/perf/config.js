@@ -36,7 +36,16 @@ const DEFAULTS = {
 	},
 	server: {
 		enabled: false,
-		command: ['npx', 'wp-env', 'run', 'cli', '--env-cwd=.', '--', 'wp'],
+		command: [
+			'npx',
+			'--no-install',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=.',
+			'--',
+			'wp',
+		],
 		shim: 'server-profile.php',
 		top: 15,
 	},

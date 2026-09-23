@@ -11,6 +11,7 @@
 'use strict';
 
 const fs = require('fs');
+const { createRequire } = require('module');
 const path = require('path');
 
 /**
@@ -89,11 +90,9 @@ function requireModule(moduleName, options = {}) {
 	if (!dir) {
 		return null;
 	}
-	// Intentional dynamic require: path resolved by walking the consumer's
-	// own node_modules for a known package name, mirroring the dispatcher's
-	// command auto-discovery in src/cli/index.js. No user input involved.
-
-	return require(dir);
+	// Load by package name through Node's resolver, anchored in the consumer's
+	// tree, rather than requiring a computed path.
+	return createRequire(path.join(dir, 'package.json'))(moduleName);
 }
 
 /**

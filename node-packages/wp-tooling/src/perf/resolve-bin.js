@@ -6,6 +6,9 @@
  * dependencies. These helpers locate that consumer-installed binary
  * (a direct or workspace-hoisted `node_modules/.bin/<bin>`), falling back to
  * `npx --no-install` so we never silently fetch it from the network.
+ *
+ * POSIX only: binaries are run via `execFileSync` without a shell, which
+ * cannot execute the `.cmd` shims npm creates under `.bin` on Windows.
  */
 
 'use strict';

@@ -119,7 +119,10 @@ describe('collectVitals', () => {
 			collectVitals(browser, '/* iife */', 'http://localhost:8888/', {
 				settleMs: 1,
 			})
-		).rejects.toThrow('net::ERR_CONNECTION_REFUSED');
+		).rejects.toMatchObject({
+			code: 'ENAVFAIL',
+			message: expect.stringContaining('net::ERR_CONNECTION_REFUSED'),
+		});
 
 		expect(calls[calls.length - 1][0]).toBe('close');
 	});
