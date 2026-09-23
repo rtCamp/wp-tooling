@@ -5,7 +5,7 @@
  * Usage:
  *     npm run profile:server -- [<path>] [<top>]
  *     # or directly:
- *     wp eval-file server-profile.php [<path>] [<top>] [--url=<host>]
+ *     wp eval-file server-profile.php [<path>] [<top>] [--url=<url>]
  *
  * Profiles the WordPress render path for <path> (default "/") with
  * rtCamp\WPDevTools\Support\XHProfProfiler and prints the top-<top>

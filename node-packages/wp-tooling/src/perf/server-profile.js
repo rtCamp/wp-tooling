@@ -3,8 +3,9 @@
  *
  * Spawns the consumer's `server-profile.php` shim (installed by
  * `wp-tooling add setup/perf`) through the configured WP-CLI command prefix
- * — typically `npx --no-install wp-env run cli --env-cwd=<path> -- wp`. The URL's origin
- * is passed as WP-CLI's `--url` (site context; also what arms
+ * — typically `npx --no-install wp-env run cli --env-cwd=<path> -- wp`. The URL's
+ * origin+path is passed as WP-CLI's `--url` (site context — the path lets a
+ * subdirectory multisite resolve the right site; also what arms
  * `redirect_canonical()` in the shim's render, which is why the shim removes
  * that hook) and the path+query is passed positionally (the shim reads it
  * into `$_GET` itself).
@@ -28,17 +29,19 @@ const MAX_BUFFER = 64 * 1024 * 1024;
 const RUN_TIMEOUT_MS = 120000;
 
 /**
- * Split a target URL into its origin (scheme+host+port) and its path+query
- * — the two pieces the shim's contract expects separately
- * (`wp eval-file server-profile.php [<path>] [<top>] [--url=<host>]`).
+ * Split a target URL into WP-CLI's site URL (origin+path, no query) and its
+ * path+query — the two pieces the shim's contract expects separately
+ * (`wp eval-file server-profile.php [<path>] [<top>] [--url=<url>]`). The
+ * path stays in the site URL because WP-CLI resolves a subdirectory
+ * multisite's site from it; a bare origin would target the main site.
  *
  * @param {string} url Full target URL.
- * @return {{origin: string, pathAndQuery: string}} Split URL.
+ * @return {{siteUrl: string, pathAndQuery: string}} Split URL.
  */
 function splitUrl(url) {
 	const parsedUrl = new URL(url);
 	return {
-		origin: parsedUrl.origin,
+		siteUrl: `${parsedUrl.origin}${parsedUrl.pathname}`,
 		pathAndQuery: `${parsedUrl.pathname}${parsedUrl.search}`,
 	};
 }
@@ -76,7 +79,7 @@ function tryParse(text) {
  * @param {string[]} server.command WP-CLI invocation prefix (e.g. `['npx','--no-install','wp-env','run','cli','--env-cwd=...','--','wp']`).
  * @param {string}   server.shim    Shim path, as WP-CLI sees it.
  * @param {number}   server.top     Top-N functions to request.
- * @param {string}   url            Target URL (origin used for `--url`; path+query passed positionally).
+ * @param {string}   url            Target URL (origin+path used for `--url`; path+query passed positionally).
  * @param {Object}   [options]
  * @param {string}   [options.cwd]  Working directory.
  * @return {{data: (Object|Array|null), diagnostic: (string|null), error: (string|null)}}
@@ -90,11 +93,11 @@ function runServerProfile(server, url, options = {}) {
 	// splitUrl (and building args from server.command) can throw on malformed
 	// input -- this module always degrades instead, so a bad URL or config
 	// must not abort the URLs after this one.
-	let origin;
+	let siteUrl;
 	let pathAndQuery;
 	let args;
 	try {
-		({ origin, pathAndQuery } = splitUrl(url));
+		({ siteUrl, pathAndQuery } = splitUrl(url));
 		const [, ...prefix] = server.command;
 		args = [
 			...prefix,
@@ -102,7 +105,7 @@ function runServerProfile(server, url, options = {}) {
 			server.shim,
 			pathAndQuery,
 			String(server.top),
-			`--url=${origin}`,
+			`--url=${siteUrl}`,
 		];
 	} catch (err) {
 		return { data: null, diagnostic: null, error: err.message };

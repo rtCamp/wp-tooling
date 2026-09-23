@@ -20,17 +20,24 @@ const SERVER = {
 };
 
 describe('splitUrl', () => {
-	test('splits origin from path + query', () => {
+	test('splits the site URL (origin + path) from path + query', () => {
 		expect(splitUrl('http://localhost:8765/?p=1')).toEqual({
-			origin: 'http://localhost:8765',
+			siteUrl: 'http://localhost:8765/',
 			pathAndQuery: '/?p=1',
 		});
 	});
 
 	test('a bare root path has no query', () => {
 		expect(splitUrl('http://localhost:8765/')).toEqual({
-			origin: 'http://localhost:8765',
+			siteUrl: 'http://localhost:8765/',
 			pathAndQuery: '/',
+		});
+	});
+
+	test('keeps a subdirectory multisite path in the site URL', () => {
+		expect(splitUrl('https://example.com/site1/page/?s=x')).toEqual({
+			siteUrl: 'https://example.com/site1/page/',
+			pathAndQuery: '/site1/page/?s=x',
 		});
 	});
 });
@@ -58,7 +65,7 @@ describe('runServerProfile', () => {
 			'server-profile.php',
 			'/?p=1',
 			'15',
-			'--url=http://localhost:8765',
+			'--url=http://localhost:8765/',
 		]);
 		expect(opts.cwd).toBe('/project');
 	});

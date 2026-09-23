@@ -417,7 +417,7 @@ function runDryRun(opts, cwd) {
 			? config.server.command
 			: [String(config.server.command)];
 		lines.push(
-			`  server:      ${commandParts.join(' ')} eval-file ${config.server.shim} <path> ${config.server.top} --url=<origin>`
+			`  server:      ${commandParts.join(' ')} eval-file ${config.server.shim} <path> ${config.server.top} --url=<origin+path>`
 		);
 	} else {
 		lines.push('  server:      disabled');
