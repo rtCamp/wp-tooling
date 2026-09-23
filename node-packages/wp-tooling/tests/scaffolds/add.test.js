@@ -233,7 +233,11 @@ describe('add command human report', () => {
 				files: [{ src: 'templates/out.txt.mustache', dest: 'out.txt' }],
 				npm_dev_dependencies: { 'pa11y-ci': '^6.0.0' },
 				scripts: {
-					npm: { 'profile:server': `run --cwd='my "odd" dir'` },
+					npm: {
+						'test:perf': 'wp-tooling perf',
+						'profile:server': `run --cwd='my "odd" dir'`,
+					},
+					composer: { lint: 'phpcs', analyse: 'phpstan analyse' },
 				},
 			}),
 			'utf8'
@@ -266,7 +270,7 @@ describe('add command human report', () => {
 		expect(captured).toContain('npm install --save-dev pa11y-ci@^6.0.0');
 	});
 
-	it('prints package.json script entries as valid JSON, escaping quotes', async () => {
+	it('prints each scripts block as a pasteable JSON body — escaped and comma-separated', async () => {
 		const cwd = makeTmpDir();
 		await buildProjectWithDevDeps(cwd);
 		const originalOut = process.stdout.write.bind(process.stdout);
@@ -283,11 +287,22 @@ describe('add command human report', () => {
 		]);
 		process.stdout.write = originalOut;
 		expect(code).toBe(0);
-		const entry = captured
-			.split('\n')
-			.find((l) => l.trim().startsWith('"profile:server"'));
-		expect(JSON.parse(`{${entry}}`)).toEqual({
+		// The entry lines right under a heading, parsed together as one object.
+		const block = (heading) => {
+			const lines = captured.split('\n');
+			const start = lines.indexOf(heading) + 1;
+			const end = lines.findIndex(
+				(l, i) => i >= start && !l.startsWith('    ')
+			);
+			return JSON.parse(`{${lines.slice(start, end).join('\n')}}`);
+		};
+		expect(block('  Add to package.json "scripts":')).toEqual({
+			'test:perf': 'wp-tooling perf',
 			'profile:server': `run --cwd='my "odd" dir'`,
+		});
+		expect(block('  Add to composer.json "scripts":')).toEqual({
+			lint: 'phpcs',
+			analyse: 'phpstan analyse',
 		});
 	});
 });

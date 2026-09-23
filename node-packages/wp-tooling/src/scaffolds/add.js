@@ -107,6 +107,16 @@ function printHelp() {
 	);
 }
 
+// Render [name, cmd] pairs as a pasteable JSON object body: escaped, comma-separated.
+function scriptEntryLines(entries) {
+	return entries.map(
+		([name, cmd], i) =>
+			`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}${
+				i < entries.length - 1 ? ',' : ''
+			}`
+	);
+}
+
 function printHumanReport(result) {
 	const { scaffold, engine, developer, ai, warnings } = result;
 	const lines = [];
@@ -187,19 +197,11 @@ function printHumanReport(result) {
 		}
 		if (npmScripts.length) {
 			lines.push('  Add to package.json "scripts":');
-			for (const [name, cmd] of npmScripts) {
-				lines.push(
-					`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}`
-				);
-			}
+			lines.push(...scriptEntryLines(npmScripts));
 		}
 		if (composerScripts.length) {
 			lines.push('  Add to composer.json "scripts":');
-			for (const [name, cmd] of composerScripts) {
-				lines.push(
-					`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}`
-				);
-			}
+			lines.push(...scriptEntryLines(composerScripts));
 		}
 		if (developer.secrets.length) {
 			lines.push(
