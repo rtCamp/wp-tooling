@@ -6,6 +6,7 @@
  *   - wp/cli namespace + tests_namespace discovery grafts the project's
  *     PSR-4 root onto the kind sub-namespace
  *   - wiring targetFile paths are normalised (no `..` segments)
+ *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
  */
 
 'use strict';
@@ -186,6 +187,60 @@ describe('setup/pa11y rendered config', () => {
 			'http://localhost:8765/?s=wordpress',
 			'http://localhost:8765/about/',
 		]);
+	});
+});
+
+describe('lint/i18n ruleset', () => {
+	it('binds the supplied text domain and reports the script + dev deps', async () => {
+		const target = makeTmpDir();
+		const result = await registry.execute(
+			'lint/i18n',
+			{ text_domain: 'acme-blog' },
+			{ cwd: target }
+		);
+		const ruleset = fs.readFileSync(
+			path.join(target, 'phpcs.i18n.xml.dist'),
+			'utf8'
+		);
+		expect(ruleset).toContain('<rule ref="WordPress.WP.I18n">');
+		expect(ruleset).toContain('<element value="acme-blog"/>');
+		expect(ruleset).toContain('<arg name="extensions" value="php,inc"/>');
+		expect(result.developer.scripts.composer).toEqual({
+			'lint:i18n': 'phpcs --standard=phpcs.i18n.xml.dist',
+		});
+		expect(Object.keys(result.developer.install.composerDev)).toEqual([
+			'dealerdirect/phpcodesniffer-composer-installer',
+			'squizlabs/php_codesniffer',
+			'wp-coding-standards/wpcs',
+		]);
+	});
+
+	it('discovers the text domain from .wp-tooling.json', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, '.wp-tooling.json'),
+			JSON.stringify({ textDomain: 'acme-shop' }),
+			'utf8'
+		);
+		const result = await registry.execute(
+			'lint/i18n',
+			{},
+			{ dryRun: true, cwd: target }
+		);
+		expect(result.engine.inputs.text_domain).toBe('acme-shop');
+	});
+
+	it('requires a text domain rather than guessing one', async () => {
+		await expect(
+			registry.execute(
+				'lint/i18n',
+				{},
+				{ dryRun: true, cwd: makeTmpDir() }
+			)
+		).rejects.toMatchObject({
+			code: 'EMISSINGINPUT',
+			missing: ['text_domain'],
+		});
 	});
 });
 

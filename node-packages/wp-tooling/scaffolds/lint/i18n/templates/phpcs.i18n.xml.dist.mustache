@@ -41,8 +41,8 @@
 		</properties>
 	</rule>
 
-	<!-- Keeps CSS/JS out of the run; `inc/php` covers legacy `.inc` includes. -->
-	<arg name="extensions" value="php,inc/php"/>
+	<!-- Keeps CSS/JS out of the run; `inc` covers legacy `.inc` includes. -->
+	<arg name="extensions" value="php,inc"/>
 
 	<file>./</file>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
@@ -57,7 +57,7 @@
 		Fixture code some editor/agent tooling stores outside the source tree
 		(e.g. eval fixtures for an AI coding assistant) reads as seeded
 		defects otherwise — narrow the path to the actual fixture location:
-		<exclude-pattern>*/.claude/skills/*/eval/*</exclude-pattern>
+		<exclude-pattern>*/.claude/skills/*/evals/*</exclude-pattern>
 
 		Block render files from @wordpress/create-block carry the block's own
 		text domain, not the project's, so they read as a mismatch:
