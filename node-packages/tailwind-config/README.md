@@ -28,3 +28,11 @@ module.exports = {
 	plugins: [new GenerateTailwindThemePlugin()],
 };
 ```
+
+## License
+
+GPL-2.0-or-later. See [LICENSE](./LICENSE).
+
+<p align="center">
+  <a href="https://rtcamp.com"><img src="https://n8e0ka87m9.gdcdn.us/kfnbt046p8/GitHub_Banner.webp" alt="rtCamp" width="100%"></a>
+</p>

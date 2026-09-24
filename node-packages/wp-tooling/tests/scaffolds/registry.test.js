@@ -390,6 +390,78 @@ describe('execute() result shape', () => {
 	});
 });
 
+describe('wiring target_file Modules-collapse gating', () => {
+	// A manifest using the `{{base_path}}/../Modules/X.php` shape (as several
+	// bundled wp/* scaffolds do): only a base_path nested inside a `Modules`
+	// dir should trigger the doubled-segment collapse.
+	async function scanFixture(basePathDefault) {
+		const tmp = makeTmpDir();
+		const dir = path.join(tmp, 'wp', 'modules-collapse-fixture');
+		await fs.mkdir(dir, { recursive: true });
+		await fs.writeFile(
+			path.join(dir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'modules-collapse-fixture',
+				category: 'wp',
+				name: 'Modules collapse fixture',
+				description: 'Fixture for collapseModules gating.',
+				source: 'template',
+				inputs: [
+					{
+						key: 'base_path',
+						description: 'Base path.',
+						default: basePathDefault,
+					},
+					{ key: 'name', description: 'Slug.', required: true },
+				],
+				files: [],
+				wiring: [
+					{
+						target_file: '{{base_path}}/../Modules/{{name}}.php',
+						anchor: '// scaffold:anchor',
+						snippet_template: '// {{name}}',
+						description: 'Wire it up.',
+					},
+				],
+			}),
+			'utf8'
+		);
+		const registry = new ScaffoldRegistry({ defaultsDir: tmp });
+		await registry.scan();
+		return registry;
+	}
+
+	it('leaves a flat base_path untouched (no double to collapse)', async () => {
+		const registry = await scanFixture('includes/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('includes/Modules/X.php');
+	});
+
+	it('collapses the doubled segment only when base_path nests inside Modules', async () => {
+		const registry = await scanFixture('inc/Modules/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('inc/Modules/X.php');
+	});
+
+	it('collapses the doubled segment when base_path nests directly under a top-level Modules dir (no leading slash before the double)', async () => {
+		const registry = await scanFixture('Modules/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('Modules/X.php');
+	});
+});
+
 describe('execute() error paths', () => {
 	let registry;
 	beforeAll(async () => {

@@ -122,6 +122,9 @@ function summarise(scaffold) {
 			kind: 'template',
 			origin: 'remote',
 			counts: null,
+			// Remote manifests are not fetched during `list`, so the full input
+			// schema is unknown until `add` hydrates them (mirrors `counts: null`).
+			inputs: null,
 		};
 	}
 	return {
@@ -146,6 +149,19 @@ function summarise(scaffold) {
 					)
 				: 0,
 		},
+		// Full input schema, so a caller (including an AI agent) has every input's
+		// key/required/default/discover_from/description without running a
+		// `--dry-run` add and parsing the EMISSINGINPUT error to discover them.
+		inputs: Array.isArray(scaffold.inputs)
+			? scaffold.inputs.map((d) => ({
+					key: d.key,
+					required: !!d.required,
+					default: d.default ?? null,
+					discover_from: d.discover_from ?? null,
+					transform: d.transform ?? null,
+					description: d.description,
+				}))
+			: [],
 	};
 }
 

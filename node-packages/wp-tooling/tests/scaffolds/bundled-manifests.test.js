@@ -18,13 +18,22 @@ const { ScaffoldRegistry } = require('../../src/scaffolds/registry');
 
 const DEFAULTS_DIR = path.join(__dirname, '..', '..', 'scaffolds');
 
+const tempDirs = [];
+
 function makeTmpDir() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	tempDirs.push(dir);
+	return dir;
 }
 
-// The bundled catalogue is immutable and these tests only dry-run execute(),
-// so a single scan is shared across the whole file rather than re-walking the
-// tree per test.
+afterEach(() => {
+	for (const dir of tempDirs.splice(0)) {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+// The bundled catalogue is immutable; executions write only to temporary
+// directories, so one catalogue scan can be shared across the file.
 let registry;
 beforeAll(async () => {
 	registry = new ScaffoldRegistry({ defaultsDir: DEFAULTS_DIR });
@@ -87,4 +96,127 @@ describe('wiring targetFile normalisation', () => {
 		expect(target).toBe('includes/Modules/Cli.php');
 		expect(target).not.toContain('..');
 	});
+});
+
+describe('ci/test-measure rendering', () => {
+	it('omits run-a11y by default and includes it when run_a11y is true', async () => {
+		const r = registry;
+		const off = makeTmpDir();
+		await r.execute('ci/test-measure', {}, { dryRun: false, cwd: off });
+		const offYaml = fs.readFileSync(
+			path.join(off, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(offYaml).not.toContain('run-a11y:');
+
+		const on = makeTmpDir();
+		await r.execute(
+			'ci/test-measure',
+			{ run_a11y: 'true' },
+			{ dryRun: false, cwd: on }
+		);
+		const onYaml = fs.readFileSync(
+			path.join(on, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(onYaml).toContain('run-a11y: true');
+	});
+});
+
+describe('setup/pa11y rendered config', () => {
+	it('JSON-escapes every URL input while preserving its value', async () => {
+		const target = makeTmpDir();
+		const inputs = {
+			base_url: 'http://localhost:8888/"quoted"',
+			sample_page: '/path\\segment',
+			search_page: '/?s="hello"&page=2',
+			extra_page: '/line\nbreak',
+		};
+		await registry.execute('setup/pa11y', inputs, { cwd: target });
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			`${inputs.base_url}/`,
+			inputs.base_url + inputs.sample_page,
+			inputs.base_url + inputs.search_page,
+			inputs.base_url + inputs.extra_page,
+		]);
+	});
+
+	it('renders valid JSON with default page paths (extra_page omitted)', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{ base_url: 'http://localhost:8888' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.defaults.standard).toBe('WCAG2AA');
+		expect(config.defaults.runners).toEqual(['axe', 'htmlcs']);
+		expect(config.urls).toEqual([
+			'http://localhost:8888/',
+			'http://localhost:8888/?p=1',
+			'http://localhost:8888/?s=hello',
+		]);
+	});
+
+	it('renders custom page paths and appends extra_page when given', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{
+				base_url: 'http://localhost:8765',
+				sample_page: '/hello-world/',
+				search_page: '/?s=wordpress',
+				extra_page: '/about/',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8765/',
+			'http://localhost:8765/hello-world/',
+			'http://localhost:8765/?s=wordpress',
+			'http://localhost:8765/about/',
+		]);
+	});
+});
+
+describe('setup/claude-skills accessibility distribution', () => {
+	it.each([
+		['default directory', {}, '.claude/skills'],
+		['custom directory', { skills_dir: 'custom/skills' }, 'custom/skills'],
+	])(
+		'copies the complete skill unchanged into the %s',
+		async (label, inputs, skillsDir) => {
+			const target = makeTmpDir();
+			await registry.execute('setup/claude-skills', inputs, {
+				cwd: target,
+			});
+			const files = [
+				'SKILL.md',
+				'evals/evals.json',
+				'evals/files/template-parts/hero.php',
+				'evals/files/theme.json',
+			];
+			for (const file of files) {
+				const copied = fs.readFileSync(
+					path.join(target, skillsDir, 'accessibility', file),
+					'utf8'
+				);
+				const original = fs.readFileSync(
+					path.join(__dirname, '../../skills/accessibility', file),
+					'utf8'
+				);
+				expect(copied).toBe(original);
+			}
+		}
+	);
 });

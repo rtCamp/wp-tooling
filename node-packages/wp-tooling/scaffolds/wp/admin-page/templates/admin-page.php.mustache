@@ -46,17 +46,22 @@ class {{class}} extends AbstractAdminPage {
 	public function get_menu_title(): string {
 		return __( '{{menu_title}}', '{{text_domain}}' );
 	}
-
+{{#parent_slug}}
 	/**
-	 * Parent menu slug. Return null for a top-level menu.
+	 * Parent menu slug (this page is a submenu under an existing menu).
 	 *
-	 * @return string|null
+	 * Emitted only when a parent slug is set. For a top-level menu the method is
+	 * omitted so the framework's nullable default (get_parent_slug(): ?string
+	 * returning null) applies: returning a concrete value from a ?string
+	 * override would make the return type too wide for PHPStan level 5's
+	 * checkTooWideReturnTypesInProtectedAndPublicMethods rule.
+	 *
+	 * @return string
 	 */
-	public function get_parent_slug(): ?string {
-		$parent = '{{parent_slug}}';
-		return '' === $parent ? null : $parent;
+	public function get_parent_slug(): string {
+		return '{{parent_slug}}';
 	}
-
+{{/parent_slug}}
 	/**
 	 * Capability required to view the page.
 	 *

@@ -1,0 +1,36 @@
+name: Test and Measure
+
+# Scaffolded by @rtcamp/wp-tooling.
+# Single caller that delegates lint, JS/PHP tests (PHP x WP matrix), build,
+# the build-artifact gate, and optional a11y to the wp-ci.yml orchestrator;
+# every job there is gated on detected changes.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/{{wsw_ref}}/.github/workflows/wp-ci.yml
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - {{default_branch}}
+
+permissions:
+  contents: read
+
+# Cancel previous in-flight runs of this workflow for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/wp-ci.yml@{{wsw_ref}}
+    with:
+      project-type: {{project_type}}
+      php-versions: '{{php_versions}}'
+      wp-versions: '{{wp_versions}}'
+      test-php-exclude: '{{test_php_exclude}}'{{#run_a11y}}
+      run-a11y: true{{/run_a11y}}

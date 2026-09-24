@@ -1,6 +1,6 @@
 {
   "name": "@rtcamp/tailwind-config",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "rtCamp shareable Tailwind CSS v4 PostCSS config + theme.json→Tailwind webpack plugin for WordPress projects.",
   "license": "GPL-2.0-or-later",
   "author": "rtCamp",
@@ -50,7 +50,7 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
-    "@rtcamp/eslint-config": "^0.1.0",
+    "@rtcamp/eslint-config": "^1.0.0",
     "jest": "^29.7.0"
   }
 }

@@ -96,6 +96,8 @@ Write a test-case checklist covering:
   - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
   - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
 
+The engine's shipped test file already covers **Integration** for a plain instance of the kind (e.g. `post_type_exists()` for `wp/cpt` ships written and passing, not as a stub) — list it to confirm coverage, not to write it. Your effort in §7 goes to **Happy path / Edge cases / Error paths**: brief-specific behaviour the engine can't know.
+
 Show the checklist to the developer. Ask: confirm, add, remove? Resolve before scaffolding. This is the cheapest place to catch a misread requirement.
 
 ### 5. Apply conventions, invoke the engine
@@ -127,7 +129,7 @@ Result shape: `{ scaffold, engine, developer, ai, warnings }`.
 | `developer.install.composer` / `developer.install.npm` | Print as copy-paste command. **Never run `composer require` / `npm install`.** |
 | `developer.secrets` | Print as `gh secret set` checklist. **Never read/write/log/transmit values.** |
 | `ai.wiring` | Adaptive wiring with consent (see 6a). |
-| `ai.tests` | Mandatory expansion under TDD loop (see 7). |
+| `ai.tests` | Shipped complete + passing for the generic pattern; add brief-specific methods under the TDD loop (see 7). |
 | `warnings` | Print to developer. |
 
 #### 6a. Adaptive wiring
@@ -147,8 +149,8 @@ For block scaffolds, surface a developer action before testing: "run `npm run bu
 
 | Step | Action |
 |---|---|
-| A | Expand the engine's stub into the full suite from §4's checklist. Strip every `markTestIncomplete`. |
-| B | Run: `composer test` / `composer test:unit` (PHP), `npm run test:js` / `npx jest` (JS). Expect red. If the runner errors before running, invoke the relevant `setup/*` scaffold and retry. |
+| A | Confirm the engine's shipped tests pass as-is (they cover §4's Integration row already, complete and green — not a step you perform). Write one new test method per remaining §4 row: the brief-specific behaviour the engine couldn't know. |
+| B | Run: `composer test` / `composer test:unit` (PHP), `npm run test:js` / `npx jest` (JS). Expect red only for the methods just added — the shipped tests stay green throughout; one going red means you broke the generic pattern, so stop and investigate. Confirm each red is an assertion failure, not a bootstrap/fatal error (env or wiring trouble isn't a valid TDD red). Runner errors before running → invoke the relevant `setup/*` scaffold and retry. |
 | C | Implement just enough production code to flip **one** failing test green. |
 | D | Re-run. Confirm that one test passes. |
 | E | Loop B-D one test at a time. |
@@ -186,7 +188,7 @@ Escalation report format: **what you tried, what you observed, what's blocking, 
 
 ## Hard rules - never violate
 
-- Never write production code before its test exists on disk.
+- Never hand-write behaviour code before its test exists on disk. (The engine's scaffolded class + test ship together, already passing, for the generic pattern — you didn't author it, so it's not a violation. The rule governs the brief-specific behaviour you add: test first, confirm red, then extend. Consented §6a wiring is likewise sanctioned, not authored behaviour.)
 - Never hand-write an artifact the engine can scaffold.
 - Never group multiple kinds under a per-feature folder (`Modules/<Feature>/...`).
 - Never declare an artifact done without its test file passing.

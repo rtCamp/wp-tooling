@@ -104,7 +104,6 @@ $ ...
 
 ### Housekeeping
 - [ ] `CHANGELOG.md` entry under `## Unreleased`
-- [ ] `.claude/issues/<N>-<slug>.md` created and maintained
 
 ---
 

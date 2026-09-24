@@ -156,6 +156,80 @@ describe('list command, --json output', () => {
 	});
 });
 
+describe('summarise', () => {
+	it("maps a local scaffold's full input schema (key/required/default/discover_from/transform/description)", () => {
+		const scaffold = {
+			slug: 'widget',
+			category: 'wp',
+			name: 'Widget',
+			description: 'A widget.',
+			source: 'template',
+			origin: 'default',
+			inputs: [
+				{
+					key: 'slug',
+					required: true,
+					description: 'Kebab-case slug.',
+				},
+				{
+					key: 'class',
+					discover_from: 'input:slug',
+					transform: 'pascal-case',
+					description: 'PascalCase class name.',
+				},
+				{
+					key: 'base_path',
+					default: 'includes/Widgets',
+					description: 'Directory for the widget file.',
+				},
+			],
+			wiring: [],
+			tests: [],
+		};
+		expect(list.summarise(scaffold).inputs).toEqual([
+			{
+				key: 'slug',
+				required: true,
+				default: null,
+				discover_from: null,
+				transform: null,
+				description: 'Kebab-case slug.',
+			},
+			{
+				key: 'class',
+				required: false,
+				default: null,
+				discover_from: 'input:slug',
+				transform: 'pascal-case',
+				description: 'PascalCase class name.',
+			},
+			{
+				key: 'base_path',
+				required: false,
+				default: 'includes/Widgets',
+				discover_from: null,
+				transform: null,
+				description: 'Directory for the widget file.',
+			},
+		]);
+	});
+
+	it('reports inputs: null (and counts: null) for a remote scaffold -- schema unknown until add hydrates it', () => {
+		// Shaped like indexEntryToRecord()'s output (tests/scaffolds/sources.test.js):
+		// a thin remote record carries no `inputs` field at all.
+		const scaffold = {
+			slug: 'test-remote',
+			category: 'ci',
+			name: 'CI: remote',
+			description: 'a remote scaffold',
+			origin: 'remote',
+		};
+		const summary = list.summarise(scaffold);
+		expect(summary.inputs).toBeNull();
+		expect(summary.counts).toBeNull();
+	});
+});
+
 describe('list command, two-directory merge', () => {
 	it('shows project-local scaffolds alongside defaults', async () => {
 		const cwd = makeTmpDir();
