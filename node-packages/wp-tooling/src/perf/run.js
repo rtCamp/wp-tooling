@@ -27,7 +27,7 @@ const {
 	requirePuppeteer,
 	detectModule,
 } = require('./resolve-module');
-const { detectBin, resolveBin } = require('./resolve-bin');
+const { detectBin, resolveBin } = require('../a11y/resolve-bin');
 const { launchBrowser, collectVitals } = require('./collect-vitals');
 const { runLighthouse, BIN: LIGHTHOUSE_BIN } = require('./lighthouse');
 const { runServerProfile } = require('./server-profile');
@@ -67,7 +67,7 @@ function requireInstalled(condition, message, details = {}) {
  * @param {string[]} [options.urls]       Repeatable `--url` values.
  * @param {string}   [options.cwd]        Project root.
  * @return {Promise<Object>} Normalized report (see normalize.js).
- * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / ENOURLS.
+ * @throws {RunnerError} EBINMISSING / EBINFAIL / EBADJSON / EBADCONFIG / ENOURLS.
  */
 async function runPerf(options = {}) {
 	const cwd = options.cwd || process.cwd();
@@ -141,8 +141,8 @@ async function runPerf(options = {}) {
  * per-URL `scanError` (the caller's run continues); lighthouse and server
  * failures degrade to `null` + a note without affecting the overall run. A
  * page that loads but whose collector throws or harvests no metric is a
- * separate `vitalsError` — Lighthouse navigates independently, so it still
- * runs for it.
+ * separate `vitalsError`. Lighthouse navigates independently, so it runs in
+ * every case.
  *
  * @param {string}      url               Target URL.
  * @param {Object}      ctx               Shared context for the run.
@@ -185,10 +185,10 @@ async function collectOne(url, ctx) {
 	}
 
 	let lighthouse = null;
-	// Lighthouse needs the same network reachability as puppeteer -- skip it
-	// once navigation already failed, rather than spend its own timeout on a
-	// dead URL. A collector failure after a good load still gets its pass.
-	if (!scanError && config.lighthouse.enabled && lighthouseBin) {
+	// Lighthouse navigates in its own browser, so it runs even after a
+	// puppeteer navigation failure (e.g. a networkidle2 timeout on a page
+	// that did load) and records or degrades independently.
+	if (config.lighthouse.enabled && lighthouseBin) {
 		try {
 			const lhr = runLighthouse(lighthouseBin, url, config.lighthouse, {
 				cwd,
@@ -305,6 +305,14 @@ function emit(report, mode) {
 		if (result.scanError) {
 			lines.push(`${result.url} — scan failed`);
 			lines.push(`  ${result.scanError}`);
+			if (
+				result.lighthouse &&
+				typeof result.lighthouse.scores.performance === 'number'
+			) {
+				lines.push(
+					`  lighthouse performance ${result.lighthouse.scores.performance}`
+				);
+			}
 		} else {
 			lines.push(`${result.url}`);
 			for (const line of result.assessment) {
@@ -406,7 +414,9 @@ function runDryRun(opts, cwd) {
 		// resolveBin only -- dry-run must not spawn lighthouse --version.
 		const bin = resolveBin(LIGHTHOUSE_BIN, { cwd });
 		lines.push(
-			`  lighthouse:  ${bin.command} (${bin.source}, not probed — dry run)`
+			bin.source === 'missing'
+				? '  lighthouse:  NOT FOUND'
+				: `  lighthouse:  ${[bin.command, ...bin.args].join(' ')} (${bin.source}, not probed — dry run)`
 		);
 	} else {
 		lines.push('  lighthouse:  disabled');
@@ -446,6 +456,7 @@ function handleError(err) {
 		(err.code === 'EBINMISSING' ||
 			err.code === 'ENOURLS' ||
 			err.code === 'EBADJSON' ||
+			err.code === 'EBADCONFIG' ||
 			err.code === 'ECONFIGREAD')
 	) {
 		return 2;

@@ -189,6 +189,24 @@ describe('normalizePerf', () => {
 		expect(result.assessment).toEqual([]);
 	});
 
+	test('a scan error keeps the independently captured lighthouse layer, still not an issue', () => {
+		const lighthouse = { scores: { performance: 0.2 }, audits: [] };
+		const report = normalizePerf([
+			{
+				url: 'http://localhost:8888/',
+				scanError:
+					'navigation failed: Navigation timeout of 30000 ms exceeded',
+				vitals: null,
+				lighthouse,
+				server: null,
+				notes: [],
+			},
+		]);
+		expect(report.results[0].lighthouse).toEqual(lighthouse);
+		expect(report.summary.failedUrls).toBe(1);
+		expect(report.summary.issues).toBe(0);
+	});
+
 	test('a clean URL with good metrics counts as passed with zero issues', () => {
 		const report = normalizePerf([
 			{

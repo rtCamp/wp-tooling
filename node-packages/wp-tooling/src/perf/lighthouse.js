@@ -1,10 +1,10 @@
 /**
  * Lighthouse performance layer for one URL.
  *
- * Runs the consumer-installed `lighthouse` binary (resolved via
- * `resolve-bin.js`, the same local/hoisted/`npx --no-install` chain as the
- * a11y runner's `pa11y-ci` resolution) restricted to the `performance`
- * category, with `--chrome-flags` pointed at Chrome for Testing via
+ * Runs the consumer-installed `lighthouse` CLI (resolved and launched by the
+ * a11y runner's `resolve-bin.js`, exactly like `pa11y-ci`: the package's `bin`
+ * entry run with Node, no `.bin` shim or npx fallback) restricted to the
+ * `performance` category, with `--chrome-flags` pointed at Chrome for Testing via
  * `CHROME_PATH` so the consumer machine needs no system Chrome install.
  * A per-URL failure here is a degrade, not a run failure — `run.js` catches
  * `RunnerError`s from this module and continues with `lighthouse: null` for

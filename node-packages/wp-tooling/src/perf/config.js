@@ -55,6 +55,86 @@ const DEFAULTS = {
 	},
 };
 
+/** Accepted `thresholds.cwv` modes (see `normalize.js` `isCwvIssue`). */
+const CWV_MODES = ['poor', 'needs-improvement', 'never'];
+
+/**
+ * Describe why a section field's value is invalid, judged against the type of
+ * its built-in default. Unknown keys are not checked — they are never read.
+ *
+ * @param {string} key   Field name.
+ * @param {*}      value Configured value.
+ * @param {*}      def   Built-in default for the field.
+ * @return {string|null} What was expected, or `null` when the value is valid.
+ */
+function fieldProblem(key, value, def) {
+	if (Array.isArray(def)) {
+		return Array.isArray(value) &&
+			value.length > 0 &&
+			value.every((v) => typeof v === 'string' && v.length > 0)
+			? null
+			: 'a non-empty array of strings';
+	}
+	if (typeof def === 'number') {
+		return Number.isFinite(value) && value >= 0
+			? null
+			: 'a non-negative number';
+	}
+	if (key === 'cwv') {
+		return CWV_MODES.includes(value)
+			? null
+			: `one of ${CWV_MODES.map((m) => `"${m}"`).join(', ')}`;
+	}
+	return typeof value === typeof def ? null : `a ${typeof def}`;
+}
+
+/**
+ * Reject a parsed config whose known fields have the wrong type, so a typo
+ * like `"enabled": "false"` cannot silently invert a layer or surface later
+ * as a degraded layer instead of a config error.
+ *
+ * @param {*}      raw        Parsed config.
+ * @param {string} configPath Config path, for the error message.
+ * @throws {RunnerError} `EBADCONFIG` naming the first invalid field.
+ */
+function validateConfig(raw, configPath) {
+	const fail = (field, expected) => {
+		throw new RunnerError(
+			'EBADCONFIG',
+			`invalid ${configPath}: "${field}" must be ${expected}`,
+			{ configPath }
+		);
+	};
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+		fail('(root)', 'an object');
+	}
+	if (raw.urls !== undefined && !Array.isArray(raw.urls)) {
+		fail('urls', 'an array of URL strings');
+	}
+	for (const section of Object.keys(DEFAULTS)) {
+		const override = raw[section];
+		if (section === 'urls' || override === undefined) {
+			continue;
+		}
+		if (
+			!override ||
+			typeof override !== 'object' ||
+			Array.isArray(override)
+		) {
+			fail(section, 'an object');
+		}
+		for (const [key, def] of Object.entries(DEFAULTS[section])) {
+			if (override[key] === undefined) {
+				continue;
+			}
+			const expected = fieldProblem(key, override[key], def);
+			if (expected) {
+				fail(`${section}.${key}`, expected);
+			}
+		}
+	}
+}
+
 /**
  * Shallow-merge a config section over its defaults.
  *
@@ -99,7 +179,8 @@ function mergeConfig(raw) {
  * @return {{config: Object, configPath: string|null, urls: string[]}} Resolved config, the
  *   config path actually read (`null` when none was read), and the effective URL list.
  * @throws {RunnerError} `ENOURLS` when no URLs are available; `EBADJSON` when the config
- *   is malformed; `ECONFIGREAD` when the config path exists but could not be read.
+ *   is malformed; `EBADCONFIG` when a known field has the wrong type or value;
+ *   `ECONFIGREAD` when the config path exists but could not be read.
  */
 function resolveConfig(options = {}) {
 	const cwd = options.cwd || process.cwd();
@@ -145,6 +226,7 @@ function resolveConfig(options = {}) {
 				{ configPath }
 			);
 		}
+		validateConfig(raw, configPath);
 	}
 
 	const config = mergeConfig(raw);

@@ -4,7 +4,7 @@
  * `puppeteer` and `web-vitals` are consumer dev dependencies, never runtime
  * dependencies of `@rtcamp/wp-tooling`. These helpers walk up from `cwd`
  * looking for an installed copy in `node_modules`, the same shape as
- * `resolve-bin.js` for binaries. Unlike `detectBin`, no child process is
+ * `../a11y/resolve-bin.js` for binaries. Unlike `detectBin`, no child process is
  * spawned — the version comes straight from the module's own package.json.
  */
 

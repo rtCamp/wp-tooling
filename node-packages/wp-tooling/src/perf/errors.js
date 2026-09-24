@@ -12,6 +12,8 @@
  *   EBINFAIL     a browser or binary launch failed for a reason other than
  *                "found issues"
  *   EBADJSON     the perf config could not be parsed as JSON
+ *   EBADCONFIG   the perf config parsed, but a known field has the wrong type
+ *                or value (e.g. `"enabled": "false"`)
  *   ECONFIGREAD  the perf config path exists but could not be read — e.g. it
  *                is a directory, or permission was denied (distinct from a
  *                simply-absent config, which is not an error)

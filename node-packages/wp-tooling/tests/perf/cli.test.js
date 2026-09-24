@@ -4,6 +4,8 @@ jest.mock('child_process');
 jest.mock('../../src/perf/resolve-module');
 jest.mock('../../src/perf/collect-vitals');
 
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
 const resolveModule = require('../../src/perf/resolve-module');
@@ -76,8 +78,23 @@ describe('perf runCli', () => {
 	let stderr;
 	let outSpy;
 	let errSpy;
+	let cwdSpy;
+	let root;
+	let lighthouseEntry;
 
 	beforeEach(() => {
+		// A consumer project with lighthouse installed: the shared resolver
+		// reads its package.json bin entry and launches it with Node.
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'perf-cli-'));
+		const packageDir = path.join(root, 'node_modules', 'lighthouse');
+		fs.mkdirSync(packageDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(packageDir, 'package.json'),
+			JSON.stringify({ bin: { lighthouse: './cli/index.js' } })
+		);
+		lighthouseEntry = path.join(packageDir, 'cli', 'index.js');
+		cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(root);
+
 		stdout = [];
 		stderr = [];
 		outSpy = jest.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -116,6 +133,8 @@ describe('perf runCli', () => {
 	afterEach(() => {
 		outSpy.mockRestore();
 		errSpy.mockRestore();
+		cwdSpy.mockRestore();
+		fs.rmSync(root, { recursive: true, force: true });
 	});
 
 	test('--help prints usage and exits 0', async () => {
@@ -147,9 +166,52 @@ describe('perf runCli', () => {
 		expect(stderr.join('')).toMatch(/wp-tooling add setup\/perf/);
 	});
 
+	test('launches lighthouse through Node and its package bin entry, never a .bin shim', async () => {
+		const code = await runCli(['--config', FIXTURE_CONFIG]);
+		expect(code).toBe(0);
+		const lighthouseCalls = execFileSync.mock.calls.filter(
+			(call) => call[1][0] === lighthouseEntry
+		);
+		// The --version probe and one run per fixture URL.
+		expect(lighthouseCalls.length).toBeGreaterThan(1);
+		for (const [command] of lighthouseCalls) {
+			expect(command).toBe(process.execPath);
+		}
+	});
+
+	test('an uninstalled lighthouse exits 2 without probing or falling back to npx', async () => {
+		fs.rmSync(path.join(root, 'node_modules', 'lighthouse'), {
+			recursive: true,
+		});
+		expect(await runCli(['--config', FIXTURE_CONFIG])).toBe(2);
+		expect(stderr.join('')).toMatch(/lighthouse not found/);
+		expect(execFileSync).not.toHaveBeenCalled();
+	});
+
+	test('a lighthouse that fails its --version probe exits 2', async () => {
+		mockChildProcess({ lighthouseAvailable: false });
+		expect(await runCli(['--config', FIXTURE_CONFIG])).toBe(2);
+		expect(stderr.join('')).toMatch(/lighthouse not found/);
+	});
+
 	test('no config and no --url exits 2 (ENOURLS)', async () => {
 		expect(await runCli(['--config', MISSING_CONFIG])).toBe(2);
 		expect(stderr.join('')).toMatch(/no URLs to test/);
+	});
+
+	test('a config with a wrongly typed field exits 2 (EBADCONFIG) before any layer runs', async () => {
+		const configPath = path.join(root, '.perfrc.json');
+		fs.writeFileSync(
+			configPath,
+			JSON.stringify({
+				urls: ['http://localhost:8888/'],
+				server: { enabled: 'false' },
+			})
+		);
+		expect(await runCli(['--config', configPath])).toBe(2);
+		expect(stderr.join('')).toMatch(/"server\.enabled" must be a boolean/);
+		expect(spawnSync).not.toHaveBeenCalled();
+		expect(collectVitalsModule.collectVitals).not.toHaveBeenCalled();
 	});
 
 	test('a malformed config exits 2 (EBADJSON), not 1', async () => {
@@ -239,13 +301,15 @@ describe('perf runCli', () => {
 		expect(parsed.summary.failedUrls).toBeGreaterThan(0);
 		expect(stderr.join('')).toMatch(/incomplete/);
 
-		// Lighthouse needs the same reachability as puppeteer, so it must be
-		// skipped for a failed URL: only the initial --version probe ran, no
-		// per-URL lighthouse invocation.
+		// Lighthouse navigates in its own browser, so a puppeteer navigation
+		// failure (e.g. a networkidle2 timeout) doesn't skip it: it still runs
+		// and its result is recorded on the failed URL.
 		const nonProbeCalls = execFileSync.mock.calls.filter(
 			(call) => !call[1].includes('--version')
 		);
-		expect(nonProbeCalls).toHaveLength(0);
+		expect(nonProbeCalls.length).toBeGreaterThan(0);
+		expect(parsed.results[0].scanError).toMatch(/navigation failed/);
+		expect(parsed.results[0].lighthouse.scores.performance).toBe(0.95);
 		// The server layer profiles via WP-CLI, not the browser, so it still
 		// runs even though the frontend layer failed to load.
 		expect(spawnSync).toHaveBeenCalled();
@@ -336,8 +400,30 @@ describe('perf runCli', () => {
 		expect(code).toBe(1);
 		const out = stdout.join('');
 		expect(out).toMatch(/— scan failed/);
+		expect(out).toMatch(/lighthouse performance 0\.95/);
 		expect(out).toMatch(/server top: WP_Query::get_posts/);
 		expect(out).toMatch(/server note: profiled via/);
+	});
+
+	test('after a navigation failure, a failing lighthouse degrades on its own', async () => {
+		mockChildProcess({ lighthouseRunThrows: true });
+		collectVitalsModule.collectVitals.mockRejectedValue(
+			new RunnerError(
+				'ENAVFAIL',
+				'navigation failed: Navigation timeout of 5000 ms exceeded'
+			)
+		);
+		const code = await runCli([
+			'--config',
+			FIXTURE_CONFIG,
+			'--output',
+			'json',
+		]);
+		expect(code).toBe(1);
+		const result = JSON.parse(stdout.join('')).results[0];
+		expect(result.scanError).toMatch(/Navigation timeout/);
+		expect(result.lighthouse).toBeNull();
+		expect(result.notes.join('')).toMatch(/lighthouse: failed/);
 	});
 
 	test('a lighthouse runtime failure degrades that layer without affecting the exit code', async () => {
@@ -390,6 +476,15 @@ describe('perf runCli', () => {
 		expect(parsed.results[0].server).toBeNull();
 	});
 
+	test('--dry-run reports an uninstalled lighthouse as NOT FOUND', async () => {
+		fs.rmSync(path.join(root, 'node_modules', 'lighthouse'), {
+			recursive: true,
+		});
+		const code = await runCli(['--dry-run', '--config', FIXTURE_CONFIG]);
+		expect(code).toBe(0);
+		expect(stdout.join('')).toContain('lighthouse:  NOT FOUND');
+	});
+
 	test('--dry-run resolves everything but runs nothing', async () => {
 		const code = await runCli(['--dry-run', '--config', FIXTURE_CONFIG]);
 		expect(code).toBe(0);
@@ -397,6 +492,9 @@ describe('perf runCli', () => {
 		expect(out).toMatch(/\[dry-run\] perf would run:/);
 		expect(out).toMatch(/puppeteer:/);
 		expect(out).toMatch(/lighthouse:.*not probed — dry run/);
+		expect(out).toContain(
+			`lighthouse:  ${process.execPath} ${lighthouseEntry} (local,`
+		);
 		expect(out).toMatch(/server:/);
 
 		// Dry-run must not probe lighthouse (or invoke anything else).

@@ -250,8 +250,8 @@ function rateMeasurableMetric(name, vitalMetric, url, cwvMode) {
 
 /**
  * Build the per-URL result entry for a browser scan failure — empty metrics
- * and no assessment; the server layer (which runs independently of the
- * browser) is unaffected.
+ * and no assessment; the lighthouse and server layers (which run
+ * independently of the puppeteer browser) are kept as captured.
  *
  * @param {Object} raw Raw per-URL capture with a truthy `scanError`.
  * @return {Object} Result entry for `normalizePerf`'s `results[]`.
@@ -262,7 +262,7 @@ function buildScanErrorResult(raw) {
 		scanError: raw.scanError,
 		metrics: Object.fromEntries(METRIC_NAMES.map((name) => [name, null])),
 		attribution: { lcpElement: null, clsSources: [], inpTarget: null },
-		lighthouse: null,
+		lighthouse: raw.lighthouse || null,
 		server: normalizeServer(raw.server),
 		assessment: [],
 		notes: raw.notes || [],

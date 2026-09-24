@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const {
@@ -127,6 +129,61 @@ describe('resolveConfig — errors', () => {
 		);
 		expect(err).toBeInstanceOf(RunnerError);
 		expect(err.code).toBe('ECONFIGREAD');
+	});
+});
+
+describe('resolveConfig — field validation', () => {
+	let dir;
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), 'perf-config-'));
+	});
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true });
+	});
+
+	/**
+	 * Write `raw` as the config and resolve it with a --url, returning the error.
+	 *
+	 * @param {*} raw Config value to serialise.
+	 * @return {Error|null} The thrown error, or null.
+	 */
+	function resolveRaw(raw) {
+		fs.writeFileSync(path.join(dir, '.perfrc.json'), JSON.stringify(raw));
+		return grab(() =>
+			resolveConfig({ cwd: dir, urls: ['http://example.test/'] })
+		);
+	}
+
+	test.each([
+		[{ server: { enabled: 'false' } }, 'server.enabled', 'a boolean'],
+		[
+			{ lighthouse: { categories: 'performance' } },
+			'lighthouse.categories',
+			'array',
+		],
+		[{ lighthouse: { topAudits: '5' } }, 'lighthouse.topAudits', 'number'],
+		[{ webVitals: { settleMs: -1 } }, 'webVitals.settleMs', 'number'],
+		[{ server: { command: [] } }, 'server.command', 'array'],
+		[{ server: { shim: 42 } }, 'server.shim', 'a string'],
+		[{ thresholds: { cwv: 'bad' } }, 'thresholds.cwv', '"poor"'],
+		[{ server: 'yes' }, 'server', 'an object'],
+		[{ urls: 'http://x/' }, 'urls', 'an array'],
+		[['http://x/'], '(root)', 'an object'],
+	])('%j throws EBADCONFIG naming %s', (raw, field, expected) => {
+		const err = resolveRaw(raw);
+		expect(err).toBeInstanceOf(RunnerError);
+		expect(err.code).toBe('EBADCONFIG');
+		expect(err.message).toContain(`"${field}" must be`);
+		expect(err.message).toContain(expected);
+	});
+
+	test('valid fields and unknown keys pass through', () => {
+		expect(
+			resolveRaw({
+				server: { enabled: true, top: 0, futureKey: 'x' },
+				thresholds: { cwv: 'never', lighthousePerformance: 0.9 },
+			})
+		).toBeNull();
 	});
 });
 
