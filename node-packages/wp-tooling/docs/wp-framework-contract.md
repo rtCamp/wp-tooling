@@ -80,6 +80,13 @@ Common optional overrides: `get_block_dir(): ?string`, `get_block_args(): array`
 
 Wiring: `register_hooks()` attaches block registration to `init`.
 
+Not for every block: `AbstractBlock::register_block()` forces
+`$args['render_callback']`, which overrides a `"render": "file:./render.php"`
+declared in `block.json`. A block that renders from a PHP template instead of a
+class method therefore implements `Registrable` directly and calls
+`register_block_type()` on its build directory — that is what
+`scaffolds/wp/block-interactive` does.
+
 ### `AbstractShortcode` (extended by `scaffolds/wp/shortcode`)
 
 Required overrides:

@@ -1,0 +1,29 @@
+/**
+ * {{vendor}}/{{slug}} front-end store (Interactivity API).
+ *
+ * The namespace here MUST match the `data-wp-interactive` value in render.php.
+ *
+ * Per-instance values live in the context seeded by render.php; values shared
+ * by every instance come from wp_interactivity_state() there. Derived values
+ * belong in `state` as getters -- but note that a directive reading a getter
+ * defined only here renders empty on the server, so bind directives to values
+ * render.php also provides.
+ *
+ * An action that needs the DOM event itself (to call `event.preventDefault()`,
+ * say) has to be wrapped in `withSyncEvent()` from this same package, because
+ * actions are otherwise run asynchronously.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/interactivity-api/
+ */
+import { store, getContext } from '@wordpress/interactivity';
+
+store( '{{vendor}}/{{slug}}', {
+	actions: {
+		toggle() {
+			const context = getContext();
+			context.isOpen = ! context.isOpen;
+		},
+	},
+} );

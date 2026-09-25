@@ -89,6 +89,7 @@ const INPUT_ENTRY = {
 		default: { type: 'string' },
 		required: { type: 'boolean' },
 		transform: { type: 'string', enum: ALLOWED_INPUT_TRANSFORMS },
+		enum: { type: 'array', items: { type: 'string' }, minItems: 1 },
 	},
 };
 

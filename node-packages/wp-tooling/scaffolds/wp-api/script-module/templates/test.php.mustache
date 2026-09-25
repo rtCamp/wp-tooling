@@ -1,0 +1,103 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
+	}
+
+	/**
+	 * Both hooks are bound if, and only if, the Script Modules API exists.
+	 *
+	 * Before WP 6.5 there is nothing to register, so register_hooks() must
+	 * bind nothing rather than fatal.
+	 */
+	public function test_register_hooks_binds_only_when_the_api_exists(): void {
+		$instance = new {{class}}();
+		$instance->register_hooks();
+
+		$api_exists     = function_exists( 'wp_register_script_module' );
+		$register_bound = false !== has_action( 'init', [ $instance, 'register_module' ] );
+		$enqueue_bound  = false !== has_action( '{{enqueue_hook}}', [ $instance, 'enqueue_module' ] );
+
+		$this->assertSame( $api_exists, $register_bound );
+		$this->assertSame( $api_exists, $enqueue_bound );
+	}
+
+	/**
+	 * The module id follows core's '@vendor/name' import-map convention.
+	 */
+	public function test_module_id_follows_the_import_map_convention(): void {
+		$this->assertMatchesRegularExpression( '#^@[a-z0-9-]+/[a-z0-9-]+$#', {{class}}::MODULE_ID );
+	}
+
+	/**
+	 * The URL is the plugin root's, plus the build-relative path.
+	 *
+	 * Path and URL are derived at different dirname() depths, because
+	 * plugin_dir_url() takes a file and returns its directory's URL, so this
+	 * asserts the two still land on the same directory. A depth that has
+	 * drifted resolves above the plugin, to <plugins>/{{build_dir}}/..., and
+	 * 404s.
+	 */
+	public function test_module_url_resolves_inside_the_plugin_directory(): void {
+		$instance   = new {{class}}();
+		$relative   = '{{build_dir}}/{{module_slug}}.js';
+		$plugin_dir = rtrim( substr( $instance->get_module_path(), 0, - strlen( $relative ) ), '/' );
+
+		$this->assertStringEndsWith(
+			basename( $plugin_dir ) . '/' . $relative,
+			$instance->get_module_url()
+		);
+	}
+
+	/**
+	 * The module is printed only when there is a built file to serve.
+	 *
+	 * Registering an absent file still emits a <script type="module"> tag, so
+	 * an unbuilt checkout would ship a 404. Written as an equivalence rather
+	 * than a skip so it means something both before and after a build.
+	 */
+	public function test_module_is_printed_only_when_the_build_output_exists(): void {
+		$instance = new {{class}}();
+		$instance->register_module();
+		$instance->enqueue_module();
+
+		$printed = '';
+
+		if ( function_exists( 'wp_script_modules' ) ) {
+			ob_start();
+			wp_script_modules()->print_enqueued_script_modules();
+			$printed = (string) ob_get_clean();
+		}
+
+		$is_buildable = function_exists( 'wp_register_script_module' ) && is_readable( $instance->get_module_path() );
+
+		$this->assertSame( $is_buildable, str_contains( $printed, '{{build_dir}}/{{module_slug}}.js' ) );
+	}
+}

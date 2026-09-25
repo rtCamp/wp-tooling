@@ -35,14 +35,61 @@
     {
       "id": 3,
       "prompt": "Add a dynamic Gutenberg block called pricing-table to my project. Blocks live at src/blocks/ and we use a vendor prefix of 'acme' for block.json names (existing blocks look like acme/hero, acme/cta).",
-      "expected_output": "src/blocks/pricing-table/ created with block.json (name: acme/pricing-table), edit.js, index.js, render.php. The vendor prefix 'acme' is detected from an existing block.json and applied. No npm install or wp-scripts build executed automatically.",
+      "expected_output": "src/blocks/pricing-table/ created with block.json (name: acme/pricing-table), edit.js, index.js, plus a PricingTable class under the project's Blocks namespace holding the server render. The vendor prefix 'acme' is detected from an existing block.json and applied. No npm install or wp-scripts build executed automatically.",
       "files": [],
       "expectations": [
         "The skill picks the wp/block-dynamic scaffold.",
         "The skill introspects an existing src/blocks/*/block.json to confirm the 'acme' vendor prefix and the src/blocks/ source directory.",
         "The engine invocation passes a vendor/namespace input that produces 'acme/pricing-table' in the generated block.json (not 'wp-tooling/pricing-table' or unprefixed 'pricing-table').",
-        "The engine writes block.json, edit.js, index.js, and render.php under src/blocks/pricing-table/.",
+        "The engine writes block.json, edit.js and index.js under src/blocks/pricing-table/, and the block class under the project's Blocks directory \u2014 wp/block-dynamic renders from a class method, so it emits no render.php (wp/block-interactive is the scaffold that does).",
         "The skill does NOT run npm install or wp-scripts build."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I need an FAQ accordion block whose open/close behaviour runs without a custom bundle \u2014 use the Interactivity API. Blocks live at src/blocks/, built output goes to assets/build/blocks/, vendor prefix 'acme'.",
+      "expected_output": "wp/block-interactive is chosen over wp/block-dynamic. src/blocks/faq-accordion/ is created with block.json (name acme/faq-accordion, supports.interactivity, viewScriptModule), render.php carrying the data-wp-* directives, view.js with the store, plus index.js and edit.js, and a registrar class under the project's Blocks namespace. build_dir is passed as assets/build/blocks so the registrar points at the real build path. The developer is told to run the project's build; nothing is installed or built automatically.",
+      "files": [],
+      "expectations": [
+        "The skill picks wp/block-interactive, not wp/block-dynamic \u2014 the behaviour is front-end interactivity, and only the interactive scaffold emits render.php and view.js.",
+        "The skill introspects the project's build script for --output-path and passes --build_dir=assets/build/blocks rather than accepting the build/blocks default.",
+        "The rendered block.json declares supports.interactivity and viewScriptModule; without the interactivity support key core never processes the directives.",
+        "render.php lands at src/blocks/faq-accordion/render.php, the path the rtCamp PHPCS ruleset exempts from the block-render sniffs.",
+        "The store namespace in view.js matches data-wp-interactive in render.php (acme/faq-accordion).",
+        "The wiring snippet targets the Blocks module on the // scaffold:wp/block-dynamic:classes anchor, which interactive and dynamic blocks share.",
+        "The skill does NOT run npm install or a build."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Add a lightbox script module to this plugin. It should be a native ES module that core loads through its import map, no bundle of my own, enqueued on the front end. Source modules live in src/js/modules/ and the existing analytics module is already wired up the same way.",
+      "expected_output": "wp-api/script-module scaffolds src/js/modules/lightbox.js, a Lightbox registrar under the project's Services namespace and a PHPUnit test. modules_dir and build_dir are read from the project's build script (src/js/modules/, assets/build/js/modules/) rather than left at the defaults, and the text domain is sampled so MODULE_ID renders @acme-blog/lightbox. The generated class registers nothing until the build has run, and the build command is surfaced as a developer action rather than executed.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp-api/script-module scaffold rather than hand-writing wp_enqueue_script or reaching for wp/block-interactive.",
+        "The engine invocation passes --modules_dir=src/js/modules and --build_dir=assets/build/js/modules, both read from the project's wp-scripts build script, not the manifest defaults.",
+        "The text domain is sampled from the plugin header or the sibling module id, so the rendered MODULE_ID is @acme-blog/lightbox and not the my-plugin default.",
+        "--enqueue_hook is either omitted or set to one of the two values the manifest enum allows; an invalid value is not passed blind.",
+        "The engine writes src/js/modules/lightbox.js, the registrar class under inc/Services/ and a PHPUnit test under the project's tests path.",
+        "The skill reports that the module registers nothing until the build output exists, and surfaces the project's build script as a developer action instead of running it.",
+        "The wiring snippet targets the Services module on the // scaffold:wp/registrable:classes anchor.",
+        "The skill does NOT run npm install, composer install or a build."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Our editors keep pasting the product price into paragraph blocks by hand and it goes stale. I want a binding source, labelled \"Product price\", that lets a paragraph or heading pull its text straight from the post's meta instead. It belongs with the rest of the services.",
+      "expected_output": "wp-api/block-bindings scaffolds a ProductPrice registrable under the project's Services namespace plus a PHPUnit test. The vendor prefix is sampled from the project's existing block.json names, so SOURCE_NAME renders acme/product-price rather than the rtcamp default, and the label is translated with the plugin's own text domain. Core's get_value_callback signature and the USES_CONTEXT declaration are left as core requires them. Any test that touches the Block Bindings API keeps its WP 6.5 guard.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp-api/block-bindings scaffold rather than hand-writing register_block_bindings_source() or reaching for a render_block filter.",
+        "The vendor prefix is sampled from the project's existing block.json names, so SOURCE_NAME renders acme/product-price and not the rtcamp manifest default.",
+        "The class lands under inc/Services/ and the test under the project's tests path, both read from the PSR-4 roots rather than the includes/ default.",
+        "The required label input is passed and rendered through the plugin's own text domain, not the my-plugin default.",
+        "The rendered get_value() keeps core's exact callback signature (array $source_args, WP_Block $block_instance, string $attribute_name) and the USES_CONTEXT declaration that makes the bound block's context reachable.",
+        "Every test that calls register_source() or touches WP_Block_Bindings_Registry keeps a WP 6.5 guard, whether it came from the stub or the skill added it; the API is core since 6.5 and an unguarded call fatals below that.",
+        "The wiring snippet targets the Services module on the // scaffold:wp/registrable:classes anchor.",
+        "The skill does NOT run composer install, composer require or npm install."
       ]
     }
   ]

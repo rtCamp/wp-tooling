@@ -8,7 +8,11 @@
  *   - wiring targetFile paths are normalised (no `..` segments)
  *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
  *   - wp-api/speculation renders into the registrable layout, reuses the
- *     registrable wiring anchor, and follows a non-`includes/` PSR-4 root
+ *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
+ *     rejects an out-of-enum mode/eagerness
+ *   - the modern WP API scaffolds (wp/block-interactive, wp-api/block-bindings,
+ *     wp-api/script-module) render every file of their layout, in order, and
+ *     reuse an existing wiring anchor rather than minting a new one
  *   - utility/* are source: package — zero files, a Composer dep and one
  *     accessor snippet, with context_slug discovered from composer.json:name
  */
@@ -141,6 +145,147 @@ describe('wp-api/speculation', () => {
 		expect(wiring.snippet).toBe(
 			'\\Acme\\Blog\\Services\\SpeculativeLoading::class,'
 		);
+	});
+
+	it('throws EINVALIDINPUT for a mode core would not accept', async () => {
+		const err = await registry
+			.execute(
+				'wp-api/speculation',
+				{ name: 'speculative-loading', mode: 'prender' },
+				{ dryRun: true, cwd: makeTmpDir() }
+			)
+			.then(
+				() => {
+					throw new Error('should have thrown');
+				},
+				(caught) => caught
+			);
+		expect(err.code).toBe('EINVALIDINPUT');
+		expect(err.invalid).toEqual([
+			{
+				key: 'mode',
+				value: 'prender',
+				allowed: ['auto', 'prefetch', 'prerender'],
+			},
+		]);
+	});
+});
+
+describe('wp/block-interactive', () => {
+	it('renders the block directory plus a registrar under the project PSR-4 root, reusing the block anchor', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'composer.json'),
+			JSON.stringify({
+				autoload: { 'psr-4': { 'Acme\\Blog\\': 'inc/' } },
+			}),
+			'utf8'
+		);
+		const result = await registry.execute(
+			'wp/block-interactive',
+			{ slug: 'faq-accordion', title: 'FAQ Accordion' },
+			{ dryRun: true, cwd: target }
+		);
+		expect(result.engine.inputs.namespace).toBe('Acme\\Blog\\Blocks');
+		expect(result.engine.inputs.class).toBe('FaqAccordion');
+		// Only the PHP class follows the PSR-4 root; the block sources are
+		// build inputs, not autoloaded code, so they stay under blocks_dir.
+		// render.php must land at `<blocks_dir>/<slug>/render.php`: the rtCamp
+		// PHPCS ruleset exempts exactly that path from the file-header and
+		// text-domain sniffs a block render file cannot satisfy.
+		expect(result.engine.wrote).toEqual([
+			'inc/Blocks/FaqAccordion.php',
+			'src/blocks/faq-accordion/block.json',
+			'src/blocks/faq-accordion/index.js',
+			'src/blocks/faq-accordion/edit.js',
+			'src/blocks/faq-accordion/render.php',
+			'src/blocks/faq-accordion/view.js',
+		]);
+		// An interactive block is still a block: it shares the Blocks module,
+		// and its anchor, with wp/block-dynamic instead of minting a new one.
+		const wiring = result.ai.wiring[0];
+		expect(wiring.targetFile).toBe('inc/Modules/Blocks.php');
+		expect(wiring.anchor).toBe('// scaffold:wp/block-dynamic:classes');
+		expect(wiring.snippet).toBe(
+			'\\Acme\\Blog\\Blocks\\FaqAccordion::class,'
+		);
+	});
+});
+
+describe('wp-api/block-bindings', () => {
+	it('renders a Services class and derives the source name from name', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'composer.json'),
+			JSON.stringify({
+				autoload: { 'psr-4': { 'Acme\\Blog\\': 'inc/' } },
+			}),
+			'utf8'
+		);
+		const result = await registry.execute(
+			'wp-api/block-bindings',
+			{ name: 'Product Price', label: 'Product price' },
+			{ dryRun: true, cwd: target }
+		);
+		expect(result.engine.inputs.class).toBe('ProductPrice');
+		expect(result.engine.inputs.source_slug).toBe('product-price');
+		expect(result.engine.wrote).toEqual(['inc/Services/ProductPrice.php']);
+		expect(result.ai.tests[0].path).toBe(
+			'tests/Services/ProductPriceTest.php'
+		);
+		const wiring = result.ai.wiring[0];
+		expect(wiring.targetFile).toBe('inc/Modules/Services.php');
+		expect(wiring.anchor).toBe('// scaffold:wp/registrable:classes');
+	});
+});
+
+describe('wp-api/script-module', () => {
+	it('renders the module source next to its registration class', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'composer.json'),
+			JSON.stringify({
+				autoload: { 'psr-4': { 'Acme\\Blog\\': 'inc/' } },
+			}),
+			'utf8'
+		);
+		const result = await registry.execute(
+			'wp-api/script-module',
+			{ name: 'lightbox' },
+			{ dryRun: true, cwd: target }
+		);
+		expect(result.engine.inputs.module_slug).toBe('lightbox');
+		expect(result.engine.inputs.enqueue_hook).toBe('wp_enqueue_scripts');
+		expect(result.engine.wrote).toEqual([
+			'inc/Services/Lightbox.php',
+			'src/js/modules/lightbox.js',
+		]);
+		expect(result.ai.wiring[0].anchor).toBe(
+			'// scaffold:wp/registrable:classes'
+		);
+	});
+
+	it('rejects an enqueue hook outside the declared enum', async () => {
+		const err = await registry
+			.execute(
+				'wp-api/script-module',
+				{ name: 'lightbox', enqueue_hook: 'admin_enqueue_scripts' },
+				{ dryRun: true, cwd: makeTmpDir() }
+			)
+			.then(
+				() => {
+					throw new Error('should have thrown');
+				},
+				(caught) => caught
+			);
+		expect(err.code).toBe('EINVALIDINPUT');
+		expect(err.invalid).toEqual([
+			{
+				key: 'enqueue_hook',
+				value: 'admin_enqueue_scripts',
+				allowed: ['wp_enqueue_scripts', 'enqueue_block_assets'],
+			},
+		]);
 	});
 });
 
