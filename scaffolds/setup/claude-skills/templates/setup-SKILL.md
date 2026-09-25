@@ -124,8 +124,17 @@ Map each feature the developer mentioned to one or more scaffold IDs from the ca
 | REST endpoint / API | `wp/rest` (if available) |
 | Cron job / background job | `wp/cron` (if available) |
 | Gutenberg block | `wp/block-dynamic` |
-| Cache / transients | `utility/cache` |
+| Object caching | `utility/cache` |
+| Transients | `utility/transients` |
+| Debug logging | `utility/logger` |
+| Timing a slow code path | `utility/timer` |
+| Feature flags / gradual rollout | `utility/feature-selector` |
 | CI pipeline | `ci/cd-wporg` (or other CI scaffold) |
+
+The `utility/*` scaffolds are `source: package`: they write no files and return the
+`rtcamp/wp-framework` dependency plus one accessor snippet for `<base_path>/Helpers/Util.php`.
+Check whether the project already exposes that accessor before applying the wiring — pasting in a
+method name that already exists in `Helpers\Util` is a PHP fatal error (cannot redeclare method).
 
 Run `npx wp-tooling list --json` to see exactly what is available. If a feature the developer wants has no matching scaffold, note it explicitly as a manual task in the final report.
 
