@@ -18,7 +18,7 @@
     "access": "restricted"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19"
   },
   "main": "index.js",
   "exports": {

@@ -589,6 +589,77 @@ describe('execute() passes scripts through to developer block', () => {
 			'rtcamp/wp-php-toolkit': '^1',
 		});
 	});
+
+	it('a bad script placeholder throws before any files are written', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				category: 'lint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				inputs: [],
+				files: [{ src: 'eslintrc.mustache', dest: '.eslintrc.js' }],
+				scripts: {
+					npm: { 'lint:js': '{{does_not_exist}}' },
+				},
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(sDir, 'eslintrc.mustache'),
+			'module.exports = {};',
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const targetDir = makeTmpDir();
+		await expect(
+			r.execute('lint/eslint', {}, { cwd: targetDir })
+		).rejects.toMatchObject({ code: 'ERENDERFAIL' });
+		expect(fssync.existsSync(path.join(targetDir, '.eslintrc.js'))).toBe(
+			false
+		);
+	});
+
+	it('a supplied value used only in a script survives the no-inputs[] fallback', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				category: 'lint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				files: [{ src: 'eslintrc.mustache', dest: '.eslintrc.js' }],
+				scripts: {
+					npm: { greet: 'echo {{message}}' },
+				},
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(sDir, 'eslintrc.mustache'),
+			'module.exports = {};',
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const targetDir = makeTmpDir();
+		const result = await r.execute(
+			'lint/eslint',
+			{ message: 'hello' },
+			{ cwd: targetDir }
+		);
+		expect(result.developer.scripts.npm.greet).toBe('echo hello');
+	});
 });
 
 describe('execute() never embeds secret values', () => {

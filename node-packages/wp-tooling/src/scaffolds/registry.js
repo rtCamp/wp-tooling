@@ -46,6 +46,22 @@ const {
 	indexEntryToRecord,
 } = require('./sources');
 
+/**
+ * Render every value in a scripts map (npm or composer) through Mustache.
+ *
+ * @param {Object} scripts  Raw `{name: command}` map from scaffold.json.
+ * @param {Object} resolved Resolved inputs to render with.
+ * @return {Object} Rendered `{name: command}` map.
+ */
+function renderScriptMap(scripts, resolved) {
+	return Object.fromEntries(
+		Object.entries(scripts || {}).map(([name, cmd]) => [
+			name,
+			render(cmd, resolved),
+		])
+	);
+}
+
 class ScaffoldRegistry {
 	/**
 	 * @param {Object|string} options
@@ -290,6 +306,13 @@ class ScaffoldRegistry {
 		const discovery = await loadDiscovery(cwd);
 		const resolved = resolveInputs(scaffold, inputs, discovery);
 
+		// Rendered before any write, so a bad placeholder throws before partial writes.
+		const scaffoldScripts = scaffold.scripts || {};
+		const renderedScripts = {
+			npm: renderScriptMap(scaffoldScripts.npm, resolved),
+			composer: renderScriptMap(scaffoldScripts.composer, resolved),
+		};
+
 		// Warn on supplied keys the scaffold does not declare. Typos like
 		// `--namspace=Inc` would otherwise be silently dropped while the
 		// real `namespace` input falls back to its default. Soft warning,
@@ -462,7 +485,6 @@ class ScaffoldRegistry {
 			});
 		}
 
-		const scaffoldScripts = scaffold.scripts || {};
 		return {
 			scaffold: {
 				id: makeId(scaffold),
@@ -492,10 +514,7 @@ class ScaffoldRegistry {
 					npm: { ...(scaffold.npm_dependencies || {}) },
 					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
-				scripts: {
-					npm: { ...(scaffoldScripts.npm || {}) },
-					composer: { ...(scaffoldScripts.composer || {}) },
-				},
+				scripts: renderedScripts,
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},
 			ai: { wiring: aiWiring, tests: aiTests },
@@ -1092,6 +1111,14 @@ function inferPlaceholders(scaffold) {
 	for (const t of scaffold.tests || []) {
 		for (const p of collectPlaceholders(t.dest)) {
 			seen.add(p);
+		}
+	}
+	for (const target of ['npm', 'composer']) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const cmd of Object.values(map)) {
+			for (const p of collectPlaceholders(cmd)) {
+				seen.add(p);
+			}
 		}
 	}
 	return Array.from(seen);

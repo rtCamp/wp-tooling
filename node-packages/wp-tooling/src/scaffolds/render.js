@@ -225,6 +225,11 @@ const TRANSFORMS = {
 	'upper-snake-case': (s) => splitWords(s).join('_').toUpperCase(),
 	// Escape JSON string contents; templates supply the surrounding quotes.
 	'json-escape': (s) => JSON.stringify(String(s)).slice(1, -1),
+	// POSIX-shell quote a single argument, only when it needs quoting.
+	'shell-escape': (s) => {
+		const v = String(s);
+		return /^[\w@%+=:,./-]+$/.test(v) ? v : `'${v.replace(/'/g, `'\\''`)}'`;
+	},
 };
 
 function splitWords(s) {
