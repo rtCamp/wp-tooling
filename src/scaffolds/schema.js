@@ -54,6 +54,7 @@ const ALLOWED_INPUT_TRANSFORMS = [
 	'snake-case',
 	'upper-snake-case',
 	'json-escape',
+	'shell-escape',
 ];
 
 /** Optional dependency maps. Each is `{ "<package>": "<version-range>" }`. */

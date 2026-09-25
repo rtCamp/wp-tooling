@@ -1,5 +1,6 @@
 /**
  * Resolve the consumer's installed Node CLI, including workspace-hoisted copies.
+ * Shared by the a11y (pa11y-ci) and perf (lighthouse) runners.
  * Launch its package.json bin entry with Node on every platform: npm's .bin
  * shims are platform-specific and Windows .cmd files cannot use execFileSync.
  * No npx fallback: a cached/global package is not the consumer's dependency.
