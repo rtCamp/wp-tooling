@@ -209,6 +209,144 @@ describe('add command non-interactive flow', () => {
 	});
 });
 
+describe('add command human report', () => {
+	async function buildProjectWithDevDeps(cwd) {
+		const scaffoldDir = path.join(
+			cwd,
+			'bin',
+			'scaffolds',
+			'test',
+			'devdeps'
+		);
+		await fs.mkdir(path.join(scaffoldDir, 'templates'), {
+			recursive: true,
+		});
+		await fs.writeFile(
+			path.join(scaffoldDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'devdeps',
+				category: 'test',
+				name: 'Dev deps',
+				description:
+					'Scaffold with dev dependencies, for report testing.',
+				source: 'template',
+				files: [{ src: 'templates/out.txt.mustache', dest: 'out.txt' }],
+				npm_dev_dependencies: { 'pa11y-ci': '^6.0.0' },
+				scripts: {
+					npm: {
+						'test:perf': 'wp-tooling perf',
+						'profile:server': `run --cwd='my "odd" dir'`,
+					},
+					composer: { lint: 'phpcs', analyse: 'phpstan analyse' },
+				},
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(scaffoldDir, 'templates/out.txt.mustache'),
+			'ok\n',
+			'utf8'
+		);
+	}
+
+	it('prints an "Install (npm dev):" section for npm_dev_dependencies', async () => {
+		const cwd = makeTmpDir();
+		await buildProjectWithDevDeps(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		let captured = '';
+		process.stdout.write = (chunk) => {
+			captured += chunk;
+			return true;
+		};
+		const code = await add.runCli([
+			'test/devdeps',
+			'--non-interactive',
+			'--cwd',
+			cwd,
+		]);
+		process.stdout.write = originalOut;
+		expect(code).toBe(0);
+		expect(captured).toContain('Install (npm dev):');
+		expect(captured).toContain('npm install --save-dev pa11y-ci@^6.0.0');
+	});
+
+	it('prints each scripts block as a pasteable JSON body — escaped and comma-separated', async () => {
+		const cwd = makeTmpDir();
+		await buildProjectWithDevDeps(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		let captured = '';
+		process.stdout.write = (chunk) => {
+			captured += chunk;
+			return true;
+		};
+		const code = await add.runCli([
+			'test/devdeps',
+			'--non-interactive',
+			'--cwd',
+			cwd,
+		]);
+		process.stdout.write = originalOut;
+		expect(code).toBe(0);
+		// The entry lines right under a heading, parsed together as one object.
+		const block = (heading) => {
+			const lines = captured.split('\n');
+			const start = lines.indexOf(heading) + 1;
+			const end = lines.findIndex(
+				(l, i) => i >= start && !l.startsWith('    ')
+			);
+			return JSON.parse(`{${lines.slice(start, end).join('\n')}}`);
+		};
+		expect(block('  Add to package.json "scripts":')).toEqual({
+			'test:perf': 'wp-tooling perf',
+			'profile:server': `run --cwd='my "odd" dir'`,
+		});
+		expect(block('  Add to composer.json "scripts":')).toEqual({
+			lint: 'phpcs',
+			analyse: 'phpstan analyse',
+		});
+	});
+});
+
+describe('add debug logging does not leak raw argument values', () => {
+	let logPath;
+
+	beforeEach(() => {
+		logPath = path.join(makeTmpDir(), 'debug.log');
+		process.env.WP_TOOLING_DEBUG = '1';
+		process.env.WP_TOOLING_DEBUG_LOG = logPath;
+		jest.resetModules();
+	});
+
+	afterEach(() => {
+		delete process.env.WP_TOOLING_DEBUG;
+		delete process.env.WP_TOOLING_DEBUG_LOG;
+		jest.resetModules();
+	});
+
+	it('logs a sanitized command + context, never the raw --input=value argv', async () => {
+		const freshAdd = require('../../src/scaffolds/add');
+		const cwd = makeTmpDir();
+		await buildProjectWithScaffold(cwd);
+		const originalOut = process.stdout.write.bind(process.stdout);
+		process.stdout.write = () => true;
+		try {
+			await freshAdd.runCli([
+				'test/echo',
+				'--non-interactive',
+				'--cwd',
+				cwd,
+				'--value=super-secret-token',
+			]);
+		} finally {
+			process.stdout.write = originalOut;
+		}
+		const report = fssync.readFileSync(logPath, 'utf8');
+		expect(report).not.toContain('super-secret-token');
+		expect(report).not.toContain('--value=');
+		expect(report).toMatch(/^command: add$/m);
+	});
+});
+
 describe('engine core is not coupled to TTY UI', () => {
 	it('non-interactive code path does not require the TTY UI kit', async () => {
 		// If `src/cli/commands/add.js` eagerly loaded TTY UI at top-level, this test would still

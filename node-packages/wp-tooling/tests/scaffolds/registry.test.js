@@ -390,6 +390,78 @@ describe('execute() result shape', () => {
 	});
 });
 
+describe('wiring target_file Modules-collapse gating', () => {
+	// A manifest using the `{{base_path}}/../Modules/X.php` shape (as several
+	// bundled wp/* scaffolds do): only a base_path nested inside a `Modules`
+	// dir should trigger the doubled-segment collapse.
+	async function scanFixture(basePathDefault) {
+		const tmp = makeTmpDir();
+		const dir = path.join(tmp, 'wp', 'modules-collapse-fixture');
+		await fs.mkdir(dir, { recursive: true });
+		await fs.writeFile(
+			path.join(dir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'modules-collapse-fixture',
+				category: 'wp',
+				name: 'Modules collapse fixture',
+				description: 'Fixture for collapseModules gating.',
+				source: 'template',
+				inputs: [
+					{
+						key: 'base_path',
+						description: 'Base path.',
+						default: basePathDefault,
+					},
+					{ key: 'name', description: 'Slug.', required: true },
+				],
+				files: [],
+				wiring: [
+					{
+						target_file: '{{base_path}}/../Modules/{{name}}.php',
+						anchor: '// scaffold:anchor',
+						snippet_template: '// {{name}}',
+						description: 'Wire it up.',
+					},
+				],
+			}),
+			'utf8'
+		);
+		const registry = new ScaffoldRegistry({ defaultsDir: tmp });
+		await registry.scan();
+		return registry;
+	}
+
+	it('leaves a flat base_path untouched (no double to collapse)', async () => {
+		const registry = await scanFixture('includes/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('includes/Modules/X.php');
+	});
+
+	it('collapses the doubled segment only when base_path nests inside Modules', async () => {
+		const registry = await scanFixture('inc/Modules/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('inc/Modules/X.php');
+	});
+
+	it('collapses the doubled segment when base_path nests directly under a top-level Modules dir (no leading slash before the double)', async () => {
+		const registry = await scanFixture('Modules/Cli');
+		const result = await registry.execute(
+			'wp/modules-collapse-fixture',
+			{ name: 'X' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('Modules/X.php');
+	});
+});
+
 describe('execute() error paths', () => {
 	let registry;
 	beforeAll(async () => {
@@ -516,6 +588,77 @@ describe('execute() passes scripts through to developer block', () => {
 		expect(result.developer.install.composerSuggest).toEqual({
 			'rtcamp/wp-php-toolkit': '^1',
 		});
+	});
+
+	it('a bad script placeholder throws before any files are written', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				category: 'lint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				inputs: [],
+				files: [{ src: 'eslintrc.mustache', dest: '.eslintrc.js' }],
+				scripts: {
+					npm: { 'lint:js': '{{does_not_exist}}' },
+				},
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(sDir, 'eslintrc.mustache'),
+			'module.exports = {};',
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const targetDir = makeTmpDir();
+		await expect(
+			r.execute('lint/eslint', {}, { cwd: targetDir })
+		).rejects.toMatchObject({ code: 'ERENDERFAIL' });
+		expect(fssync.existsSync(path.join(targetDir, '.eslintrc.js'))).toBe(
+			false
+		);
+	});
+
+	it('a supplied value used only in a script survives the no-inputs[] fallback', async () => {
+		const tmp = makeTmpDir();
+		const sDir = path.join(tmp, 'lint');
+		await fs.mkdir(sDir, { recursive: true });
+		await fs.writeFile(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'eslint',
+				category: 'lint',
+				name: 'ESLint',
+				description: 'ESLint',
+				source: 'template',
+				files: [{ src: 'eslintrc.mustache', dest: '.eslintrc.js' }],
+				scripts: {
+					npm: { greet: 'echo {{message}}' },
+				},
+			}),
+			'utf8'
+		);
+		await fs.writeFile(
+			path.join(sDir, 'eslintrc.mustache'),
+			'module.exports = {};',
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir: tmp });
+		await r.scan();
+		const targetDir = makeTmpDir();
+		const result = await r.execute(
+			'lint/eslint',
+			{ message: 'hello' },
+			{ cwd: targetDir }
+		);
+		expect(result.developer.scripts.npm.greet).toBe('echo hello');
 	});
 });
 

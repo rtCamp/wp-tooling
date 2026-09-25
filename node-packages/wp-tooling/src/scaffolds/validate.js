@@ -669,6 +669,24 @@ function checkTemplatesRender(scaffold, scaffoldDir) {
 			errs.push(`wiring snippet_template render failed: ${err.message}`);
 		}
 	}
+	for (const target of ALLOWED_SCRIPT_TARGETS) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const [name, cmd] of Object.entries(map)) {
+			const missing = collectPlaceholders(cmd).filter(
+				(k) => !(k in supply)
+			);
+			for (const k of missing) {
+				supply[k] = 'x';
+			}
+			try {
+				render(cmd, supply);
+			} catch (err) {
+				errs.push(
+					`scripts.${target}['${name}'] render failed: ${err.message}`
+				);
+			}
+		}
+	}
 	return errs;
 }
 

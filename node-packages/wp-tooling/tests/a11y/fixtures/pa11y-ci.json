@@ -1,0 +1,46 @@
+{
+	"total": 4,
+	"passes": 1,
+	"errors": 2,
+	"results": {
+		"http://localhost:8888/about": [],
+		"http://localhost:8888/": [
+			{
+				"code": "WCAG2AA.Principle1.Guideline1_1.1_1_1.H37",
+				"type": "error",
+				"typeCode": 1,
+				"message": "Img element missing an alt attribute.",
+				"context": "<img src=\"/hero.jpg\" class=\"card__media hero\">",
+				"selector": "html > body > main > img:nth-child(2)",
+				"runner": "htmlcs"
+			},
+			{
+				"code": "color-contrast",
+				"type": "error",
+				"typeCode": 1,
+				"message": "Elements must have sufficient color contrast.",
+				"context": "<a id=\"cta\" class=\"wp-block-acme-cta\" href=\"/buy\">Buy</a>",
+				"selector": "#cta",
+				"runner": "axe"
+			},
+			{
+				"code": "WCAG2AA.Principle1.Guideline1_3.1_3_1.H42.2",
+				"type": "warning",
+				"typeCode": 2,
+				"message": "Heading markup should be used if this content is intended as a heading.",
+				"context": "<b>Section</b>",
+				"selector": "html > body > b",
+				"runner": "htmlcs"
+			},
+			{
+				"code": "WCAG2AA.Principle4.Guideline4_1.4_1_2.H91.A.NoContent",
+				"type": "notice",
+				"typeCode": 3,
+				"message": "Anchor element found with no link content.",
+				"context": "<a href=\"/x\"></a>",
+				"selector": "html > body > a",
+				"runner": "htmlcs"
+			}
+		]
+	}
+}

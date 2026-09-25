@@ -46,6 +46,22 @@ const {
 	indexEntryToRecord,
 } = require('./sources');
 
+/**
+ * Render every value in a scripts map (npm or composer) through Mustache.
+ *
+ * @param {Object} scripts  Raw `{name: command}` map from scaffold.json.
+ * @param {Object} resolved Resolved inputs to render with.
+ * @return {Object} Rendered `{name: command}` map.
+ */
+function renderScriptMap(scripts, resolved) {
+	return Object.fromEntries(
+		Object.entries(scripts || {}).map(([name, cmd]) => [
+			name,
+			render(cmd, resolved),
+		])
+	);
+}
+
 class ScaffoldRegistry {
 	/**
 	 * @param {Object|string} options
@@ -290,6 +306,13 @@ class ScaffoldRegistry {
 		const discovery = await loadDiscovery(cwd);
 		const resolved = resolveInputs(scaffold, inputs, discovery);
 
+		// Rendered before any write, so a bad placeholder throws before partial writes.
+		const scaffoldScripts = scaffold.scripts || {};
+		const renderedScripts = {
+			npm: renderScriptMap(scaffoldScripts.npm, resolved),
+			composer: renderScriptMap(scaffoldScripts.composer, resolved),
+		};
+
 		// Warn on supplied keys the scaffold does not declare. Typos like
 		// `--namspace=Inc` would otherwise be silently dropped while the
 		// real `namespace` input falls back to its default. Soft warning,
@@ -393,8 +416,34 @@ class ScaffoldRegistry {
 		// `target_file` templates often build on a path input (e.g.
 		// `{{base_path}}/../Modules/Cli.php`); normalise so the caller gets
 		// `includes/Modules/Cli.php`, not a `..` segment to clean up.
+		//
+		// The `../Modules/<Kind>.php` shape assumes `base_path` is a SIBLING of
+		// the Modules directory (the flat default, e.g. `includes/Cli`). When a
+		// consumer nests artifact dirs INSIDE Modules (e.g. base_path
+		// `inc/Modules/Cli`), the `..` climbs to `inc/Modules` and the literal
+		// `Modules/` re-descends, producing a doubled `inc/Modules/Modules/...`.
+		// Collapse that accidental double so the emitted wiring target is the
+		// real module file in either layout. This only fires when the double
+		// actually occurs, so the flat layout is unaffected.
+		// Only collapse when the resolved `base_path` itself nests inside a
+		// `Modules` directory -- the one condition that produces the doubled
+		// segment. Pattern-matching the rendered output alone would also mangle
+		// an unrelated manifest whose real target happens to contain the same
+		// substring.
+		const basePathValue = resolved.base_path || '';
+		const baseNestedInModules =
+			'Modules' ===
+			path.posix.basename(
+				path.posix.dirname(path.posix.normalize(basePathValue))
+			);
+		const collapseModules = (p) =>
+			baseNestedInModules
+				? p.replace(/(^|\/)Modules\/Modules\//, '$1Modules/')
+				: p;
 		const aiWiring = (scaffold.wiring || []).map((w) => ({
-			targetFile: path.posix.normalize(render(w.target_file, resolved)),
+			targetFile: collapseModules(
+				path.posix.normalize(render(w.target_file, resolved))
+			),
 			anchor: w.anchor,
 			snippet: render(w.snippet_template, resolved),
 			description: w.description || '',
@@ -436,7 +485,6 @@ class ScaffoldRegistry {
 			});
 		}
 
-		const scaffoldScripts = scaffold.scripts || {};
 		return {
 			scaffold: {
 				id: makeId(scaffold),
@@ -466,10 +514,7 @@ class ScaffoldRegistry {
 					npm: { ...(scaffold.npm_dependencies || {}) },
 					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
-				scripts: {
-					npm: { ...(scaffoldScripts.npm || {}) },
-					composer: { ...(scaffoldScripts.composer || {}) },
-				},
+				scripts: renderedScripts,
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},
 			ai: { wiring: aiWiring, tests: aiTests },
@@ -1096,6 +1141,14 @@ function inferPlaceholders(scaffold) {
 	for (const t of scaffold.tests || []) {
 		for (const p of collectPlaceholders(t.dest)) {
 			seen.add(p);
+		}
+	}
+	for (const target of ['npm', 'composer']) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const cmd of Object.values(map)) {
+			for (const p of collectPlaceholders(cmd)) {
+				seen.add(p);
+			}
 		}
 	}
 	return Array.from(seen);

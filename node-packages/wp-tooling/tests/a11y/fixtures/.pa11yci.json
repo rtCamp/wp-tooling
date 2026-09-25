@@ -1,0 +1,10 @@
+{
+	"defaults": {
+		"standard": "WCAG2AA",
+		"timeout": 60000
+	},
+	"urls": [
+		"http://localhost:8888/",
+		{ "url": "http://localhost:8888/about", "timeout": 30000 }
+	]
+}
