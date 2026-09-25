@@ -13,6 +13,8 @@
  *   - the modern WP API scaffolds (wp/block-interactive, wp-api/block-bindings,
  *     wp-api/script-module) render every file of their layout, in order, and
  *     reuse an existing wiring anchor rather than minting a new one
+ *   - utility/* are source: package — zero files, a Composer dep and one
+ *     accessor snippet, with context_slug discovered from composer.json:name
  */
 
 'use strict';
@@ -170,45 +172,7 @@ describe('wp-api/speculation', () => {
 });
 
 describe('wp/block-interactive', () => {
-	it('renders the block directory plus a registrar, reusing the block anchor', async () => {
-		const target = makeTmpDir();
-		fs.writeFileSync(
-			path.join(target, 'composer.json'),
-			JSON.stringify({
-				autoload: { 'psr-4': { 'Acme\\Blog\\': 'includes/' } },
-			}),
-			'utf8'
-		);
-		const result = await registry.execute(
-			'wp/block-interactive',
-			{ slug: 'faq-accordion', title: 'FAQ Accordion' },
-			{ dryRun: true, cwd: target }
-		);
-		expect(result.engine.inputs.namespace).toBe('Acme\\Blog\\Blocks');
-		expect(result.engine.inputs.class).toBe('FaqAccordion');
-		// render.php must land at `<blocks_dir>/<slug>/render.php`: the rtCamp
-		// PHPCS ruleset exempts exactly that path from the file-header and
-		// text-domain sniffs a block render file cannot satisfy.
-		expect(result.engine.wrote).toEqual([
-			'includes/Blocks/FaqAccordion.php',
-			'src/blocks/faq-accordion/block.json',
-			'src/blocks/faq-accordion/index.js',
-			'src/blocks/faq-accordion/edit.js',
-			'src/blocks/faq-accordion/render.php',
-			'src/blocks/faq-accordion/view.js',
-		]);
-		// An interactive block is still a block: it shares the Blocks module,
-		// and its anchor, with wp/block-dynamic instead of minting a new one.
-		const wiring = result.ai.wiring[0];
-		expect(wiring.targetFile).toBe('includes/Modules/Blocks.php');
-		expect(wiring.targetFile).not.toContain('..');
-		expect(wiring.anchor).toBe('// scaffold:wp/block-dynamic:classes');
-		expect(wiring.snippet).toBe(
-			'\\Acme\\Blog\\Blocks\\FaqAccordion::class,'
-		);
-	});
-
-	it('follows the project PSR-4 root when it is not includes/', async () => {
+	it('renders the block directory plus a registrar under the project PSR-4 root, reusing the block anchor', async () => {
 		const target = makeTmpDir();
 		fs.writeFileSync(
 			path.join(target, 'composer.json'),
@@ -222,13 +186,29 @@ describe('wp/block-interactive', () => {
 			{ slug: 'faq-accordion', title: 'FAQ Accordion' },
 			{ dryRun: true, cwd: target }
 		);
+		expect(result.engine.inputs.namespace).toBe('Acme\\Blog\\Blocks');
+		expect(result.engine.inputs.class).toBe('FaqAccordion');
 		// Only the PHP class follows the PSR-4 root; the block sources are
 		// build inputs, not autoloaded code, so they stay under blocks_dir.
-		expect(result.engine.wrote[0]).toBe('inc/Blocks/FaqAccordion.php');
-		expect(result.engine.wrote[1]).toBe(
-			'src/blocks/faq-accordion/block.json'
+		// render.php must land at `<blocks_dir>/<slug>/render.php`: the rtCamp
+		// PHPCS ruleset exempts exactly that path from the file-header and
+		// text-domain sniffs a block render file cannot satisfy.
+		expect(result.engine.wrote).toEqual([
+			'inc/Blocks/FaqAccordion.php',
+			'src/blocks/faq-accordion/block.json',
+			'src/blocks/faq-accordion/index.js',
+			'src/blocks/faq-accordion/edit.js',
+			'src/blocks/faq-accordion/render.php',
+			'src/blocks/faq-accordion/view.js',
+		]);
+		// An interactive block is still a block: it shares the Blocks module,
+		// and its anchor, with wp/block-dynamic instead of minting a new one.
+		const wiring = result.ai.wiring[0];
+		expect(wiring.targetFile).toBe('inc/Modules/Blocks.php');
+		expect(wiring.anchor).toBe('// scaffold:wp/block-dynamic:classes');
+		expect(wiring.snippet).toBe(
+			'\\Acme\\Blog\\Blocks\\FaqAccordion::class,'
 		);
-		expect(result.ai.wiring[0].targetFile).toBe('inc/Modules/Blocks.php');
 	});
 });
 
@@ -687,4 +667,111 @@ describe('setup/claude-skills accessibility distribution', () => {
 			}
 		}
 	);
+});
+
+// [id, framework class basename]
+const UTILITY = [
+	['utility/cache', 'Cache'],
+	['utility/transients', 'Transients'],
+	['utility/logger', 'Logger'],
+	['utility/timer', 'Timer'],
+	['utility/feature-selector', 'FeatureSelector'],
+];
+
+// Target dir carrying the demo skeleton's package name, so context_slug
+// discovery has something to resolve.
+function targetWithComposerName(name = 'rtcamp/project-name-features') {
+	const target = makeTmpDir();
+	fs.writeFileSync(
+		path.join(target, 'composer.json'),
+		JSON.stringify({ name }),
+		'utf8'
+	);
+	return target;
+}
+
+describe('utility/* package scaffolds', () => {
+	it.each(UTILITY)(
+		'%s writes nothing and reports the dep plus one accessor snippet',
+		async (id, className) => {
+			const result = await registry.execute(
+				id,
+				{},
+				{ dryRun: true, cwd: targetWithComposerName() }
+			);
+
+			expect(result.scaffold.kind).toBe('package');
+			expect(result.engine.wrote).toEqual([]);
+			expect(result.engine.skipped).toEqual([]);
+			expect(result.ai.tests).toEqual([]);
+			expect(result.developer.secrets).toEqual([]);
+			expect(result.developer.install.composer).toEqual({
+				'rtcamp/wp-framework': '^1.0',
+			});
+
+			expect(result.ai.wiring).toHaveLength(1);
+			const w = result.ai.wiring[0];
+			expect(w.anchor).toBe(`// scaffold:${id}`);
+			expect(w.targetFile).toBe('includes/Helpers/Util.php');
+			expect(w.snippet).toContain(
+				`\\rtCamp\\WPFramework\\Utils\\${className}`
+			);
+			// The engine passes `description` through verbatim, so it must not
+			// carry a placeholder that would reach the caller unresolved.
+			expect(w.description).not.toContain('{{');
+		}
+	);
+
+	it('discovers context_slug from composer.json:name, snake-cased', async () => {
+		const result = await registry.execute(
+			'utility/cache',
+			{},
+			{ dryRun: true, cwd: targetWithComposerName() }
+		);
+		expect(result.engine.inputs.context_slug).toBe(
+			'rtcamp_project_name_features'
+		);
+		expect(result.ai.wiring[0].snippet).toContain(
+			"new \\rtCamp\\WPFramework\\Utils\\Cache( 'rtcamp_project_name_features' )"
+		);
+	});
+
+	it('prefers a supplied context_slug over the discovered one', async () => {
+		const result = await registry.execute(
+			'utility/transients',
+			{ context_slug: 'acme_blog' },
+			{ dryRun: true, cwd: targetWithComposerName() }
+		);
+		expect(result.engine.inputs.context_slug).toBe('acme_blog');
+		expect(result.ai.wiring[0].snippet).toContain("( 'acme_blog' )");
+	});
+
+	it('falls back to the default slug when there is no composer.json', async () => {
+		const result = await registry.execute(
+			'utility/logger',
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.engine.inputs.context_slug).toBe('my_plugin');
+	});
+
+	it('honours a base_path override in the wiring target', async () => {
+		const result = await registry.execute(
+			'utility/cache',
+			{ base_path: 'inc' },
+			{ dryRun: true, cwd: targetWithComposerName() }
+		);
+		expect(result.ai.wiring[0].targetFile).toBe('inc/Helpers/Util.php');
+	});
+
+	it('constructs Timer with no argument — it takes no context', async () => {
+		const result = await registry.execute(
+			'utility/timer',
+			{},
+			{ dryRun: true, cwd: targetWithComposerName() }
+		);
+		const snippet = result.ai.wiring[0].snippet;
+		expect(snippet).toContain('new \\rtCamp\\WPFramework\\Utils\\Timer()');
+		expect(snippet).not.toContain('rtcamp_project_name_features');
+	});
 });

@@ -42,7 +42,7 @@ bin/wp-tooling.js   thin shim requiring ../src/cli/index.js
 scaffolds/          top-level categories: ci/, lint/, setup/, wp/
 docs/               ai-orchestration.md, authoring-scaffolds.md, editor-setup.md,
                     examples.md, wp-framework-contract.md
-skills/             README.md + scaffold/ + setup/ (each with SKILL.md + evals/);
+skills/             README.md + scaffold/ + setup/ + devtools-setup/ (each with SKILL.md + evals/);
                     *-workspace/ dirs are gitignored eval scratch, not shipped content
 tests/              mirrors src/'s 8 dirs, plus fixtures/ and a skills/ test dir (10 total)
 ```
