@@ -6,6 +6,7 @@
  *   - wp/cli namespace + tests_namespace discovery grafts the project's
  *     PSR-4 root onto the kind sub-namespace
  *   - wiring targetFile paths are normalised (no `..` segments)
+ *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
  *     rejects an out-of-enum mode/eagerness
@@ -24,13 +25,22 @@ const { ScaffoldRegistry } = require('../../src/scaffolds/registry');
 
 const DEFAULTS_DIR = path.join(__dirname, '..', '..', 'scaffolds');
 
+const tempDirs = [];
+
 function makeTmpDir() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp-tooling-bundled-'));
+	tempDirs.push(dir);
+	return dir;
 }
 
-// The bundled catalogue is immutable and these tests only dry-run execute(),
-// so a single scan is shared across the whole file rather than re-walking the
-// tree per test.
+afterEach(() => {
+	for (const dir of tempDirs.splice(0)) {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+// The bundled catalogue is immutable; executions write only to temporary
+// directories, so one catalogue scan can be shared across the file.
 let registry;
 beforeAll(async () => {
 	registry = new ScaffoldRegistry({ defaultsDir: DEFAULTS_DIR });
@@ -96,46 +106,12 @@ describe('wiring targetFile normalisation', () => {
 });
 
 describe('wp-api/speculation', () => {
-	it('renders into the Services layout and reuses the registrable anchor', async () => {
-		const r = registry;
-		const target = makeTmpDir();
-		fs.writeFileSync(
-			path.join(target, 'composer.json'),
-			JSON.stringify({
-				autoload: { 'psr-4': { 'Acme\\Blog\\': 'includes/' } },
-			}),
-			'utf8'
-		);
-		const result = await r.execute(
-			'wp-api/speculation',
-			{ name: 'speculative-loading' },
-			{ dryRun: true, cwd: target }
-		);
-		expect(result.engine.inputs.namespace).toBe('Acme\\Blog\\Services');
-		expect(result.engine.inputs.mode).toBe('prerender');
-		expect(result.engine.inputs.eagerness).toBe('moderate');
-		expect(result.engine.wrote).toEqual([
-			'includes/Services/SpeculativeLoading.php',
-		]);
-		expect(result.ai.tests[0].path).toBe(
-			'tests/Services/SpeculativeLoadingTest.php'
-		);
-		// The generated class IS a Registrable, so it wires into the same
-		// module (and the same anchor) as wp/registrable.
-		const wiring = result.ai.wiring[0];
-		expect(wiring.targetFile).toBe('includes/Modules/Services.php');
-		expect(wiring.targetFile).not.toContain('..');
-		expect(wiring.anchor).toBe('// scaffold:wp/registrable:classes');
-		expect(wiring.snippet).toBe(
-			'\\Acme\\Blog\\Services\\SpeculativeLoading::class,'
-		);
-	});
-
-	it('follows the project PSR-4 root when it is not includes/', async () => {
+	it('renders into the Services layout under the project PSR-4 root and reuses the registrable anchor', async () => {
 		// Both consuming repos map their root to `inc/`, so the namespace and
 		// the directory have to be grafted from the same map entry — otherwise
 		// the class is namespaced `<Root>\Services` but written to
-		// `includes/Services`, outside the autoload root.
+		// `includes/Services`, outside the autoload root. (An `includes/` root
+		// would match the manifest default and hide a missing graft.)
 		const target = makeTmpDir();
 		fs.writeFileSync(
 			path.join(target, 'composer.json'),
@@ -150,12 +126,23 @@ describe('wp-api/speculation', () => {
 			{ dryRun: true, cwd: target }
 		);
 		expect(result.engine.inputs.namespace).toBe('Acme\\Blog\\Services');
+		expect(result.engine.inputs.mode).toBe('prerender');
+		expect(result.engine.inputs.eagerness).toBe('moderate');
 		expect(result.engine.wrote).toEqual([
 			'inc/Services/SpeculativeLoading.php',
 		]);
-		const wiringTarget = result.ai.wiring[0].targetFile;
-		expect(wiringTarget).toBe('inc/Modules/Services.php');
-		expect(wiringTarget).not.toContain('..');
+		expect(result.ai.tests[0].path).toBe(
+			'tests/Services/SpeculativeLoadingTest.php'
+		);
+		// The generated class IS a Registrable, so it wires into the same
+		// module (and the same anchor) as wp/registrable.
+		const wiring = result.ai.wiring[0];
+		expect(wiring.targetFile).toBe('inc/Modules/Services.php');
+		expect(wiring.targetFile).not.toContain('..');
+		expect(wiring.anchor).toBe('// scaffold:wp/registrable:classes');
+		expect(wiring.snippet).toBe(
+			'\\Acme\\Blog\\Services\\SpeculativeLoading::class,'
+		);
 	});
 
 	it('throws EINVALIDINPUT for a mode core would not accept', async () => {
@@ -320,4 +307,384 @@ describe('wp-api/script-module', () => {
 			},
 		]);
 	});
+});
+
+describe('ci/test-measure rendering', () => {
+	it('omits run-a11y by default and includes it when run_a11y is true', async () => {
+		const r = registry;
+		const off = makeTmpDir();
+		await r.execute('ci/test-measure', {}, { dryRun: false, cwd: off });
+		const offYaml = fs.readFileSync(
+			path.join(off, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(offYaml).not.toContain('run-a11y:');
+
+		const on = makeTmpDir();
+		await r.execute(
+			'ci/test-measure',
+			{ run_a11y: 'true' },
+			{ dryRun: false, cwd: on }
+		);
+		const onYaml = fs.readFileSync(
+			path.join(on, '.github/workflows/test-measure.yml'),
+			'utf8'
+		);
+		expect(onYaml).toContain('run-a11y: true');
+	});
+});
+
+describe('setup/perf rendered config', () => {
+	it('renders valid JSON with default page paths and the server layer disabled', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8888/',
+			'http://localhost:8888/?p=1',
+			'http://localhost:8888/?s=hello',
+		]);
+		// webVitals/lighthouse/thresholds/server.shim/server.top are
+		// deliberately absent from the rendered file -- config.js's
+		// mergeConfig fills them from DEFAULTS at read time, so the scaffold
+		// never re-hardcodes a value that could drift from those defaults.
+		expect(config.lighthouse).toBeUndefined();
+		expect(config.webVitals).toBeUndefined();
+		expect(config.server.enabled).toBe(false);
+		expect(config.server.command).toEqual([
+			'npx',
+			'--no-install',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=.',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('renders custom page paths, appends extra_page, and enables the server layer when server_enabled is given', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{
+				base_url: 'http://localhost:8765',
+				sample_page: '/hello-world/',
+				search_page: '/?s=wordpress',
+				extra_page: '/about/',
+				server_enabled: 'true',
+				server_env_cwd: 'wp-content/plugins/dummy-plugin',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8765/',
+			'http://localhost:8765/hello-world/',
+			'http://localhost:8765/?s=wordpress',
+			'http://localhost:8765/about/',
+		]);
+		expect(config.server.enabled).toBe(true);
+		expect(config.server.command).toEqual([
+			'npx',
+			'--no-install',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=wp-content/plugins/dummy-plugin',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('enables the server layer at the WordPress root when server_env_cwd is explicitly "."', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{
+				base_url: 'http://localhost:8888',
+				server_enabled: 'true',
+				server_env_cwd: '.',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.server.enabled).toBe(true);
+		expect(config.server.command).toEqual([
+			'npx',
+			'--no-install',
+			'wp-env',
+			'run',
+			'cli',
+			'--env-cwd=.',
+			'--',
+			'wp',
+		]);
+	});
+
+	it('renders the profile:server npm script from the resolved server_env_cwd, not a hardcoded plugin-path guess', async () => {
+		const r = registry;
+
+		const pluginResult = await r.execute(
+			'setup/perf',
+			{
+				base_url: 'http://localhost:8888',
+				server_env_cwd: 'wp-content/plugins/dummy-plugin',
+			},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(pluginResult.developer.scripts.npm['profile:server']).toBe(
+			'wp-env run cli --env-cwd=wp-content/plugins/dummy-plugin -- wp eval-file server-profile.php'
+		);
+
+		const rootResult = await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(rootResult.developer.scripts.npm['profile:server']).toBe(
+			'wp-env run cli --env-cwd=. -- wp eval-file server-profile.php'
+		);
+	});
+
+	it('JSON-escapes every URL input while preserving its value', async () => {
+		const target = makeTmpDir();
+		const inputs = {
+			base_url: 'http://localhost:8888/"quoted"',
+			sample_page: '/path\\segment',
+			search_page: '/?s="hello"&page=2',
+			extra_page: '/line\nbreak',
+			server_env_cwd: '.',
+		};
+		await registry.execute('setup/perf', inputs, { cwd: target });
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			`${inputs.base_url}/`,
+			inputs.base_url + inputs.sample_page,
+			inputs.base_url + inputs.search_page,
+			inputs.base_url + inputs.extra_page,
+		]);
+	});
+
+	it('escapes server_env_cwd separately for the JSON config and the shell script', async () => {
+		const target = makeTmpDir();
+		const envCwd = 'wp-content/plugins/my "odd" plugin';
+		const result = await registry.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: envCwd },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.perfrc.json'), 'utf8')
+		);
+		expect(config.server.command).toContain(`--env-cwd=${envCwd}`);
+		expect(result.developer.scripts.npm['profile:server']).toBe(
+			`wp-env run cli --env-cwd='${envCwd}' -- wp eval-file server-profile.php`
+		);
+	});
+
+	it('has no safe default for server_env_cwd, since a wrong guess would silently point the server layer at the wrong shim location', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await expect(
+			r.execute(
+				'setup/perf',
+				{ base_url: 'http://localhost:8888' },
+				{ cwd: target }
+			)
+		).rejects.toThrow(/server_env_cwd/);
+	});
+
+	it('copies the server-profile.php shim verbatim (raw: true, no mustache rendering)', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/perf',
+			{ base_url: 'http://localhost:8888', server_env_cwd: '.' },
+			{ cwd: target }
+		);
+		const shim = fs.readFileSync(
+			path.join(target, 'server-profile.php'),
+			'utf8'
+		);
+		const source = fs.readFileSync(
+			path.join(
+				DEFAULTS_DIR,
+				'setup',
+				'perf',
+				'templates',
+				'server-profile.php'
+			),
+			'utf8'
+		);
+		expect(shim).toBe(source);
+		expect(shim).toContain('\\rtCamp\\WPDevTools\\Support\\XHProfProfiler');
+	});
+});
+
+describe('setup/pa11y rendered config', () => {
+	it('JSON-escapes every URL input while preserving its value', async () => {
+		const target = makeTmpDir();
+		const inputs = {
+			base_url: 'http://localhost:8888/"quoted"',
+			sample_page: '/path\\segment',
+			search_page: '/?s="hello"&page=2',
+			extra_page: '/line\nbreak',
+		};
+		await registry.execute('setup/pa11y', inputs, { cwd: target });
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			`${inputs.base_url}/`,
+			inputs.base_url + inputs.sample_page,
+			inputs.base_url + inputs.search_page,
+			inputs.base_url + inputs.extra_page,
+		]);
+	});
+
+	it('renders valid JSON with default page paths (extra_page omitted)', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{ base_url: 'http://localhost:8888' },
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.defaults.standard).toBe('WCAG2AA');
+		expect(config.defaults.runners).toEqual(['axe', 'htmlcs']);
+		expect(config.urls).toEqual([
+			'http://localhost:8888/',
+			'http://localhost:8888/?p=1',
+			'http://localhost:8888/?s=hello',
+		]);
+	});
+
+	it('renders custom page paths and appends extra_page when given', async () => {
+		const r = registry;
+		const target = makeTmpDir();
+		await r.execute(
+			'setup/pa11y',
+			{
+				base_url: 'http://localhost:8765',
+				sample_page: '/hello-world/',
+				search_page: '/?s=wordpress',
+				extra_page: '/about/',
+			},
+			{ cwd: target }
+		);
+		const config = JSON.parse(
+			fs.readFileSync(path.join(target, '.pa11yci.json'), 'utf8')
+		);
+		expect(config.urls).toEqual([
+			'http://localhost:8765/',
+			'http://localhost:8765/hello-world/',
+			'http://localhost:8765/?s=wordpress',
+			'http://localhost:8765/about/',
+		]);
+	});
+});
+
+describe('lint/i18n ruleset', () => {
+	it('binds the supplied text domain and reports the script + dev deps', async () => {
+		const target = makeTmpDir();
+		const result = await registry.execute(
+			'lint/i18n',
+			{ text_domain: 'acme-blog' },
+			{ cwd: target }
+		);
+		const ruleset = fs.readFileSync(
+			path.join(target, 'phpcs.i18n.xml.dist'),
+			'utf8'
+		);
+		expect(ruleset).toContain('<rule ref="WordPress.WP.I18n">');
+		expect(ruleset).toContain('<element value="acme-blog"/>');
+		expect(ruleset).toContain('<arg name="extensions" value="php,inc"/>');
+		expect(result.developer.scripts.composer).toEqual({
+			'lint:i18n': 'phpcs --standard=phpcs.i18n.xml.dist',
+		});
+		expect(Object.keys(result.developer.install.composerDev)).toEqual([
+			'dealerdirect/phpcodesniffer-composer-installer',
+			'squizlabs/php_codesniffer',
+			'wp-coding-standards/wpcs',
+		]);
+	});
+
+	it('discovers the text domain from .wp-tooling.json', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, '.wp-tooling.json'),
+			JSON.stringify({ textDomain: 'acme-shop' }),
+			'utf8'
+		);
+		const result = await registry.execute(
+			'lint/i18n',
+			{},
+			{ dryRun: true, cwd: target }
+		);
+		expect(result.engine.inputs.text_domain).toBe('acme-shop');
+	});
+
+	it('requires a text domain rather than guessing one', async () => {
+		await expect(
+			registry.execute(
+				'lint/i18n',
+				{},
+				{ dryRun: true, cwd: makeTmpDir() }
+			)
+		).rejects.toMatchObject({
+			code: 'EMISSINGINPUT',
+			missing: ['text_domain'],
+		});
+	});
+});
+
+describe('setup/claude-skills accessibility distribution', () => {
+	it.each([
+		['default directory', {}, '.claude/skills'],
+		['custom directory', { skills_dir: 'custom/skills' }, 'custom/skills'],
+	])(
+		'copies the complete skill unchanged into the %s',
+		async (label, inputs, skillsDir) => {
+			const target = makeTmpDir();
+			await registry.execute('setup/claude-skills', inputs, {
+				cwd: target,
+			});
+			const files = [
+				'SKILL.md',
+				'evals/evals.json',
+				'evals/files/template-parts/hero.php',
+				'evals/files/theme.json',
+			];
+			for (const file of files) {
+				const copied = fs.readFileSync(
+					path.join(target, skillsDir, 'accessibility', file),
+					'utf8'
+				);
+				const original = fs.readFileSync(
+					path.join(__dirname, '../../skills/accessibility', file),
+					'utf8'
+				);
+				expect(copied).toBe(original);
+			}
+		}
+	);
 });

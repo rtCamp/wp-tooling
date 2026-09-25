@@ -163,6 +163,7 @@ Available via `transform`:
 - `snake-case`: `qm-export` → `qm_export`
 - `upper-snake-case`: `wporg-username` → `WPORG_USERNAME`
 - `json-escape`: `Acme\Blog` → `Acme\\Blog` (embed a PHP namespace in a JSON snippet)
+- `shell-escape`: `my plugin` → `'my plugin'` (POSIX-quote one shell argument; safe values like `wp-content/plugins/x` stay bare)
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
 
