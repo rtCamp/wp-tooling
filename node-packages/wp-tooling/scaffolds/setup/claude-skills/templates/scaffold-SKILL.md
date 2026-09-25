@@ -76,6 +76,7 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\Cli` |
 | `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
 | `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
+| `wp-api/speculation` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 
 `utility/*` is absent from the table on purpose: those are `source: package`, so they have no source dir, no test dir and no module. Each returns one accessor snippet for `<base_path>/Helpers/Util.php` under anchor `// scaffold:utility/<slug>`. Never add a framework `Utils\*` class to a module or to `Main::CLASSES` — they implement neither `Registrable` nor `Shareable`, so the Loader would construct them with the wrong (or a missing) constructor argument.
 
@@ -97,6 +98,7 @@ Write a test-case checklist covering:
   - `wp/block-dynamic`: block name, `register_hooks` action, `render()` markup with `WP_Query` fixture, empty state, count cap, attribute filters.
   - `wp/cron`: `wp_next_scheduled()`, callback fires, unschedule works.
   - `wp/cli`: `WP_CLI::add_command` registered, `__invoke` behaviour, dry-run flag.
+  - `wp-api/speculation`: both filters bound, the `MODE`/`EAGERNESS` constants hold values core accepts, `wp_speculation_rules_configuration` returns the scaffolded mode/eagerness, a `null` config stays `null`, exclusions merge without dropping other callers' paths, and `register_hooks()` no-ops on WP < 6.8.
 
 The engine's shipped test file already covers **Integration** for a plain instance of the kind (e.g. `post_type_exists()` for `wp/cpt` ships written and passing, not as a stub) — list it to confirm coverage, not to write it. Your effort in §7 goes to **Happy path / Edge cases / Error paths**: brief-specific behaviour the engine can't know.
 
@@ -163,7 +165,7 @@ Frameworks per kind:
 
 | Kind | Framework |
 |---|---|
-| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable` | PHPUnit |
+| `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation` | PHPUnit |
 | `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
 | `block/interactive` | Jest + Playwright |
 | `ci/*` | actionlint + yaml-parse |
