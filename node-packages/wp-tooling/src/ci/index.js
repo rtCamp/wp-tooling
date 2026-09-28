@@ -9,9 +9,19 @@ const {
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
 } = require('./detect-changes');
+const {
+	computeGate,
+	parseClover,
+	parseLcov,
+	parseDiffHunks,
+} = require('./coverage-gate');
 
 module.exports = {
 	detectChanges,
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
+	computeGate,
+	parseClover,
+	parseLcov,
+	parseDiffHunks,
 };

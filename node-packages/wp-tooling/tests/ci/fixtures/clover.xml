@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1790000000">
+  <project timestamp="1790000000">
+    <package name="Acme\Modules">
+      <file name="/var/www/html/wp-content/plugins/acme/inc/Modules/Cache.php">
+        <class name="Acme\Modules\Cache" namespace="Acme\Modules">
+          <metrics complexity="3" methods="2" coveredmethods="1" statements="5" coveredstatements="3" elements="7" coveredelements="4"/>
+        </class>
+        <line num="10" type="method" name="get" visibility="public" complexity="1" crap="1" count="1"/>
+        <line num="12" type="stmt" count="1"/>
+        <line num="13" type="stmt" count="1"/>
+        <line num="14" type="cond" count="1"/>
+        <line num="20" type="method" name="flush" visibility="public" complexity="2" crap="6" count="0"/>
+        <line num="22" type="stmt" count="0"/>
+        <line num="23" type="stmt" count="0"/>
+        <metrics loc="30" ncloc="25" classes="1" methods="2" coveredmethods="1" statements="5" coveredstatements="3" elements="7" coveredelements="4"/>
+      </file>
+      <file name="/var/www/html/wp-content/plugins/acme/inc/Modules/R&amp;D.php">
+        <line count="3" type="stmt" num="5"/>
+      </file>
+      <file name="/var/www/html/wp-content/plugins/acme/inc/Empty.php"/>
+    </package>
+  </project>
+</coverage>

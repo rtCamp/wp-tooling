@@ -191,6 +191,12 @@ describe('cli COMMANDS registry', () => {
 		expect(typeof cli.COMMANDS['detect-changes'].run).toBe('function');
 	});
 
+	test('coverage-gate is registered with a summary and run handler', () => {
+		expect(cli.COMMANDS['coverage-gate']).toBeDefined();
+		expect(typeof cli.COMMANDS['coverage-gate'].summary).toBe('string');
+		expect(typeof cli.COMMANDS['coverage-gate'].run).toBe('function');
+	});
+
 	test('install-hooks is registered with a summary and run handler', () => {
 		expect(cli.COMMANDS['install-hooks']).toBeDefined();
 		expect(typeof cli.COMMANDS['install-hooks'].summary).toBe('string');

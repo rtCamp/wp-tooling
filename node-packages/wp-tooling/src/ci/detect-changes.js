@@ -487,6 +487,8 @@ function runCli(argv) {
 module.exports = {
 	detectChanges,
 	runCli,
+	takeValue,
+	formatGithubLine,
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
 };
