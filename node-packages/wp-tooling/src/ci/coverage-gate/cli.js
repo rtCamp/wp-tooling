@@ -54,8 +54,11 @@ const BOOLEAN_FLAGS = {
 	'-h': 'help',
 };
 
-/** A plain decimal from 0 to 100: no sign, exponent, hex or whitespace. */
-const THRESHOLD_RE = /^\d{1,3}(?:\.\d+)?$/;
+/**
+ * A plain decimal from 0 to 100 with at most two decimals: no sign, exponent,
+ * hex or whitespace. Two decimals keep the gate's comparison in integers.
+ */
+const THRESHOLD_RE = /^\d{1,3}(?:\.\d{1,2})?$/;
 
 const NO_BASE_MESSAGE =
 	'No pull request base to diff against (not a pull_request event and no --base); coverage gate skipped.';
@@ -84,7 +87,7 @@ const USAGE = [
 	'  --format <clover|lcov>        Report format. Inferred from the extension when omitted',
 	'                                (.xml → clover, .info → lcov).',
 	`  --threshold <0-100>           Minimum % of changed executable lines covered (default: ${DEFAULT_THRESHOLD}).`,
-	'                                Below the threshold fails; exactly at it passes.',
+	'                                Up to two decimals. Below the threshold fails; exactly at it passes.',
 	'  --base <ref>                  Ref or SHA to diff against (merge base ... HEAD). Default: the',
 	'                                pull request base from $GITHUB_EVENT_PATH / $GITHUB_BASE_REF.',
 	'                                With neither, the gate is skipped with a notice (push events).',
@@ -197,7 +200,7 @@ function parseThreshold(raw) {
 	const threshold = Number(raw);
 	if (!THRESHOLD_RE.test(raw) || threshold > 100) {
 		throw new Error(
-			`invalid --threshold "${raw}" (expected a number from 0 to 100)`
+			`invalid --threshold "${raw}" (expected a number from 0 to 100, at most two decimals)`
 		);
 	}
 	return threshold;

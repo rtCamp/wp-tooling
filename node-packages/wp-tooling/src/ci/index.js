@@ -14,6 +14,9 @@ const {
 	parseClover,
 	parseLcov,
 	parseDiffHunks,
+	GateError,
+	DEFAULT_UNMEASURED_POLICY,
+	UNMEASURED_POLICIES,
 } = require('./coverage-gate');
 
 module.exports = {
@@ -24,4 +27,7 @@ module.exports = {
 	parseClover,
 	parseLcov,
 	parseDiffHunks,
+	GateError,
+	DEFAULT_UNMEASURED_POLICY,
+	UNMEASURED_POLICIES,
 };

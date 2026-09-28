@@ -108,22 +108,21 @@ function captureOutput() {
 	};
 }
 
+test('@rtcamp/wp-tooling/ci exposes GateError and the unmeasured policies', () => {
+	const ci = require('../../src/ci');
+	expect(new ci.GateError('x')).toBeInstanceOf(Error);
+	expect(ci.GateError).toBe(require('../../src/ci/coverage-gate').GateError);
+	expect(ci.UNMEASURED_POLICIES).toEqual(['warn', 'fail', 'ignore']);
+	expect(ci.DEFAULT_UNMEASURED_POLICY).toBe('warn');
+});
+
 describe('parseDiffHunks', () => {
 	const changed = parseDiffHunks(fixture('diff-hunks.txt'));
 
-	test('multi-line hunk adds every post-image line', () => {
+	test('+c,d adds d lines, +c adds one, +c,0 (pure deletion) adds none', () => {
 		expect([...changed.get('inc/Modules/Cache.php')]).toEqual([
 			12, 13, 14, 23,
 		]);
-	});
-
-	test('single-line hunk without a count is one line', () => {
-		expect(changed.get('inc/Modules/Cache.php').has(23)).toBe(true);
-		expect(changed.get('inc/Renamed.php')).toEqual(new Set([4]));
-	});
-
-	test('pure deletion hunk (+c,0) adds nothing', () => {
-		expect(changed.get('inc/Modules/Cache.php').has(30)).toBe(false);
 	});
 
 	test('new file counts from line 1; deleted file is absent', () => {
@@ -132,6 +131,7 @@ describe('parseDiffHunks', () => {
 	});
 
 	test('rename keys by the new path', () => {
+		expect(changed.get('inc/Renamed.php')).toEqual(new Set([4]));
 		expect(changed.has('inc/Moved.php')).toBe(false);
 	});
 
@@ -178,6 +178,21 @@ describe('parseDiffHunks', () => {
 		expect(parseDiffHunks(diff).size).toBe(0);
 	});
 
+	test('strips only the tab Git appends to a path with a space', () => {
+		const diff = [
+			'diff --git a/inc/Foo Bar.php b/inc/Foo Bar.php',
+			'+++ b/inc/Foo Bar.php\t',
+			'@@ -1 +1 @@',
+			'diff --git a/inc/end  b/inc/end ',
+			'+++ b/inc/end \t',
+			'@@ -3 +3 @@',
+		].join('\n');
+		expect([...parseDiffHunks(diff).keys()]).toEqual([
+			'inc/Foo Bar.php',
+			'inc/end ',
+		]);
+	});
+
 	test('an entry without a +++ header does not inherit the previous file', () => {
 		const diff = [
 			'diff --git a/inc/A.php b/inc/A.php',
@@ -213,13 +228,15 @@ describe('parseClover', () => {
 				.size
 		).toBe(0);
 	});
-});
 
-test('parseClover decodes numeric XML entities', () => {
-	const report = parseClover(
-		'<file name="/x/&#x41;&#66;.php"><line num="1" type="stmt" count="2"/></file>'
-	);
-	expect(report.get('/x/AB.php').get(1)).toBe(2);
+	test('decodes numeric entities; one beyond Unicode stays as written', () => {
+		const numeric = parseClover(
+			'<file name="/x/&#x41;&#66;&#999999999;&#x110000;.php"><line num="1" type="stmt" count="2"/></file>'
+		);
+		expect([...numeric.keys()]).toEqual([
+			'/x/AB&#999999999;&#x110000;.php',
+		]);
+	});
 });
 
 describe('parseLcov', () => {
@@ -315,66 +332,66 @@ describe('computeGate', () => {
 		expect(r.files[0]).toMatchObject({ executable: 0, missed: [] });
 	});
 
-	test('changed source file missing from the report is unmeasured, not covered', () => {
-		const r = computeGate({
-			changed: new Map([
-				['inc/A.php', new Set([1])],
-				['inc/New.php', new Set([1, 2])],
-			]),
-			report: reportWith('/abs/inc/A.php', 1, 1),
-			threshold: 80,
-			format: 'clover',
+	test('a fractional threshold passes exactly at it, and the percent is exact', () => {
+		const at = computeGate({
+			changed: changedAll('inc/A.php', 1500),
+			report: reportWith('/abs/inc/A.php', 1500, 147),
+			threshold: 9.8,
 		});
-		expect(r.unmeasured).toEqual(['inc/New.php']);
-		expect(r.changedLines).toBe(1);
+		expect(at).toMatchObject({ percent: 9.8, passed: true });
+		const round = computeGate({
+			changed: changedAll('inc/A.php', 100),
+			report: reportWith('/abs/inc/A.php', 100, 57),
+			threshold: 57,
+		});
+		expect(round).toMatchObject({ percent: 57, passed: true });
 	});
 
-	test('non-source and excluded files are skipped entirely', () => {
+	test('non-source and excluded files are out of scope, never measured', () => {
 		const r = computeGate({
 			changed: new Map([
 				['README.md', new Set([1])],
 				['tests/php/CacheTest.php', new Set([1])],
 				['src/cart.test.js', new Set([1])],
-			]),
-			report: reportWith('/abs/inc/A.php', 1, 1),
-			threshold: 80,
-			format: 'clover',
-		});
-		expect(r.unmeasured).toEqual([]);
-		expect(r.files).toEqual([]);
-	});
-
-	test('out-of-scope files are reported, not measured', () => {
-		const r = computeGate({
-			changed: new Map([
-				['README.md', new Set([1])],
 				['inc/A.php', new Set([1])],
 			]),
 			report: reportWith('/abs/inc/A.php', 1, 1),
 			threshold: 80,
 			format: 'clover',
 		});
-		expect(r.outOfScope).toEqual(['README.md']);
+		expect(r.outOfScope).toEqual([
+			'README.md',
+			'src/cart.test.js',
+			'tests/php/CacheTest.php',
+		]);
+		expect(r.files.map((entry) => entry.path)).toEqual(['inc/A.php']);
+		expect(r.unmeasured).toEqual([]);
 	});
 
 	test.each([
-		['warn', true],
-		['ignore', true],
-		['fail', false],
-	])('unmeasured policy %s → passed %s', (unmeasuredPolicy, passed) => {
-		const r = computeGate({
-			changed: new Map([
-				['inc/A.php', new Set([1])],
-				['inc/New.php', new Set([1])],
-			]),
-			report: reportWith('/abs/inc/A.php', 1, 1),
-			threshold: 80,
-			format: 'clover',
-			unmeasuredPolicy,
-		});
-		expect(r.unmeasured).toEqual(['inc/New.php']);
-		expect(r.passed).toBe(passed);
-	});
+		['default (warn)', undefined, true],
+		['ignore', 'ignore', true],
+		['fail', 'fail', false],
+	])(
+		'unmeasured file is listed, not counted; policy %s',
+		(_label, unmeasuredPolicy, passed) => {
+			const r = computeGate({
+				changed: new Map([
+					['inc/A.php', new Set([1])],
+					['inc/New.php', new Set([1, 2])],
+				]),
+				report: reportWith('/abs/inc/A.php', 1, 1),
+				threshold: 80,
+				format: 'clover',
+				unmeasuredPolicy,
+			});
+			expect(r).toMatchObject({
+				unmeasured: ['inc/New.php'],
+				changedLines: 1,
+				passed,
+			});
+		}
+	);
 
 	test('fail policy also fails a PR that only adds unmeasured files', () => {
 		const r = computeGate({
@@ -385,17 +402,6 @@ describe('computeGate', () => {
 			unmeasuredPolicy: 'fail',
 		});
 		expect(r).toMatchObject({ changedLines: 0, passed: false });
-	});
-
-	test('exclude: null keeps test paths', () => {
-		const r = computeGate({
-			changed: new Map([['tests/php/Helper.php', new Set([1])]]),
-			report: new Map(),
-			threshold: 80,
-			format: 'clover',
-			exclude: null,
-		});
-		expect(r.unmeasured).toEqual(['tests/php/Helper.php']);
 	});
 });
 
@@ -429,6 +435,22 @@ describe('helpers', () => {
 		expect(resolveGateBase({ env: {} })).toBeNull();
 	});
 
+	test('resolveGateBase falls through a corrupt or missing event payload', () => {
+		const eventPath = path.join(tempDir('cov-evt-'), 'event.json');
+		fs.writeFileSync(eventPath, '{ not json');
+		expect(
+			resolveGateBase({ env: { GITHUB_EVENT_PATH: eventPath } })
+		).toBeNull();
+		expect(
+			resolveGateBase({
+				env: {
+					GITHUB_EVENT_PATH: `${eventPath}.missing`,
+					GITHUB_BASE_REF: 'main',
+				},
+			})
+		).toBe('origin/main');
+	});
+
 	test('formatSummary names files, missed lines and unmeasured files', () => {
 		const md = formatSummary(
 			{
@@ -440,7 +462,7 @@ describe('helpers', () => {
 						missed: [7, 8],
 					},
 				],
-				unmeasured: ['inc/New.php', 'inc/Dup.php'],
+				unmeasured: ['inc/New|Old.php', 'inc/Dup.php'],
 				ambiguous: [{ path: 'inc/Dup.php', candidates: ['/a', '/b'] }],
 				outOfScope: ['README.md'],
 				changedLines: 4,
@@ -452,7 +474,7 @@ describe('helpers', () => {
 		);
 		expect(md).toContain('| `inc/A.php` | 4 | 2 | 50% | 7-8 |');
 		expect(md).toContain('#### Not measured');
-		expect(md).toContain('- `inc/New.php`\n');
+		expect(md).toContain('- `inc/New|Old.php`\n');
 		expect(md).toContain('- `inc/Dup.php` (several report entries match');
 		expect(md).toContain('1 other changed file not checked');
 		expect(md).toContain('2 changed files not in the coverage report');
@@ -584,6 +606,17 @@ describe('runCli', () => {
 			'1 changed file not in the coverage report'
 		);
 		expect(io.stdout()).toContain('inc/New.php');
+	});
+
+	test('text mode counts out-of-scope files like the summary does', () => {
+		writeReport([3, 4, 5]);
+		expect(
+			runCli([...baseArgs(), '--exclude', 'New\\.php$'], { env: {} })
+		).toBe(0);
+		expect(io.stdout()).toContain(
+			'1 other changed file not checked: not a source type this report covers, or excluded.'
+		);
+		expect(io.stdout()).not.toContain('not measured');
 	});
 
 	test('fails below threshold and names missed lines', () => {
@@ -786,28 +819,31 @@ describe('runCli', () => {
 	});
 
 	test.each([
-		[[]],
-		[['--report', 'x.json']],
-		[['--report', 'x.xml', '--format', 'cobertura']],
-		[['--report', 'x.xml', '--output', 'json']],
-		[['--report', 'x.xml', '--unmeasured', 'maybe']],
-		[['--report', 'x.xml', '--exclude', '(']],
-		[['--report', 'x.xml', '--threshold', '101']],
-		[['--report', 'x.xml', '--threshold', '0x10']],
-		[['--report', 'x.xml', '--threshold', '1e1']],
-		[['--report', 'x.xml', '--threshold', '-5']],
-		[['--bogus']],
-	])('usage error exits 2: %j', (argv) => {
+		[[], '--report <path> is required'],
+		[['--report', 'x.json'], 'cannot infer the format'],
+		[['--report', 'x.xml', '--format', 'cobertura'], 'invalid --format'],
+		[['--report', 'x.xml', '--output', 'json'], 'invalid --output'],
+		[
+			['--report', 'x.xml', '--unmeasured', 'maybe'],
+			'invalid --unmeasured',
+		],
+		[['--report', 'x.xml', '--exclude', '('], 'invalid --exclude regex'],
+		[['--report', 'x.xml', '--threshold', '101'], 'invalid --threshold'],
+		[['--report', 'x.xml', '--threshold', '0x10'], 'invalid --threshold'],
+		[['--report', 'x.xml', '--threshold', '1e1'], 'invalid --threshold'],
+		[['--report', 'x.xml', '--threshold', '66.666'], 'invalid --threshold'],
+		[
+			['--report', 'x.xml', '--threshold', '-5'],
+			'missing value for --threshold',
+		],
+		[
+			['--report', 'x.xml', '--exclude', '--threshold', '80'],
+			'missing value for --exclude',
+		],
+		[['--bogus'], 'unknown argument'],
+	])('usage error exits 2: %j', (argv, reason) => {
 		expect(runCli(argv, { env: {} })).toBe(2);
-	});
-
-	test('--exclude does not swallow a following flag', () => {
-		expect(
-			runCli(['--report', 'x.xml', '--exclude', '--threshold', '80'], {
-				env: {},
-			})
-		).toBe(2);
-		expect(io.stderr()).toContain('missing value for --exclude');
+		expect(io.stderr()).toContain(reason);
 	});
 
 	test('a fractional threshold is accepted', () => {
@@ -873,7 +909,7 @@ describe('runCli with an LCOV report', () => {
 	});
 
 	test('--no-exclude brings test files back into scope', () => {
-		runCli([...args(), '--no-exclude'], { env: {} });
+		expect(runCli([...args(), '--no-exclude'], { env: {} })).toBe(1);
 		expect(io.stdout()).toContain(
 			'not measured (missing from the report):'
 		);

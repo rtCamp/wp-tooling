@@ -101,7 +101,17 @@ function unmeasuredItem(file, ambiguousPaths) {
 	const note = ambiguousPaths.includes(file)
 		? ' (several report entries match; ambiguous)'
 		: '';
-	return `- \`${escapeTableCell(file)}\`${note}`;
+	return `- \`${file}\`${note}`;
+}
+
+/**
+ * Count of changed files the gate did not look at, shared by every output.
+ *
+ * @param {Object} result computeGate() result.
+ * @return {string} Sentence naming the out-of-scope count.
+ */
+function outOfScopeLine(result) {
+	return `${plural(result.outOfScope.length, 'other changed file')} not checked: not a source type this report covers, or excluded.`;
 }
 
 /**
@@ -141,10 +151,7 @@ function formatSummary(result, threshold) {
 		);
 	}
 	if (result.outOfScope.length > 0) {
-		rows.push(
-			`${plural(result.outOfScope.length, 'other changed file')} not checked: not a source type this report covers, or excluded.`,
-			''
-		);
+		rows.push(outOfScopeLine(result), '');
 	}
 	return rows.join('\n') + '\n';
 }
@@ -181,6 +188,9 @@ function formatText(result, threshold) {
 			'not measured (missing from the report):',
 			...result.unmeasured.map((file) => `  ${file}`)
 		);
+	}
+	if (result.outOfScope.length > 0) {
+		rows.push(outOfScopeLine(result));
 	}
 	return rows.join('\n') + '\n';
 }

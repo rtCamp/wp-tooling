@@ -22,21 +22,24 @@ const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
  */
 const CLOVER_EXECUTABLE_TYPES = new Set(['stmt', 'cond']);
 
+const MAX_CODE_POINT = 0x10ffff;
+
 /**
- * Decode the five predefined XML entities plus numeric references.
+ * Decode the five predefined XML entities plus numeric references. A numeric
+ * reference beyond Unicode is left as written rather than throwing.
  *
  * @param {string} value
  * @return {string} Decoded text.
  */
 function decodeXml(value) {
 	return value.replace(XML_ENTITY_RE, (entity, hex, dec, named) => {
-		if (hex) {
-			return String.fromCodePoint(parseInt(hex, 16));
+		if (named) {
+			return XML_ENTITIES[named.toLowerCase()];
 		}
-		if (dec) {
-			return String.fromCodePoint(parseInt(dec, 10));
-		}
-		return XML_ENTITIES[named.toLowerCase()];
+		const codePoint = hex ? parseInt(hex, 16) : parseInt(dec, 10);
+		return codePoint <= MAX_CODE_POINT
+			? String.fromCodePoint(codePoint)
+			: entity;
 	});
 }
 

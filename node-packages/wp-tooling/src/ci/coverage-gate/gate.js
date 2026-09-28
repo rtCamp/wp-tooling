@@ -34,14 +34,15 @@ const DEFAULT_EXCLUDE =
 
 /**
  * Share of `covered` in `total` as a percentage, floored to two decimals so a
- * displayed 80% never hides a 79.996% that failed.
+ * displayed 80% never hides a 79.996% that failed. Scales before dividing:
+ * `(57 / 100) * 10000` is 5699.999…, which would floor to 56.99.
  *
  * @param {number} covered
  * @param {number} total
  * @return {number|null} Percentage, or `null` when `total` is 0.
  */
 function toPercent(covered, total) {
-	return total === 0 ? null : Math.floor((covered / total) * 10000) / 100;
+	return total === 0 ? null : Math.floor((covered * 10000) / total) / 100;
 }
 
 /**
@@ -129,13 +130,14 @@ function measureFile(file, changedLines, hits) {
  * changed source file absent from the report is listed as unmeasured and
  * never counted as covered. The gate passes when nothing executable changed,
  * or when the covered share is at or above the threshold (below fails) — and,
- * under the `fail` policy, no changed source file is unmeasured. The
- * comparison multiplies instead of dividing, so 8 of 10 at 80 passes exactly.
+ * under the `fail` policy, no changed source file is unmeasured. The threshold
+ * is compared in whole hundredths of a percent, in integers, so a share
+ * exactly at it passes (8 of 10 at 80, 147 of 1500 at 9.8).
  *
  * @param {Object}                           options
  * @param {Map<string, Set<number>>}         options.changed            Path → changed lines.
  * @param {Map<string, Map<number, number>>} options.report             Report path → line → hits.
- * @param {number}                           options.threshold          Minimum percentage (0-100).
+ * @param {number}                           options.threshold          Minimum percentage (0-100, two decimals at most).
  * @param {string}                           [options.format]           `clover` or `lcov`; limits which files are looked up.
  * @param {RegExp|null}                      [options.exclude]          Changed paths to skip entirely.
  * @param {string}                           [options.root]             Absolute working dir, for tie-breaking matches.
@@ -181,8 +183,10 @@ function computeGate({
 		0
 	);
 	const coveredLines = files.reduce((sum, entry) => sum + entry.covered, 0);
+	const thresholdHundredths = Math.round(threshold * 100);
 	const meetsThreshold =
-		changedLines === 0 || coveredLines * 100 >= threshold * changedLines;
+		changedLines === 0 ||
+		coveredLines * 10000 >= thresholdHundredths * changedLines;
 	const unmeasuredFails =
 		unmeasuredPolicy === 'fail' && unmeasured.length > 0;
 	return {

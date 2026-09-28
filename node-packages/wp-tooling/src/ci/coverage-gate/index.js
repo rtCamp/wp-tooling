@@ -20,6 +20,8 @@ const {
 	matchReportFile,
 	DEFAULT_EXCLUDE,
 	DEFAULT_THRESHOLD,
+	DEFAULT_UNMEASURED_POLICY,
+	UNMEASURED_POLICIES,
 } = require('./gate');
 const { formatRanges, formatSummary } = require('./render');
 const { runCli } = require('./cli');
@@ -41,4 +43,6 @@ module.exports = {
 	GateError,
 	DEFAULT_EXCLUDE,
 	DEFAULT_THRESHOLD,
+	DEFAULT_UNMEASURED_POLICY,
+	UNMEASURED_POLICIES,
 };

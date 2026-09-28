@@ -73,7 +73,9 @@ function unquoteGitPath(raw) {
  * @return {Set<number>|null} The file's line set, or `null` for `/dev/null` (a deletion).
  */
 function startFile(changed, header) {
-	const target = unquoteGitPath(header.slice(4).trim());
+	// Git appends a tab to a path containing a space; strip only that, so a
+	// name that really ends in a space survives.
+	const target = unquoteGitPath(header.slice(4).replace(/\t$/, ''));
 	if (target === '/dev/null') {
 		return null;
 	}
