@@ -1,6 +1,10 @@
 /**
  * Output rendering: text report, Markdown job summary, GitHub annotations and
  * step outputs. Pure string builders — nothing here writes anywhere.
+ *
+ * File paths come from the pull request, so they are untrusted: every output
+ * neutralises them (see printable(), codeSpan(), escapeData()) so a crafted
+ * name can't start a workflow command or inject Markdown/HTML.
  */
 
 'use strict';
@@ -68,13 +72,46 @@ function verdictLine(result, threshold) {
 }
 
 /**
- * Escape a Markdown table cell.
+ * Make a path safe to print on one line: control characters (newlines
+ * included) become visible `\xNN` escapes.
  *
  * @param {string} text
- * @return {string} Text with `|` escaped.
+ * @return {string} Text with no control characters.
+ */
+function printable(text) {
+	return String(text).replace(
+		/\p{Cc}/gu,
+		(char) => `\\x${char.codePointAt(0).toString(16).padStart(2, '0')}`
+	);
+}
+
+/**
+ * Escape a Markdown table cell. Backslashes are escaped too, so a `\` right
+ * before a `|` can't cancel the pipe's escape and split the cell.
+ *
+ * @param {string} text
+ * @return {string} Text with `\` and `|` escaped.
  */
 function escapeTableCell(text) {
-	return String(text).replace(/\|/g, '\\|');
+	return String(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
+/**
+ * Wrap text in a Markdown code span that its own backticks can't close: the
+ * fence is one backtick longer than the longest run inside, padded with a
+ * space when the text starts or ends with a backtick or space.
+ *
+ * @param {string} text Printable text (no line breaks).
+ * @return {string} Code span.
+ */
+function codeSpan(text) {
+	const longestRun = (text.match(/`+/g) ?? []).reduce(
+		(longest, run) => Math.max(longest, run.length),
+		0
+	);
+	const fence = '`'.repeat(longestRun + 1);
+	const pad = /^[` ]|[` ]$/.test(text) ? ' ' : '';
+	return `${fence}${pad}${text}${pad}${fence}`;
 }
 
 /**
@@ -87,7 +124,8 @@ function summaryRow(entry) {
 	const percent = toPercent(entry.covered, entry.executable);
 	const percentCell = percent === null ? EMPTY_CELL : `${percent}%`;
 	const missedCell = formatRanges(entry.missed) || EMPTY_CELL;
-	return `| \`${escapeTableCell(entry.path)}\` | ${entry.executable} | ${entry.covered} | ${percentCell} | ${missedCell} |`;
+	const pathCell = codeSpan(printable(escapeTableCell(entry.path)));
+	return `| ${pathCell} | ${entry.executable} | ${entry.covered} | ${percentCell} | ${missedCell} |`;
 }
 
 /**
@@ -101,7 +139,7 @@ function unmeasuredItem(file, ambiguousPaths) {
 	const note = ambiguousPaths.includes(file)
 		? ' (several report entries match; ambiguous)'
 		: '';
-	return `- \`${file}\`${note}`;
+	return `- ${codeSpan(printable(file))}${note}`;
 }
 
 /**
@@ -167,7 +205,8 @@ function formatSkipSummary(message) {
 }
 
 /**
- * Render the text-mode report.
+ * Render the text-mode report. Every line starts with a fixed token (never a
+ * path), so the Actions runner can't read a crafted path as `::command::`.
  *
  * @param {Object} result    computeGate() result.
  * @param {number} threshold
@@ -180,13 +219,13 @@ function formatText(result, threshold) {
 			? `  missed: ${formatRanges(entry.missed)}`
 			: '';
 		rows.push(
-			`  ${entry.path}  ${entry.covered}/${entry.executable}${missed}`
+			`  - ${printable(entry.path)}  ${entry.covered}/${entry.executable}${missed}`
 		);
 	}
 	if (result.unmeasured.length > 0) {
 		rows.push(
 			'not measured (missing from the report):',
-			...result.unmeasured.map((file) => `  ${file}`)
+			...result.unmeasured.map((file) => `  - ${printable(file)}`)
 		);
 	}
 	if (result.outOfScope.length > 0) {
@@ -224,14 +263,17 @@ function escapeProperty(value) {
  * @param {string} level           `notice`, `warning` or `error`.
  * @param {string} message
  * @param {Object} [location]
- * @param {string} [location.file] Path relative to the repo root.
+ * @param {string} [location.file] Path relative to the repo root. Control
+ *                                 characters are made visible, so a name
+ *                                 carrying terminal escapes can't restyle the
+ *                                 log — at the cost of not attaching to it.
  * @param {number} [location.line]
  * @return {string} The command line.
  */
 function annotation(level, message, { file, line } = {}) {
 	const props = [];
 	if (file) {
-		props.push(`file=${escapeProperty(file)}`);
+		props.push(`file=${escapeProperty(printable(file))}`);
 	}
 	if (line) {
 		props.push(`line=${line}`);

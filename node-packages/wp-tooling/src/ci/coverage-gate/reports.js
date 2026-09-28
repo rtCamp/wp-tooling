@@ -2,17 +2,16 @@
  * Coverage report parsers. Each returns the same shape: file path as written
  * in the report → executable line number → hit count.
  *
- * Regex-based on purpose — zero runtime dependencies, and both formats are
- * flat enough that a real XML parser buys nothing.
+ * Hand-rolled on purpose — zero runtime dependencies, and both formats are
+ * flat enough that a real XML parser buys nothing. Clover is scanned with
+ * `indexOf` rather than regexes so a malformed or hostile report stays linear
+ * (a PR controls the paths, and can shape the report its own tests write).
  */
 
 'use strict';
 
 const path = require('path');
 
-const CLOVER_FILE_RE = /<file\b([^>]*?)(?:\/>|>([\s\S]*?)<\/file>)/g;
-const CLOVER_LINE_RE = /<line\b([^>]*?)\/?>/g;
-const XML_ATTR_RE = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 const XML_ENTITY_RE = /&(?:#x([0-9a-f]+)|#(\d+)|(amp|lt|gt|quot|apos));/gi;
 const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 
@@ -44,18 +43,69 @@ function decodeXml(value) {
 }
 
 /**
- * Parse XML attributes out of a tag's attribute string.
+ * Parse XML attributes out of a tag's attribute string, in one pass.
  *
  * @param {string} source e.g. ` num="12" type="stmt" count="0"`.
  * @return {Object<string, string>} Attribute name → decoded value.
  */
 function parseAttributes(source) {
-	return Object.fromEntries(
-		[...source.matchAll(XML_ATTR_RE)].map((attr) => [
-			attr[1],
-			decodeXml(attr[2] ?? attr[3]),
-		])
-	);
+	const attrs = Object.create(null);
+	let from = 0;
+	for (;;) {
+		const eq = source.indexOf('=', from);
+		if (eq === -1) {
+			return attrs;
+		}
+		let open = eq + 1;
+		while (open < source.length && /\s/.test(source[open])) {
+			open++;
+		}
+		const quote = source[open];
+		if (quote !== '"' && quote !== "'") {
+			from = eq + 1;
+			continue;
+		}
+		const close = source.indexOf(quote, open + 1);
+		if (close === -1) {
+			return attrs;
+		}
+		const name = source.slice(from, eq).trim().split(/\s+/).pop();
+		attrs[name] = decodeXml(source.slice(open + 1, close));
+		from = close + 1;
+	}
+}
+
+/**
+ * Find the next `<tag …>` or `<tag …/>` at or after `from`.
+ *
+ * @param {string} xml
+ * @param {string} tag  Element name.
+ * @param {number} from Search start.
+ * @return {{ attrs: string, selfClosing: boolean, end: number }|null} The tag's attribute source, whether it closes itself, and the index just past its `>`; `null` when there is none.
+ */
+function nextTag(xml, tag, from) {
+	const open = `<${tag}`;
+	for (
+		let start = xml.indexOf(open, from);
+		start !== -1;
+		start = xml.indexOf(open, start + open.length)
+	) {
+		const after = start + open.length;
+		if (!/[\s/>]/.test(xml[after] ?? '')) {
+			continue; // `<filename`, not `<file`.
+		}
+		const close = xml.indexOf('>', after);
+		if (close === -1) {
+			return null;
+		}
+		const selfClosing = xml[close - 1] === '/';
+		return {
+			attrs: xml.slice(after, selfClosing ? close - 1 : close),
+			selfClosing,
+			end: close + 1,
+		};
+	}
+	return null;
 }
 
 /**
@@ -91,8 +141,12 @@ function recordHit(hits, lineNo, count) {
  * @param {string}              body Markup between `<file>` and `</file>`.
  */
 function readCloverLines(hits, body) {
-	for (const lineMatch of body.matchAll(CLOVER_LINE_RE)) {
-		const attrs = parseAttributes(lineMatch[1]);
+	for (
+		let line = nextTag(body, 'line', 0);
+		line;
+		line = nextTag(body, 'line', line.end)
+	) {
+		const attrs = parseAttributes(line.attrs);
 		if (!CLOVER_EXECUTABLE_TYPES.has(attrs.type)) {
 			continue;
 		}
@@ -105,17 +159,33 @@ function readCloverLines(hits, body) {
 }
 
 /**
- * Parse a Clover XML report (PHPUnit `--coverage-clover`).
+ * Parse a Clover XML report (PHPUnit `--coverage-clover`). A `<file>` with no
+ * closing `</file>` ends the scan: the report was truncated.
  *
  * @param {string} xml Report contents.
  * @return {Map<string, Map<number, number>>} File path → line → hit count.
  */
 function parseClover(xml) {
 	const report = new Map();
-	for (const fileMatch of xml.matchAll(CLOVER_FILE_RE)) {
-		const { name } = parseAttributes(fileMatch[1]);
+	let from = 0;
+	for (
+		let file = nextTag(xml, 'file', 0);
+		file;
+		file = nextTag(xml, 'file', from)
+	) {
+		from = file.end;
+		let body = '';
+		if (!file.selfClosing) {
+			const close = xml.indexOf('</file>', from);
+			if (close === -1) {
+				break;
+			}
+			body = xml.slice(from, close);
+			from = close + '</file>'.length;
+		}
+		const { name } = parseAttributes(file.attrs);
 		if (name) {
-			readCloverLines(hitsFor(report, name), fileMatch[2] ?? '');
+			readCloverLines(hitsFor(report, name), body);
 		}
 	}
 	return report;

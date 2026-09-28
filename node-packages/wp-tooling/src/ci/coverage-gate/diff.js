@@ -52,7 +52,7 @@ function unquoteGitPath(raw) {
 			bytes.push(...Buffer.from(body[i], 'utf8'));
 			continue;
 		}
-		const octal = /^[0-7]{3}/.exec(body.slice(i + 1));
+		const octal = /^[0-7]{3}$/.exec(body.slice(i + 1, i + 4));
 		if (octal) {
 			bytes.push(parseInt(octal[0], 8));
 			i += 3;

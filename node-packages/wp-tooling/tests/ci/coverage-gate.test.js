@@ -237,6 +237,38 @@ describe('parseClover', () => {
 			'/x/AB&#999999999;&#x110000;.php',
 		]);
 	});
+
+	test("reads single-quoted attributes with spaces around '='; skips <filename>", () => {
+		const parsed = parseClover(
+			"<filename name='/x/No.php'/><file name = '/x/A.php'><line num = '3' type='stmt' count='1'/></file>"
+		);
+		expect([...parsed.keys()]).toEqual(['/x/A.php']);
+		expect(parsed.get('/x/A.php').get(3)).toBe(1);
+	});
+
+	test('a <file> without </file> ends the scan (truncated report)', () => {
+		const parsed = parseClover(
+			'<file name="/x/A.php"><line num="1" type="stmt" count="1"/></file><file name="/x/B.php"><line num="1" type="stmt" count="1"/>'
+		);
+		expect([...parsed.keys()]).toEqual(['/x/A.php']);
+	});
+
+	// Each input took 1-30 s with the old regex parser (quadratic backtracking).
+	test.each([
+		[
+			'a long attribute run',
+			`<file name="a"><line  ${'a-'.repeat(80000)}/></file>`,
+		],
+		['many unclosed <file> tags', '<file name="a">'.repeat(40000)],
+		[
+			'many <line without >',
+			`<file name="a">${'<line'.repeat(40000)}</file>`,
+		],
+	])('stays linear on %s', (_label, xml) => {
+		const started = Date.now();
+		parseClover(xml);
+		expect(Date.now() - started).toBeLessThan(1000);
+	});
 });
 
 describe('parseLcov', () => {
@@ -480,6 +512,31 @@ describe('helpers', () => {
 		expect(md).toContain('2 changed files not in the coverage report');
 		expect(md).toContain('failed');
 	});
+});
+
+test('formatSummary keeps a backslash-pipe inside its cell and pads edge backticks', () => {
+	const md = formatSummary(
+		{
+			files: [
+				{
+					path: 'inc/a\\|b.php',
+					executable: 1,
+					covered: 1,
+					missed: [],
+				},
+			],
+			unmeasured: ['`x`'],
+			ambiguous: [],
+			outOfScope: [],
+			changedLines: 1,
+			coveredLines: 1,
+			percent: 100,
+			passed: true,
+		},
+		80
+	);
+	expect(md).toContain('| `inc/a\\\\\\|b.php` | 1 | 1 | 100% | — |');
+	expect(md).toContain('- `` `x` ``\n');
 });
 
 describe('gitChangedLines (real git)', () => {
@@ -858,6 +915,65 @@ describe('runCli', () => {
 		expect(io.stdout()).toContain('processUncoveredFiles');
 		expect(io.stdout()).toContain('collectCoverageFrom');
 		expect(io.stdout()).toContain('uncommitted work is ignored');
+	});
+});
+
+describe('runCli with hostile file names', () => {
+	const INJECTED = 'inc/x\n::error::pwned.php';
+	const ESCAPE = 'inc/\x1b[8mhidden.php';
+	const MARKDOWN = 'inc/a|b`c.php';
+	let root;
+	let base;
+	let io;
+	beforeAll(() => {
+		root = tempDir('cov-names-');
+		sh(root, 'init', '-q', '-b', 'main');
+		sh(root, 'commit', '-q', '--allow-empty', '-m', 'base');
+		base = sh(root, 'rev-parse', 'HEAD').trim();
+		write(root, INJECTED, '<?php\necho 1;\n');
+		write(root, MARKDOWN, '<?php\necho 1;\n');
+		write(root, ESCAPE, '<?php\necho 1;\n');
+		sh(root, 'add', '-A');
+		sh(root, 'commit', '-q', '-m', 'feature');
+		write(
+			root,
+			'clover.xml',
+			`<file name="/app/${MARKDOWN}"><line num="2" type="stmt" count="1"/></file>`
+		);
+	});
+	beforeEach(() => {
+		io = captureOutput();
+	});
+	afterEach(() => {
+		io.restore();
+	});
+
+	test('a crafted path cannot start a workflow command or break the summary', () => {
+		const dir = tempDir('cov-gh-');
+		const env = {
+			GITHUB_OUTPUT: path.join(dir, 'out'),
+			GITHUB_STEP_SUMMARY: path.join(dir, 'summary'),
+		};
+		const args = ['--report', 'clover.xml', '--working-dir', root];
+		expect(
+			runCli([...args, '--base', base, '--output', 'github'], { env })
+		).toBe(0);
+		const commands = io
+			.stdout()
+			.split('\n')
+			.filter((line) => line.trimStart().startsWith('::'));
+		const missing =
+			'::Changed file is missing from the coverage report, so its lines are not measured.';
+		expect(commands).toEqual([
+			`::warning file=inc/\\x1b[8mhidden.php${missing}`,
+			`::warning file=inc/x\\x0a%3A%3Aerror%3A%3Apwned.php${missing}`,
+		]);
+		expect(io.stdout()).not.toContain('\x1b');
+		expect(io.stdout()).toContain('  - inc/x\\x0a::error::pwned.php');
+		const summary = fs.readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
+		expect(summary).toContain('| ``inc/a\\|b`c.php`` | 1 | 1 | 100% | — |');
+		expect(summary).toContain('- `inc/x\\x0a::error::pwned.php`');
+		expect(summary).not.toContain('\x1b');
 	});
 });
 
