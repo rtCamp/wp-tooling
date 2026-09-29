@@ -1,0 +1,160 @@
+<?php
+/**
+ * {{class}}: registers the @{{text_domain}}/{{module_slug}} script module.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://developer.wordpress.org/reference/functions/wp_register_script_module/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Registers and enqueues a Script Module (core since WP 6.5).
+ *
+ * Script modules are native ES modules: core prints an import map, so the
+ * module can import '@wordpress/interactivity' and other registered modules by
+ * bare specifier without a bundler.
+ *
+ * Dependencies and the cache-busting version come from the build's generated
+ * .asset.php when it exists, which is why the build output -- not the source
+ * file -- is what gets registered.
+ */
+final class {{class}} implements Registrable {
+
+	/**
+	 * Module identifier, used in the import map and by every enqueue call.
+	 * The '@vendor/name' shape matches core's own '@wordpress/*' modules.
+	 */
+	public const MODULE_ID = '@{{text_domain}}/{{module_slug}}';
+
+	/**
+	 * Bind registration and enqueueing.
+	 *
+	 * No-ops before WP 6.5, where the Script Modules API does not exist.
+	 */
+	public function register_hooks(): void {
+		if ( ! function_exists( 'wp_register_script_module' ) ) {
+			return;
+		}
+
+		add_action( 'init', [ $this, 'register_module' ] );
+		add_action( '{{enqueue_hook}}', [ $this, 'enqueue_module' ] );
+	}
+
+	/**
+	 * Register the module so it lands in the import map.
+	 *
+	 * A no-op before WP 6.5, and a no-op until the build has run: registering
+	 * a file that does not exist still prints a <script type="module"> tag, so
+	 * an unbuilt checkout would ship a 404 on every page the module is
+	 * enqueued on.
+	 */
+	public function register_module(): void {
+		if ( ! function_exists( 'wp_register_script_module' ) || ! is_readable( $this->get_module_path() ) ) {
+			return;
+		}
+
+		$asset = $this->get_asset_meta();
+
+		/**
+		 * Deliberately on the WP 6.5 signature: wp_register_script_module()'s
+		 * $args parameter (in_footer, fetchpriority) arrived in 6.9.
+		 */
+		wp_register_script_module(
+			self::MODULE_ID,
+			$this->get_module_url(),
+			$this->normalise_dependencies( $asset['dependencies'] ?? [] ),
+			$asset['version'] ?? false
+		);
+	}
+
+	/**
+	 * Enqueue the module.
+	 *
+	 * Enqueued on every request this hook fires for. Narrow it with a
+	 * conditional -- a template check, a block presence check -- so the module
+	 * only ships where it is needed.
+	 */
+	public function enqueue_module(): void {
+		if ( ! function_exists( 'wp_enqueue_script_module' ) ) {
+			return;
+		}
+
+		wp_enqueue_script_module( self::MODULE_ID );
+	}
+
+	/**
+	 * Filesystem path of the built module.
+	 *
+	 * Assumes this class sits two levels below the plugin root (the default
+	 * '<plugin>/includes/Services/' layout). Adjust the dirname() depths here
+	 * and in get_module_url() together if the class lives somewhere else.
+	 */
+	public function get_module_path(): string {
+		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{module_slug}}.js';
+	}
+
+	/**
+	 * Public URL of the built module.
+	 *
+	 * The dirname() depth is one shallower than get_module_path()'s on
+	 * purpose: plugin_dir_url() takes a *file* and returns the URL of the
+	 * directory holding it, so passing '<plugin>/includes' yields the plugin
+	 * root URL. Both therefore describe the same directory.
+	 */
+	public function get_module_url(): string {
+		return plugin_dir_url( dirname( __DIR__ ) ) . '{{build_dir}}/{{module_slug}}.js';
+	}
+
+	/**
+	 * Read the build's asset manifest, when the build has run.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function get_asset_meta(): array {
+		$asset_file = dirname( __DIR__, 2 ) . '/{{build_dir}}/{{module_slug}}.asset.php';
+
+		if ( ! is_readable( $asset_file ) ) {
+			return [];
+		}
+
+		$asset = require $asset_file;
+
+		return is_array( $asset ) ? $asset : [];
+	}
+
+	/**
+	 * Normalise dependencies to the id/import form core expects.
+	 *
+	 * A dependency may be a bare module id or an array carrying an 'import'
+	 * key of 'static' or 'dynamic'; core wants the array form.
+	 *
+	 * @param array<int,mixed> $dependencies Raw dependency list.
+	 *
+	 * @return array<int,array<string,string>>
+	 */
+	private function normalise_dependencies( array $dependencies ): array {
+		$normalised = [];
+
+		foreach ( $dependencies as $dependency ) {
+			if ( is_string( $dependency ) ) {
+				$normalised[] = [ 'id' => $dependency ];
+				continue;
+			}
+
+			if ( is_array( $dependency ) && isset( $dependency['id'] ) && is_string( $dependency['id'] ) ) {
+				$normalised[] = $dependency;
+			}
+		}
+
+		return $normalised;
+	}
+}

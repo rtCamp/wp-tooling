@@ -117,6 +117,27 @@ The requested `<category>/<slug>` is not in the merged catalogue.
 
 **Skill response:** read `missingDetails`, prompt or run discovery via `discover_from` (§6), retry the same `execute()` call with the resolved values added.
 
+### `EINVALIDINPUT`
+
+An input declaring an `enum` resolved to a value outside it. The check runs on the value *after* any
+`transform`, so it reflects what would have reached the templates.
+
+```json
+{
+    "code": "EINVALIDINPUT",
+    "message": "Invalid input values: mode='prender' (allowed: auto, prefetch, prerender)",
+    "scaffold": "wp-api/speculation",
+    "invalid": [
+        { "key": "mode", "value": "prender", "allowed": ["auto", "prefetch", "prerender"] }
+    ]
+}
+```
+
+**Skill response:** do **not** retry with a guessed value. Read `invalid[].allowed`, ask the
+developer to choose from that set (offering the closest match to `value` as the suggestion), and
+retry with the confirmed value. A value the developer supplied explicitly is a typo to surface, not
+one to silently correct.
+
 ### `EBADSCAFFOLD`
 
 A `scaffold.json` in the catalogue is malformed (invalid JSON or fails schema validation). Indicates a scaffold-author bug, not a caller bug.
