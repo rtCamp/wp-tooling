@@ -252,6 +252,27 @@ function validateInputs(inputs) {
 				`${fieldPath}.transform: must be one of ${ALLOWED_INPUT_TRANSFORMS.join(', ')}`
 			);
 		}
+		if (entry.enum !== undefined) {
+			if (
+				!Array.isArray(entry.enum) ||
+				entry.enum.length === 0 ||
+				entry.enum.some((v) => typeof v !== 'string' || v.length === 0)
+			) {
+				errors.push(
+					`${fieldPath}.enum: must be a non-empty array of non-empty strings`
+				);
+			} else if (new Set(entry.enum).size !== entry.enum.length) {
+				errors.push(`${fieldPath}.enum: must not contain duplicates`);
+			} else if (
+				typeof entry.default === 'string' &&
+				!entry.enum.includes(entry.default)
+			) {
+				// A default outside its own enum would fail every run.
+				errors.push(
+					`${fieldPath}.default: '${entry.default}' must be one of ${entry.enum.join(', ')}`
+				);
+			}
+		}
 		for (const k of Object.keys(entry)) {
 			if (
 				![
@@ -261,6 +282,7 @@ function validateInputs(inputs) {
 					'default',
 					'required',
 					'transform',
+					'enum',
 				].includes(k)
 			) {
 				errors.push(`${fieldPath}: unknown field '${k}'`);
@@ -667,6 +689,24 @@ function checkTemplatesRender(scaffold, scaffoldDir) {
 			render(w.snippet_template, supply);
 		} catch (err) {
 			errs.push(`wiring snippet_template render failed: ${err.message}`);
+		}
+	}
+	for (const target of ALLOWED_SCRIPT_TARGETS) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const [name, cmd] of Object.entries(map)) {
+			const missing = collectPlaceholders(cmd).filter(
+				(k) => !(k in supply)
+			);
+			for (const k of missing) {
+				supply[k] = 'x';
+			}
+			try {
+				render(cmd, supply);
+			} catch (err) {
+				errs.push(
+					`scripts.${target}['${name}'] render failed: ${err.message}`
+				);
+			}
 		}
 	}
 	return errs;

@@ -107,6 +107,16 @@ function printHelp() {
 	);
 }
 
+// Render [name, cmd] pairs as a pasteable JSON object body: escaped, comma-separated.
+function scriptEntryLines(entries) {
+	return entries.map(
+		([name, cmd], i) =>
+			`    ${JSON.stringify(name)}: ${JSON.stringify(cmd)}${
+				i < entries.length - 1 ? ',' : ''
+			}`
+	);
+}
+
 function printHumanReport(result) {
 	const { scaffold, engine, developer, ai, warnings } = result;
 	const lines = [];
@@ -132,7 +142,12 @@ function printHumanReport(result) {
 	}
 	lines.push('');
 	const composer = Object.entries(developer.install.composer);
+	const composerDev = Object.entries(developer.install.composerDev || {});
+	const composerSuggest = Object.entries(
+		developer.install.composerSuggest || {}
+	);
 	const npm = Object.entries(developer.install.npm);
+	const npmDev = Object.entries(developer.install.npmDev || {});
 	const npmScripts = developer.scripts
 		? Object.entries(developer.scripts.npm || {})
 		: [];
@@ -141,7 +156,10 @@ function printHumanReport(result) {
 		: [];
 	if (
 		composer.length ||
+		composerDev.length ||
+		composerSuggest.length ||
 		npm.length ||
+		npmDev.length ||
 		developer.secrets.length ||
 		npmScripts.length ||
 		composerScripts.length
@@ -153,23 +171,37 @@ function printHumanReport(result) {
 				lines.push(`    composer require ${pkg}:${ver}`);
 			}
 		}
+		if (composerDev.length) {
+			lines.push('  Install (composer dev):');
+			for (const [pkg, ver] of composerDev) {
+				lines.push(`    composer require --dev ${pkg}:${ver}`);
+			}
+		}
+		if (composerSuggest.length) {
+			lines.push('  Suggest (composer, informational):');
+			for (const [pkg, note] of composerSuggest) {
+				lines.push(`    ${pkg}: ${note}`);
+			}
+		}
 		if (npm.length) {
 			lines.push('  Install (npm):');
 			for (const [pkg, ver] of npm) {
 				lines.push(`    npm install ${pkg}@${ver}`);
 			}
 		}
+		if (npmDev.length) {
+			lines.push('  Install (npm dev):');
+			for (const [pkg, ver] of npmDev) {
+				lines.push(`    npm install --save-dev ${pkg}@${ver}`);
+			}
+		}
 		if (npmScripts.length) {
 			lines.push('  Add to package.json "scripts":');
-			for (const [name, cmd] of npmScripts) {
-				lines.push(`    "${name}": "${cmd}"`);
-			}
+			lines.push(...scriptEntryLines(npmScripts));
 		}
 		if (composerScripts.length) {
 			lines.push('  Add to composer.json "scripts":');
-			for (const [name, cmd] of composerScripts) {
-				lines.push(`    "${name}": "${cmd}"`);
-			}
+			lines.push(...scriptEntryLines(composerScripts));
 		}
 		if (developer.secrets.length) {
 			lines.push(

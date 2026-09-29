@@ -127,6 +127,7 @@ The `inputs[]` array is the authoritative declaration. For each input the engine
 2. `discover_from` (see below).
 3. `default`.
 4. Error `EMISSINGINPUT` if the field is `required: true`.
+5. Error `EINVALIDINPUT` if the resolved value falls outside a declared `enum`.
 
 An explicit value always wins over discovery, so AI/CLI callers are never overridden.
 
@@ -137,7 +138,7 @@ or key is absent the input falls through to its `default` (so a project without 
 exactly as if `discover_from` were not set).
 
 - `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
-- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** (first map key, trailing `\` stripped) — but only for non-path inputs; inputs whose key looks like a path (`base_path`, `*_path`, `*_dir`) keep their own `default`, since the PSR-4 root directory is rarely a scaffold's target sub-path.
+- `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** for ordinary inputs (first map key, trailing `\` stripped) and the **root directory** for path inputs (that same entry's value; the first element if it is a list). Either way the discovered root replaces only the *first segment* of the input's `default`, keeping the scaffold's sub-namespace or sub-directory: with a map of `Acme\Blog\` → `inc/`, a `namespace` default of `Inc\Cli` yields `Acme\Blog\Cli` and a `base_path` default of `includes/Cli` yields `inc/Cli`. Both come from the same map entry, so a class is never namespaced into the autoload root while being written outside it. A path input whose `default` has no sub-directory resolves to the root directory itself, and a PSR-4 target of `./` leaves just the sub-directory.
 - `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
 
 Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
@@ -162,12 +163,31 @@ Available via `transform`:
 - `snake-case`: `qm-export` → `qm_export`
 - `upper-snake-case`: `wporg-username` → `WPORG_USERNAME`
 - `json-escape`: `Acme\Blog` → `Acme\\Blog` (embed a PHP namespace in a JSON snippet)
+- `shell-escape`: `my plugin` → `'my plugin'` (POSIX-quote one shell argument; safe values like `wp-content/plugins/x` stay bare)
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
 
+### Constraining values with `enum`
+
+When an input only makes sense as one of a fixed set, declare `enum`. The engine checks the
+**resolved** value (after any `transform`) and throws `EINVALIDINPUT` naming the allowed set, so a
+typo fails at `add` time instead of rendering code that silently does nothing:
+
+```json
+{
+    "key": "mode",
+    "description": "Speculative loading mode.",
+    "enum": ["auto", "prefetch", "prerender"],
+    "default": "prerender"
+}
+```
+
+`validate` additionally rejects a `default` that is not one of its own `enum` members, since that
+combination would fail on every run. See `wp-api/speculation` for a live example.
+
 ### Boolean inputs
 
-There is no `boolean` type in the schema. Use a string input with `"true"` / `"false"` values and a `default`, and check it in templates with `{{#key}}...{{/key}}` or `{{^key}}...{{/key}}`.
+There is no `boolean` type in the schema. Use a string input with `"true"` / `"false"` values and a `default`, and check it in templates with `{{#key}}...{{/key}}` or `{{^key}}...{{/key}}`. Add `"enum": ["true", "false"]` to reject anything else.
 
 Example (from `wp/cli`):
 
@@ -193,6 +213,24 @@ Each entry:
 - `description`: explains intent. The AI uses this when asking the developer for consent.
 
 Use sections inside `snippet_template` to vary the snippet by flag (e.g. the singleton vs multi-instance registration in `wp/cli`).
+
+---
+
+## Package scaffolds (`source: "package"`)
+
+A package scaffold wires up a class that already ships in `vendor/` rather than generating one. It
+declares `files: []`, the `composer_dependencies` entry that provides the class, and the `wiring[]`
+snippet that constructs it. `execute()` reports `scaffold.kind: "package"` and writes nothing.
+
+- `module_class`: the fully qualified PHP class the scaffold wires up (e.g.
+  `rtCamp\\WPFramework\\Utils\\Cache` — doubled backslashes, since this is JSON). Manifest metadata
+  documenting which vendor class the `wiring[]` snippet constructs. Optional, but set it on every
+  package scaffold.
+
+The `utility/*` scaffolds are the bundled examples. Note what a package scaffold **cannot** do: it
+cannot create the wrapper class its snippet might want, because `files[]` is empty. Keep the snippet
+self-sufficient against an existing file, and use `description` to spell out the alternatives the
+project may prefer.
 
 ---
 
@@ -263,6 +301,10 @@ The engine merges all dependency maps from selected scaffolds (via `collectDepen
 `category` accepts kebab-case with slashes (`lint/phpcs`, `setup`, `wp`). The combined id is `<category>/<slug>`. Two-level: `wp/cli`. Three-level: `lint/phpcs/vip`.
 
 Use nesting when a scaffold has multiple variants of the same concept (PHPCS standard choice). Use a flat category when scaffolds are independent (`setup/editorconfig`, `setup/psr4`, `setup/phpunit`).
+
+`wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8; `wp-api/block-bindings` and `wp-api/script-module`, both WP 6.5). Those pair with `"wizard_step": "wp-apis"`.
+
+A block stays in `wp` even when its behaviour comes from a modern core API: `wp/block-interactive` uses the Interactivity API, but what it generates is a block directory, so it sits beside `wp/block-dynamic` and shares its wiring anchor rather than opening a `block` category.
 
 ---
 
@@ -363,11 +405,16 @@ Look at these existing scaffolds when authoring a new one:
 | Plain class implementing `CLICommand` with PHPUnit stub | `wp/cli` |
 | PHP class extending a framework abstract | `wp/cpt`, `wp/taxonomy`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role` |
 | Cron handler implementing `Registrable` directly | `wp/cron` |
+| Version-guarded customisation of a core WP API | `wp-api/speculation` |
+| Registering something into a core registry on `init` | `wp-api/block-bindings` |
+| PHP class paired with a JS asset the build compiles | `wp-api/script-module` |
 | Module that hosts other Registrable classes | `wp/module` |
 | Static config file (no inputs) | `setup/editorconfig` |
 | Wiring into an existing JSON file | `setup/psr4` |
+| `source: package` — zero files, a Composer dep plus one wiring snippet | `utility/cache`, `utility/timer` |
 | Multiple variants of the same concept | `lint/phpcs/{full,core,vip}` |
 | Block with `block.json` + framework class | `wp/block-dynamic` |
+| Block with `render.php` + a `viewScriptModule` store | `wp/block-interactive` |
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
 | Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 

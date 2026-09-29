@@ -54,6 +54,7 @@ const ALLOWED_INPUT_TRANSFORMS = [
 	'snake-case',
 	'upper-snake-case',
 	'json-escape',
+	'shell-escape',
 ];
 
 /** Optional dependency maps. Each is `{ "<package>": "<version-range>" }`. */
@@ -88,6 +89,7 @@ const INPUT_ENTRY = {
 		default: { type: 'string' },
 		required: { type: 'boolean' },
 		transform: { type: 'string', enum: ALLOWED_INPUT_TRANSFORMS },
+		enum: { type: 'array', items: { type: 'string' }, minItems: 1 },
 	},
 };
 

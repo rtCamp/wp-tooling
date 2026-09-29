@@ -1,0 +1,34 @@
+{
+	"slug": "logger",
+	"category": "utility",
+	"name": "Logger utility",
+	"description": "Wires up the framework Logger utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Logger writes prefixed debug / info / warning / error lines and stays silent unless WP_DEBUG is on.",
+	"source": "package",
+	"module_class": "rtCamp\\WPFramework\\Utils\\Logger",
+	"files": [],
+	"inputs": [
+		{
+			"key": "base_path",
+			"description": "Directory holding the PHP source, relative to the project root, without a trailing slash. Default 'includes' matches the rtCamp skeleton; pass 'inc' or 'src' for projects that differ.",
+			"default": "includes"
+		},
+		{
+			"key": "context_slug",
+			"description": "Prefix every log line is tagged with, so this project's entries are greppable and distinguishable from another consumer's. Discovered from the composer package name and normalised to snake_case, so 'rtcamp/acme-blog' becomes 'rtcamp_acme_blog'. Pass an explicit value to override.",
+			"discover_from": "composer.json:name",
+			"transform": "snake-case",
+			"default": "my_plugin"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/Helpers/Util.php",
+			"anchor": "// scaffold:utility/logger",
+			"snippet_template": "/**\n * The project's shared framework Logger. Silent unless WP_DEBUG.\n *\n * @return \\rtCamp\\WPFramework\\Utils\\Logger Shared logger.\n */\npublic static function logger(): \\rtCamp\\WPFramework\\Utils\\Logger {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPFramework\\Utils\\Logger( '{{context_slug}}' );\n\t}\n\n\treturn $instance;\n}",
+			"description": "Add a shared accessor for the framework Logger to the project's static helper class. Check for an existing logger accessor before applying, and skip this wiring if one is already there: the rtCamp skeleton ships a Core\\Logger class extending the framework Logger, registered in Main::CLASSES and reached through Util::logger(), so re-applying the snippet would redeclare the method and fatal. Otherwise the snippet is self-contained: paste it inside the existing helper class body and Util::logger()->info( 'Cache warmed', array( 'items' => 42 ) ) works with nothing further to wire. Do not add the framework Logger to a Modules class or to Main::CLASSES — it implements neither Registrable nor Shareable, so the framework Loader would construct it with the framework's own default prefix rather than this project's. Requires rtcamp/wp-framework to be installed first."
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	}
+}

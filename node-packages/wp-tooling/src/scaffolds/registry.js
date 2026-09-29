@@ -46,6 +46,22 @@ const {
 	indexEntryToRecord,
 } = require('./sources');
 
+/**
+ * Render every value in a scripts map (npm or composer) through Mustache.
+ *
+ * @param {Object} scripts  Raw `{name: command}` map from scaffold.json.
+ * @param {Object} resolved Resolved inputs to render with.
+ * @return {Object} Rendered `{name: command}` map.
+ */
+function renderScriptMap(scripts, resolved) {
+	return Object.fromEntries(
+		Object.entries(scripts || {}).map(([name, cmd]) => [
+			name,
+			render(cmd, resolved),
+		])
+	);
+}
+
 class ScaffoldRegistry {
 	/**
 	 * @param {Object|string} options
@@ -290,6 +306,13 @@ class ScaffoldRegistry {
 		const discovery = await loadDiscovery(cwd);
 		const resolved = resolveInputs(scaffold, inputs, discovery);
 
+		// Rendered before any write, so a bad placeholder throws before partial writes.
+		const scaffoldScripts = scaffold.scripts || {};
+		const renderedScripts = {
+			npm: renderScriptMap(scaffoldScripts.npm, resolved),
+			composer: renderScriptMap(scaffoldScripts.composer, resolved),
+		};
+
 		// Warn on supplied keys the scaffold does not declare. Typos like
 		// `--namspace=Inc` would otherwise be silently dropped while the
 		// real `namespace` input falls back to its default. Soft warning,
@@ -462,7 +485,6 @@ class ScaffoldRegistry {
 			});
 		}
 
-		const scaffoldScripts = scaffold.scripts || {};
 		return {
 			scaffold: {
 				id: makeId(scaffold),
@@ -492,10 +514,7 @@ class ScaffoldRegistry {
 					npm: { ...(scaffold.npm_dependencies || {}) },
 					npmDev: { ...(scaffold.npm_dev_dependencies || {}) },
 				},
-				scripts: {
-					npm: { ...(scaffoldScripts.npm || {}) },
-					composer: { ...(scaffoldScripts.composer || {}) },
-				},
+				scripts: renderedScripts,
 				secrets: (scaffold.secrets || []).map((s) => ({ ...s })),
 			},
 			ai: { wiring: aiWiring, tests: aiTests },
@@ -868,10 +887,11 @@ async function loadDiscovery(cwd) {
  *
  * Supported sources:
  *   - `composer.json:<dot.path>` / `package.json:<dot.path>` — dotted lookup of
- *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0` yields
- *     the root **namespace** (first map key, trailing `\\` stripped) — but only
- *     for non-path inputs, since the PSR-4 root directory is rarely a scaffold's
- *     target sub-path; path inputs (e.g. `base_path`) keep their default.
+ *     a string value. Special case: `autoload.psr-4` / `autoload.psr-0` reads the
+ *     first map entry — its **namespace** (key, trailing `\\` stripped) for
+ *     ordinary inputs, its **directory** (value) for path inputs — and grafts
+ *     that root onto the input's `default`, keeping the default's sub-namespace
+ *     or sub-directory.
  *   - `config:<dot.path>` — string value from `.wp-tooling.json`.
  *
  * Unknown sources (e.g. `plugin-header:`, `input:` handled by the caller)
@@ -896,9 +916,6 @@ function discoverFromSource(decl, discovery) {
 		}
 		const selector = spec.slice(colon + 1);
 		if (selector === 'autoload.psr-4' || selector === 'autoload.psr-0') {
-			if (isPathInput(decl.key)) {
-				return undefined; // dir inputs keep their (more specific) default
-			}
 			const map = getByPath(obj, selector);
 			const firstKey =
 				map && typeof map === 'object' && !Array.isArray(map)
@@ -906,6 +923,11 @@ function discoverFromSource(decl, discovery) {
 					: undefined;
 			if (!firstKey) {
 				return undefined;
+			}
+			if (isPathInput(decl.key)) {
+				const def =
+					typeof decl.default === 'string' ? decl.default : '';
+				return graftPath(map[firstKey], def);
 			}
 			const root = firstKey.replace(/\\+$/, '');
 			// Graft the discovered root onto the default's sub-namespace: a
@@ -931,6 +953,33 @@ function discoverFromSource(decl, discovery) {
 // Heuristic: does this input key name a filesystem path/dir rather than a namespace?
 function isPathInput(key) {
 	return /(^|_)(path|dir)$/.test(key) || key === 'base_path';
+}
+
+// The directory counterpart of the namespace graft in discoverFromSource(): a
+// PSR-4 map's *value* is the autoload root directory, so a default of
+// `includes/Cli` means "root dir + `/Cli`". Grafting keeps the scaffold's
+// sub-directory while following the project's own layout — without it, a project
+// mapping its root to `inc/` or `src/` gets a correctly-namespaced class written
+// outside the autoload root, where it never loads.
+function graftPath(value, def) {
+	// A PSR-4 target may be a list of directories; the first is the canonical one.
+	const raw = Array.isArray(value) ? value[0] : value;
+	if (typeof raw !== 'string') {
+		return undefined;
+	}
+	let dir = raw.trim().replace(/\/+$/, '');
+	if (dir === '.') {
+		dir = '';
+	} else if (dir.startsWith('./')) {
+		dir = dir.slice(2);
+	}
+	const slash = def.indexOf('/');
+	const tail = slash === -1 ? '' : def.slice(slash + 1);
+	if (!dir) {
+		// Root-level autoload: the sub-directory alone is the whole path.
+		return tail || undefined;
+	}
+	return tail ? `${dir}/${tail}` : dir;
 }
 
 // Resolve a dotted path (`a.b.c`) within a plain object; undefined if absent.
@@ -1022,7 +1071,8 @@ function resolveDeclared(declared, supplied, discovery) {
  * discovery.
  *
  * Throws EMISSINGINPUT (with `missingDetails`) when required inputs are
- * not supplied (after `default` is applied).
+ * not supplied (after `default` is applied), then EINVALIDINPUT (with
+ * `invalid`) when a resolved value falls outside its declared `enum`.
  *
  * @param {Object}                scaffold  - The scaffold record being executed.
  * @param {Object<string,string>} supplied  - Caller-supplied input values.
@@ -1071,6 +1121,34 @@ function resolveInputs(scaffold, supplied, discovery = {}) {
 			{ scaffold: makeId(scaffold), missing, missingDetails }
 		);
 	}
+
+	// Constrained inputs are checked post-transform, i.e. on the value that
+	// actually reaches the templates.
+	const invalid = [];
+	for (const decl of declared || []) {
+		if (!Array.isArray(decl.enum) || !(decl.key in resolved)) {
+			continue;
+		}
+		if (!decl.enum.includes(resolved[decl.key])) {
+			invalid.push({
+				key: decl.key,
+				value: resolved[decl.key],
+				allowed: decl.enum,
+			});
+		}
+	}
+	if (invalid.length) {
+		throw new ScaffoldError(
+			'EINVALIDINPUT',
+			`Invalid input values: ${invalid
+				.map(
+					(i) =>
+						`${i.key}='${i.value}' (allowed: ${i.allowed.join(', ')})`
+				)
+				.join('; ')}`,
+			{ scaffold: makeId(scaffold), invalid }
+		);
+	}
 	return resolved;
 }
 
@@ -1092,6 +1170,14 @@ function inferPlaceholders(scaffold) {
 	for (const t of scaffold.tests || []) {
 		for (const p of collectPlaceholders(t.dest)) {
 			seen.add(p);
+		}
+	}
+	for (const target of ['npm', 'composer']) {
+		const map = (scaffold.scripts && scaffold.scripts[target]) || {};
+		for (const cmd of Object.values(map)) {
+			for (const p of collectPlaceholders(cmd)) {
+				seen.add(p);
+			}
 		}
 	}
 	return Array.from(seen);

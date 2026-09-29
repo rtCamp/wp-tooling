@@ -1,0 +1,90 @@
+<?php
+/**
+ * Tests for {{namespace}}\{{class}}.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{tests_namespace}};
+
+use {{namespace}}\{{class}};
+use WP_Block_Type_Registry;
+use WP_UnitTestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Class {{class}}Test
+ *
+ * @covers \{{namespace}}\{{class}}
+ */
+final class {{class}}Test extends WP_UnitTestCase {
+
+	/**
+	 * Leave the registry as we found it: register_block() may have added the
+	 * block type when the build output is present.
+	 */
+	public function tear_down(): void {
+		if ( WP_Block_Type_Registry::get_instance()->is_registered( {{class}}::NAME ) ) {
+			unregister_block_type( {{class}}::NAME );
+		}
+
+		parent::tear_down();
+	}
+
+	/**
+	 * The class is a Registrable, so the framework Loader boots it.
+	 */
+	public function test_implements_registrable(): void {
+		$this->assertInstanceOf( Registrable::class, new {{class}}() );
+	}
+
+	/**
+	 * Registration is deferred to init, as block registration must be.
+	 */
+	public function test_register_hooks_attaches_to_init(): void {
+		$instance = new {{class}}();
+		$instance->register_hooks();
+
+		$this->assertNotFalse( has_action( 'init', [ $instance, 'register_block' ] ) );
+	}
+
+	/**
+	 * The block name is the token block.json and view.js's store share.
+	 */
+	public function test_name_matches_the_block_manifest(): void {
+		$this->assertSame( '{{vendor}}/{{slug}}', {{class}}::NAME );
+	}
+
+	/**
+	 * WordPress must be pointed at the build output, not the source tree, or
+	 * it would try to register raw ES modules.
+	 */
+	public function test_block_dir_points_at_the_build_output(): void {
+		$this->assertStringEndsWith(
+			'/{{build_dir}}/{{slug}}',
+			( new {{class}}() )->get_block_dir()
+		);
+	}
+
+	/**
+	 * register_block() is safe to call whatever the environment: before WP 6.5
+	 * or before a build it registers nothing instead of failing.
+	 */
+	public function test_register_block_is_a_no_op_without_build_output(): void {
+		$instance = new {{class}}();
+		$instance->register_block();
+
+		$expected = function_exists( 'wp_interactivity_state' ) && is_dir( $instance->get_block_dir() );
+
+		$this->assertSame(
+			$expected,
+			WP_Block_Type_Registry::get_instance()->is_registered( {{class}}::NAME )
+		);
+	}
+}
