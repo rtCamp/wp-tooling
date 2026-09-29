@@ -1,0 +1,113 @@
+<?php
+/**
+ * {{class}}: the {{vendor}}/{{source_slug}} block bindings source.
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://developer.wordpress.org/reference/functions/register_block_bindings_source/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use WP_Block;
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Registers a Block Bindings source (core since WP 6.5).
+ *
+ * A bindings source lets editors point a block attribute at external data
+ * instead of typing a value, through block markup like:
+ *
+ *     "metadata": { "bindings": { "content": {
+ *         "source": "{{vendor}}/{{source_slug}}",
+ *         "args": { "key": "some-key" }
+ *     } } }
+ *
+ * Replace the lookup in get_value() with this project's own data source; the
+ * registration around it is the part that rarely changes.
+ */
+final class {{class}} implements Registrable {
+
+	/**
+	 * Source name. Core requires a namespace prefix and allows only lowercase
+	 * alphanumerics, dashes and the separating slash.
+	 */
+	public const SOURCE_NAME = '{{vendor}}/{{source_slug}}';
+
+	/**
+	 * Block context this source needs. Core merges these into the bound
+	 * block's `uses_context`, which is how get_value() can read a post ID.
+	 *
+	 * @var string[]
+	 */
+	public const USES_CONTEXT = [ 'postId' ];
+
+	/**
+	 * Register the source on init.
+	 *
+	 * No-ops before WP 6.5, where the Block Bindings API does not exist.
+	 */
+	public function register_hooks(): void {
+		if ( ! function_exists( 'register_block_bindings_source' ) ) {
+			return;
+		}
+
+		add_action( 'init', [ $this, 'register_source' ] );
+	}
+
+	/**
+	 * Hand the source to core.
+	 */
+	public function register_source(): void {
+		register_block_bindings_source(
+			self::SOURCE_NAME,
+			[
+				'label'              => __( '{{label}}', '{{text_domain}}' ),
+				'get_value_callback' => [ $this, 'get_value' ],
+				'uses_context'       => self::USES_CONTEXT,
+			]
+		);
+	}
+
+	/**
+	 * Resolve a bound attribute's value.
+	 *
+	 * Core calls this while rendering each bound block. Returning null leaves
+	 * the block's own value in place, and returning false removes the
+	 * attribute entirely -- so a lookup that finds nothing should return null,
+	 * never an empty string.
+	 *
+	 * @param array<string,mixed> $source_args    Args from the block's bindings metadata.
+	 * @param WP_Block            $block_instance The block being rendered.
+	 * @param string              $attribute_name The bound attribute.
+	 *
+	 * @return string|null Replacement value, or null to keep the block's own.
+	 */
+	public function get_value( array $source_args, WP_Block $block_instance, string $attribute_name ): ?string {
+		$key = isset( $source_args['key'] ) && is_string( $source_args['key'] ) ? $source_args['key'] : '';
+
+		if ( '' === $key ) {
+			return null;
+		}
+
+		// USES_CONTEXT is what makes postId available here.
+		$post_id = $block_instance->context['postId'] ?? null;
+
+		if ( ! is_numeric( $post_id ) ) {
+			return null;
+		}
+
+		$value = get_post_meta( (int) $post_id, $key, true );
+
+		if ( ! is_scalar( $value ) || '' === $value ) {
+			return null;
+		}
+
+		return (string) $value;
+	}
+}

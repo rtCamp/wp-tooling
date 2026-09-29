@@ -145,6 +145,62 @@ describe('validate inputs block', () => {
 		});
 		expect(errors[0]).toMatch(/inputs\[0\]\.transform: must be one of/);
 	});
+
+	it('accepts an enum with a member default', () => {
+		expect(
+			validate({
+				...baseValid(),
+				inputs: [
+					{
+						key: 'mode',
+						description: 'Mode',
+						enum: ['auto', 'prefetch'],
+						default: 'prefetch',
+					},
+				],
+			})
+		).toEqual([]);
+	});
+
+	it('rejects an empty or non-string enum', () => {
+		expect(
+			validate({
+				...baseValid(),
+				inputs: [{ key: 'mode', description: 'X', enum: [] }],
+			})[0]
+		).toMatch(/inputs\[0\]\.enum: must be a non-empty array/);
+		expect(
+			validate({
+				...baseValid(),
+				inputs: [{ key: 'mode', description: 'X', enum: ['a', 2] }],
+			})[0]
+		).toMatch(/inputs\[0\]\.enum: must be a non-empty array/);
+	});
+
+	it('rejects duplicate enum members', () => {
+		const errors = validate({
+			...baseValid(),
+			inputs: [{ key: 'mode', description: 'X', enum: ['a', 'a'] }],
+		});
+		expect(errors).toContain('inputs[0].enum: must not contain duplicates');
+	});
+
+	it('rejects a default outside its own enum', () => {
+		const errors = validate({
+			...baseValid(),
+			inputs: [
+				{
+					key: 'mode',
+					description: 'X',
+					enum: ['auto', 'prefetch'],
+					default: 'prerender',
+				},
+			],
+		});
+		expect(errors[0]).toMatch(
+			/inputs\[0\]\.default: 'prerender' must be one of auto, prefetch/
+		);
+	});
 });
 
 describe('validate wiring block', () => {
