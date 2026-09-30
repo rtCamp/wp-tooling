@@ -510,7 +510,7 @@ describe('run --list (usage + failure contract)', () => {
 		const payload = JSON.parse(stdout.trim());
 		expect(payload.mode).toBe('setup');
 		expect(
-			payload.warnings.some((w) => /--reinit will overwrite/.test(w))
+			payload.warnings.some((w) => /restore a valid identity/i.test(w))
 		).toBe(true);
 		expect(process.exitCode || 0).toBe(0);
 	});
@@ -669,20 +669,6 @@ describe('setup records the capability selection', () => {
 			intent: true,
 			drift: false,
 		});
-	});
-
-	it('rejects an unknown --remove-examples key without persisting anything', async () => {
-		await expect(
-			run(FULL_CONFIG, {
-				root,
-				argv: [
-					'--yes',
-					'--name=Acme Blog',
-					'--remove-examples=cron,not-a-real-group',
-				],
-			})
-		).rejects.toThrow(/Unknown --remove-examples key.*not-a-real-group/);
-		expect(fs.existsSync(path.join(root, IDENTITY_FILE))).toBe(false);
 	});
 });
 

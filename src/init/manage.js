@@ -12,6 +12,8 @@
 const { makeFeatureApi, reconcile, toggleFeatures } = require('./features');
 const { readIdentityFile, readFeatures } = require('./persist');
 const { editDetailsFlow } = require('./identity');
+const { selectFeatures } = require('./selection');
+const { validateFeatureFlags, validatePaths } = require('./validation');
 
 /**
  * Capitalise the first letter.
@@ -148,34 +150,16 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 		process.exitCode = 1;
 		return;
 	}
-	if (flags.features && (flags.enable || flags.disable)) {
-		ui.error('--features cannot be combined with --enable/--disable.');
-		process.exitCode = 1;
-		return;
-	}
-
+	validateFeatureFlags(config, flags);
+	validatePaths(config, root, identity);
 	const features = config.features || [];
+
 	const api = makeFeatureApi(root, identity, ui);
 	const { rows, unknown: retired } = reconcile(
 		config,
 		identity.features || {},
 		api
 	);
-
-	const validKeys = new Set(features.map((f) => f.key));
-	const requested = [
-		...(flags.features || []),
-		...(flags.enable || []),
-		...(flags.disable || []),
-	];
-	const badKey = requested.find((k) => !validKeys.has(k));
-	if (badKey) {
-		ui.error(
-			`Unknown feature "${badKey}". Valid: ${[...validKeys].join(', ') || '(none)'}`
-		);
-		process.exitCode = 1;
-		return;
-	}
 
 	const hasFlagSelection = Boolean(
 		flags.features || flags.enable || flags.disable
@@ -189,14 +173,10 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 	}
 
 	if (hasFlagSelection) {
-		let wantOn;
-		if (flags.features) {
-			wantOn = new Set(flags.features);
-		} else {
-			wantOn = new Set(rows.filter((r) => r.on).map((r) => r.key));
-			(flags.enable || []).forEach((k) => wantOn.add(k));
-			(flags.disable || []).forEach((k) => wantOn.delete(k));
-		}
+		const wantOn = selectFeatures(
+			flags,
+			rows.filter((row) => row.on).map((row) => row.key)
+		);
 		await toggleFeatures(config, root, {
 			mode: 'manage',
 			wantOn,
@@ -234,6 +214,7 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 				ui,
 				flags
 			);
+			api.identity = readIdentityFile(root) || identity;
 			continue;
 		}
 		if ('Show status' === choice) {
@@ -247,7 +228,7 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 		}
 		// Toggle features: re-read fresh rows each loop.
 		const r = reconcile(config, reqReadFeatures(root), api);
-		await toggleFeatures(config, root, {
+		const result = await toggleFeatures(config, root, {
 			mode: 'manage',
 			flags,
 			api,
@@ -255,6 +236,9 @@ const manageFlow = async (config, root, argv, identity, ui, reinit) => {
 			rows: r.rows,
 			unknown: r.unknown,
 		});
+		if (result.failed.length) {
+			return;
+		}
 	}
 };
 

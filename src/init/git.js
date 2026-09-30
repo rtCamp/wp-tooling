@@ -41,8 +41,10 @@ const initRepo = (root, ui) => {
 			fs.rmSync(gitDir, { recursive: true, force: true });
 		}
 	} catch (err) {
-		ui.error(`Could not remove existing .git directory: ${err.message}`);
-		return false;
+		throw new Error(
+			`Could not remove existing .git directory: ${err.message}`,
+			{ cause: err }
+		);
 	}
 
 	try {
@@ -50,8 +52,7 @@ const initRepo = (root, ui) => {
 		ui.success('Git repository initialized');
 		return true;
 	} catch (err) {
-		ui.error(`git init failed: ${err.message}`);
-		return false;
+		throw new Error(`git init failed: ${err.message}`, { cause: err });
 	}
 };
 
@@ -70,8 +71,9 @@ const commitAll = (root, message, ui) => {
 		ui.success('Created initial commit');
 		return true;
 	} catch (err) {
-		ui.warn(`Could not create initial commit: ${err.message}`);
-		return false;
+		throw new Error(`Could not create initial commit: ${err.message}`, {
+			cause: err,
+		});
 	}
 };
 
@@ -138,8 +140,9 @@ const installGitHooks = async (root, ui) => {
 		return true;
 	} catch (err) {
 		spin.fail('Git hook installation failed');
-		ui.warn(err.message);
-		return false;
+		throw new Error(`Git hook installation failed: ${err.message}`, {
+			cause: err,
+		});
 	}
 };
 

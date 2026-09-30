@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+	validateFeatures,
+	safeDetectMap,
 	makeFeatureApi,
 	enableFeature,
 	disableFeature,
@@ -63,7 +65,7 @@ describe('api.editJson', () => {
 
 	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-	it('preserves tab indentation', () => {
+	it('preserves tab indentation', async () => {
 		touch(root, 'composer.json', '{\n\t"name": "acme/demo"\n}\n');
 
 		api.editJson('composer.json', (obj) => {
@@ -75,7 +77,7 @@ describe('api.editJson', () => {
 		);
 	});
 
-	it('preserves two-space indentation', () => {
+	it('preserves two-space indentation', async () => {
 		touch(root, '.wp-env.json', '{\n  "core": null\n}\n');
 
 		api.editJson('.wp-env.json', (obj) => {
@@ -87,14 +89,14 @@ describe('api.editJson', () => {
 		);
 	});
 
-	it('throws for a missing file without create', () => {
+	it('throws for a missing file without create', async () => {
 		expect(() => api.editJson('nope.json', () => {})).toThrow(
 			'editJson: nope.json not found'
 		);
 		expect(fs.existsSync(path.join(root, 'nope.json'))).toBe(false);
 	});
 
-	it('names the offending file when the JSON is unparseable', () => {
+	it('names the offending file when the JSON is unparseable', async () => {
 		touch(root, '.wp-env.override.json', '{ this is not json');
 
 		expect(() => api.editJson('.wp-env.override.json', () => {})).toThrow(
@@ -105,7 +107,7 @@ describe('api.editJson', () => {
 		expect(raw(root, '.wp-env.override.json')).toBe('{ this is not json');
 	});
 
-	it('creates a missing file with create, defaulting to tab indent', () => {
+	it('creates a missing file with create, defaulting to tab indent', async () => {
 		api.editJson(
 			'.wp-env.override.json',
 			(obj) => {
@@ -119,7 +121,7 @@ describe('api.editJson', () => {
 		);
 	});
 
-	it('takes a created file indent from indentFrom', () => {
+	it('takes a created file indent from indentFrom', async () => {
 		touch(root, '.wp-env.json', '{\n  "core": null\n}\n');
 
 		api.editJson(
@@ -135,7 +137,7 @@ describe('api.editJson', () => {
 		);
 	});
 
-	it('leaves an existing file untouched when the mutator throws', () => {
+	it('leaves an existing file untouched when the mutator throws', async () => {
 		const before = '{\n\t"name": "acme/demo"\n}\n';
 		touch(root, 'composer.json', before);
 
@@ -149,7 +151,7 @@ describe('api.editJson', () => {
 		expect(raw(root, 'composer.json')).toBe(before);
 	});
 
-	it('rolls back a completed edit when a later hook step throws', () => {
+	it('rolls back edits made after an async hook resumes and then fails', async () => {
 		const before = '{\n\t"name": "acme/demo"\n}\n';
 		touch(root, 'composer.json', before);
 		touch(root, 'package.json', '{\n\t"name": "demo"\n}\n');
@@ -157,7 +159,8 @@ describe('api.editJson', () => {
 		const feature = {
 			key: 'rollback',
 			label: 'Rollback',
-			onEnable: (a) => {
+			onEnable: async (a) => {
+				await Promise.resolve();
 				a.editJson('composer.json', (obj) => {
 					obj['require-dev'] = { 'rtcamp/wp-dev-tools': 'dev-main' };
 				});
@@ -173,9 +176,9 @@ describe('api.editJson', () => {
 			onDisable: () => {},
 		};
 
-		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
-			'late failure'
-		);
+		await expect(
+			enableFeature(feature, api, 'bin/features')
+		).rejects.toThrow('late failure');
 
 		expect(raw(root, 'composer.json')).toBe(before);
 		expect(fs.existsSync(path.join(root, '.wp-env.override.json'))).toBe(
@@ -183,7 +186,7 @@ describe('api.editJson', () => {
 		);
 	});
 
-	it('rolls back directory creation for a newly created nested path', () => {
+	it('rolls back directory creation for a newly created nested path', async () => {
 		const feature = {
 			key: 'rollback-dir',
 			label: 'Rollback dir',
@@ -200,14 +203,14 @@ describe('api.editJson', () => {
 			onDisable: () => {},
 		};
 
-		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
-			'late failure'
-		);
+		await expect(
+			enableFeature(feature, api, 'bin/features')
+		).rejects.toThrow('late failure');
 
 		expect(fs.existsSync(path.join(root, 'nested'))).toBe(false);
 	});
 
-	it('preserves a pre-existing ancestor directory on rollback', () => {
+	it('preserves a pre-existing ancestor directory on rollback', async () => {
 		touch(root, 'a/existing.txt', 'keep me\n');
 
 		const feature = {
@@ -226,15 +229,15 @@ describe('api.editJson', () => {
 			onDisable: () => {},
 		};
 
-		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
-			'late failure'
-		);
+		await expect(
+			enableFeature(feature, api, 'bin/features')
+		).rejects.toThrow('late failure');
 
 		expect(fs.existsSync(path.join(root, 'a', 'b'))).toBe(false);
 		expect(raw(root, 'a/existing.txt')).toBe('keep me\n');
 	});
 
-	it('still backs editPackageJson, which keeps its own indent', () => {
+	it('still backs editPackageJson, which keeps its own indent', async () => {
 		touch(root, 'package.json', '{\n  "name": "demo"\n}\n');
 
 		api.editPackageJson((pkg) => {
@@ -262,7 +265,7 @@ describe('makeFeatureApi from the public ./init entry point', () => {
 
 	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-	it('editJson works when destructured off the api', () => {
+	it('editJson works when destructured off the api', async () => {
 		touch(root, '.wp-env.json', '{\n  "core": null\n}\n');
 		const { editJson } = api;
 
@@ -279,7 +282,7 @@ describe('makeFeatureApi from the public ./init entry point', () => {
 		);
 	});
 
-	it('setDefine works when destructured off the api', () => {
+	it('setDefine works when destructured off the api', async () => {
 		touch(root, 'entry.php', "<?php\ndefine( 'FOO', false );\n");
 		const { setDefine } = api;
 
@@ -307,11 +310,15 @@ describe('api.note', () => {
 		detect: (a) => a.exists('enabled.flag'),
 	});
 
-	it('queues rather than printing during the hook', () => {
+	it('queues rather than printing during the hook', async () => {
 		const ui = fakeUi();
 		const api = makeFeatureApi(root, IDENTITY, ui);
 
-		enableFeature(noteFeature('run composer install'), api, 'bin/features');
+		await enableFeature(
+			noteFeature('run composer install'),
+			api,
+			'bin/features'
+		);
 
 		expect(ui.calls.info).toEqual([]);
 		expect(api._notes).toEqual(['run composer install']);
@@ -335,7 +342,7 @@ describe('api.note', () => {
 		expect(api._notes).toEqual([]);
 	});
 
-	it('drops notes queued by a hook that then threw', () => {
+	it('drops notes queued by a hook that then threw', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
 		const feature = {
 			key: 'boom',
@@ -347,9 +354,9 @@ describe('api.note', () => {
 			onDisable: () => {},
 		};
 
-		expect(() => enableFeature(feature, api, 'bin/features')).toThrow(
-			'nope'
-		);
+		await expect(
+			enableFeature(feature, api, 'bin/features')
+		).rejects.toThrow('nope');
 		expect(api._notes).toEqual([]);
 	});
 
@@ -488,11 +495,11 @@ describe('enable / disable / detect round trip', () => {
 
 	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-	it('writes both halves on enable and reads back as detected', () => {
+	it('writes both halves on enable and reads back as detected', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
 		expect(detectFeature(feature, api)).toBe(false);
 
-		enableFeature(feature, api, 'bin/features');
+		await enableFeature(feature, api, 'bin/features');
 
 		expect(readJson(root, 'composer.json')['require-dev']).toEqual({
 			'acme/probe': 'dev-main',
@@ -506,21 +513,21 @@ describe('enable / disable / detect round trip', () => {
 		expect(detectFeature(feature, api)).toBe(true);
 	});
 
-	it('is idempotent on re-enable', () => {
+	it('is idempotent on re-enable', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
-		enableFeature(feature, api, 'bin/features');
+		await enableFeature(feature, api, 'bin/features');
 		const after = raw(root, 'composer.json');
 
-		enableFeature(feature, api, 'bin/features');
+		await enableFeature(feature, api, 'bin/features');
 
 		expect(raw(root, 'composer.json')).toBe(after);
 	});
 
-	it('leaves no trace on disable', () => {
+	it('leaves no trace on disable', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
-		enableFeature(feature, api, 'bin/features');
+		await enableFeature(feature, api, 'bin/features');
 
-		disableFeature(feature, api, []);
+		await disableFeature(feature, api, []);
 
 		expect(readJson(root, 'composer.json')['require-dev']).toEqual({});
 		expect(fs.existsSync(path.join(root, '.env.override.json'))).toBe(
@@ -530,21 +537,21 @@ describe('enable / disable / detect round trip', () => {
 		expect(detectFeature(feature, api)).toBe(false);
 	});
 
-	it('keeps unrelated override content on disable', () => {
+	it('keeps unrelated override content on disable', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
-		enableFeature(feature, api, 'bin/features');
+		await enableFeature(feature, api, 'bin/features');
 		api.editJson('.env.override.json', (obj) => {
 			obj.config.MY_OWN_KEY = 'keep me';
 		});
 
-		disableFeature(feature, api, []);
+		await disableFeature(feature, api, []);
 
 		expect(readJson(root, '.env.override.json').config).toEqual({
 			MY_OWN_KEY: 'keep me',
 		});
 	});
 
-	it('reads as disabled when only the committed half is present', () => {
+	it('reads as disabled when only the committed half is present', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
 		api.editJson('composer.json', (obj) => {
 			obj['require-dev'] = { 'acme/probe': 'dev-main' };
@@ -553,7 +560,7 @@ describe('enable / disable / detect round trip', () => {
 		expect(detectFeature(feature, api)).toBe(false);
 	});
 
-	it('reads as disabled when only the local half is present', () => {
+	it('reads as disabled when only the local half is present', async () => {
 		const api = makeFeatureApi(root, IDENTITY, fakeUi());
 		api.editJson(
 			'.env.override.json',
@@ -566,7 +573,7 @@ describe('enable / disable / detect round trip', () => {
 		expect(detectFeature(feature, api)).toBe(false);
 	});
 
-	it('does not throw probing an empty project', () => {
+	it('does not throw probing an empty project', async () => {
 		const bare = makeRoot();
 		try {
 			const api = makeFeatureApi(bare, IDENTITY, fakeUi());
@@ -577,3 +584,372 @@ describe('enable / disable / detect round trip', () => {
 		}
 	});
 });
+
+describe('feature transitions', () => {
+	let root;
+	const ui = { ...fakeUi(), radio: jest.fn(), confirm: jest.fn() };
+	beforeEach(() => {
+		root = makeRoot();
+		process.exitCode = undefined;
+		jest.clearAllMocks();
+	});
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+		process.exitCode = undefined;
+		jest.restoreAllMocks();
+	});
+	test.each(['persist', 'detect'])(
+		'rolls back the entire batch after %s failure',
+		async (failure) => {
+			const localUi = fakeUi();
+			const original = '{"features":{},"custom":"keep"}';
+			touch(root, '.wp-scaffold.json', original);
+			touch(root, 'shared.txt', 'before');
+			const api = makeFeatureApi(root, IDENTITY, localUi);
+			const features = ['first', 'second'].map((key) => ({
+				key,
+				label: key,
+				detect: () => {
+					if ('detect' === failure && api.exists('second.flag')) {
+						throw new Error('detect failed');
+					}
+					return api.exists(`${key}.flag`);
+				},
+				onEnable: () => {
+					api.write(`${key}.flag`, key);
+					api.write('shared.txt', key);
+					api.note('must not print');
+				},
+			}));
+			const write = fs.writeFileSync;
+			let failed = false;
+			const spy = jest
+				.spyOn(fs, 'writeFileSync')
+				.mockImplementation((file, ...args) => {
+					if (
+						'persist' === failure &&
+						path.basename(file) === '.wp-scaffold.json' &&
+						!failed
+					) {
+						failed = true;
+						write(file, 'truncated');
+						throw new Error('persist failed');
+					}
+					return write(file, ...args);
+				});
+			try {
+				await expect(
+					toggleFeatures({ features }, root, {
+						mode: 'manage',
+						api,
+						ui: localUi,
+						flags: { yes: true },
+						wantOn: new Set(['first', 'second']),
+					})
+				).rejects.toThrow(`${failure} failed`);
+				expect(raw(root, '.wp-scaffold.json')).toBe(original);
+				expect(raw(root, 'shared.txt')).toBe('before');
+				expect(api.exists('first.flag')).toBe(false);
+				expect(api.exists('second.flag')).toBe(false);
+				expect(api._journal).toHaveLength(0);
+				expect(api._notes).toHaveLength(0);
+				expect(localUi.calls.info).not.toContain('must not print');
+				expect(localUi.calls.success).not.toContain(
+					'Features updated.'
+				);
+			} finally {
+				spy.mockRestore();
+			}
+		}
+	);
+
+	test.each(['Cancel', 'Apply changes'])(
+		'%s without toggling does not persist drift',
+		async (choice) => {
+			ui.radio.mockResolvedValueOnce(choice);
+			const identity = { name: 'Acme Blog', features: { demo: false } };
+			const original = JSON.stringify(identity);
+			touch(root, '.wp-scaffold.json', original);
+			const config = {
+				features: [{ key: 'demo', label: 'Demo', detect: () => true }],
+			};
+			await toggleFeatures(config, root, {
+				mode: 'manage',
+				api: makeFeatureApi(root, identity, ui),
+				ui,
+			});
+			expect(
+				fs.readFileSync(path.join(root, '.wp-scaffold.json'), 'utf8')
+			).toBe(original);
+			expect(ui.radio).toHaveBeenCalledTimes(1);
+			expect(ui.confirm).not.toHaveBeenCalled();
+		}
+	);
+
+	test.each([false, true])(
+		'persists only successful transitions (earlier success: %s)',
+		async (earlierSuccess) => {
+			const identity = {
+				name: 'Acme Blog',
+				features: {
+					first: false,
+					failing: false,
+					drift: false,
+					retired: true,
+				},
+			};
+			const original = JSON.stringify(identity);
+			touch(root, '.wp-scaffold.json', original);
+			const config = {
+				features: [
+					{
+						key: 'first',
+						label: 'First',
+						detect: (api) => api.exists('first.flag'),
+						onEnable: (api) => api.write('first.flag', 'enabled'),
+					},
+					{
+						key: 'failing',
+						label: 'Failing',
+						detect: (api) => api.exists('failing.flag'),
+						onEnable(api) {
+							api.write('failing.flag', 'enabled');
+							throw new Error('hook failed');
+						},
+					},
+					{ key: 'drift', label: 'Drift', detect: () => true },
+				],
+			};
+			const result = await toggleFeatures(config, root, {
+				mode: 'manage',
+				api: makeFeatureApi(root, identity, ui),
+				ui,
+				wantOn: new Set([
+					'failing',
+					'drift',
+					...(earlierSuccess ? ['first'] : []),
+				]),
+				flags: { yes: true },
+			});
+			expect(result.changed).toBe(earlierSuccess);
+			expect(result.failed).toEqual(['failing']);
+			expect(process.exitCode).toBe(1);
+			expect(fs.existsSync(path.join(root, 'failing.flag'))).toBe(false);
+			const saved = fs.readFileSync(
+				path.join(root, '.wp-scaffold.json'),
+				'utf8'
+			);
+			const expected = earlierSuccess
+				? `${JSON.stringify({ ...identity, features: { first: true, failing: false, drift: true } }, null, '\t')}\n`
+				: original;
+			expect(saved).toBe(expected);
+		}
+	);
+
+	test('rollback failures are reported alongside the original hook failure', async () => {
+		touch(root, 'file.txt', 'before');
+		const originalWrite = fs.writeFileSync;
+		jest.spyOn(fs, 'writeFileSync').mockImplementation(
+			(file, body, ...options) => {
+				if (String(body) === 'before') {
+					throw new Error('undo failed');
+				}
+				return originalWrite(file, body, ...options);
+			}
+		);
+		const api = makeFeatureApi(root, {}, ui);
+		await expect(
+			enableFeature(
+				{
+					onEnable(featureApi) {
+						featureApi.write('file.txt', 'after');
+						throw new Error('original failure');
+					},
+				},
+				api,
+				'bin/features'
+			)
+		).rejects.toThrow(/original failure; rollback failed: undo failed/);
+	});
+
+	test('a failed disable stops the transition and protects shared dependencies', async () => {
+		touch(
+			root,
+			'package.json',
+			JSON.stringify({ devDependencies: { shared: '1' } })
+		);
+		touch(root, 'first.flag');
+		touch(root, 'second.flag');
+		const config = {
+			features: [
+				{
+					key: 'first',
+					label: 'First',
+					detect: (api) => api.exists('first.flag'),
+					apply: { devDependencies: { shared: '1' } },
+					onDisable() {
+						throw new Error('cannot disable');
+					},
+				},
+				{
+					key: 'second',
+					label: 'Second',
+					detect: (api) => api.exists('second.flag'),
+					apply: { devDependencies: { shared: '1' } },
+					onDisable: (api) => api.remove('second.flag'),
+				},
+			],
+		};
+		const result = await toggleFeatures(config, root, {
+			mode: 'scaffold',
+			api: makeFeatureApi(root, {}, ui),
+			ui,
+			wantOn: new Set(),
+			flags: { yes: true },
+		});
+		expect(result.failed).toEqual(['first']);
+		expect(fs.existsSync(path.join(root, 'second.flag'))).toBe(true);
+		expect(
+			JSON.parse(fs.readFileSync(path.join(root, 'package.json')))
+				.devDependencies.shared
+		).toBe('1');
+	});
+});
+
+describe('validateFeatures', () => {
+	test.each([
+		{ features: {} },
+		{ features: [null] },
+		{ features: [{ key: 'demo', label: 'Demo', detect: true }] },
+		{
+			features: [
+				{
+					key: 'demo',
+					label: 'Demo',
+					onEnable: 'bad',
+					onDisable: 'bad',
+				},
+			],
+		},
+		{ features: [{ key: 'demo', label: 'Demo', onEnable() {} }] },
+		{
+			features: [{ key: 'demo', label: 'Demo' }],
+			examples: { groups: [{ key: 'example', label: 'Demo' }] },
+		},
+		{
+			examples: {
+				groups: [
+					{ key: 'a', label: 'A' },
+					{ key: 'a', label: 'B' },
+				],
+			},
+		},
+		{ examples: { groups: [{ key: 'a', label: 'A', strip: 'file.php' }] } },
+	])('rejects malformed manifest %j', (manifest) => {
+		expect(() => validateFeatures(manifest)).toThrow();
+	});
+
+	test.each([
+		['dependencies', null],
+		['devDependencies', 42],
+		['scripts', false],
+		['scripts', ['echo hi']],
+		['dependencies', {}],
+	])('rejects non-string apply.%s value %j', (field, value) => {
+		expect(() =>
+			validateFeatures({
+				features: [
+					{
+						key: 'demo',
+						label: 'Demo',
+						apply: { [field]: { example: value } },
+					},
+				],
+			})
+		).toThrow(`apply.${field}.example`);
+	});
+	test('accepts npm dependency references and empty script strings', () => {
+		expect(() =>
+			validateFeatures({
+				features: [
+					{
+						key: 'demo',
+						label: 'Demo',
+						apply: {
+							dependencies: {
+								local: 'file:../local',
+								remote: 'github:owner/repo#main',
+								range: '^1.0.0',
+							},
+							devDependencies: { any: '*' },
+							scripts: { disabled: '', build: 'node build.js' },
+						},
+					},
+				],
+			})
+		).not.toThrow();
+	});
+
+	test.each([[], { files: null }, { scripts: [] }])(
+		'rejects malformed apply %j',
+		(apply) => {
+			expect(() =>
+				validateFeatures({
+					features: [{ key: 'demo', label: 'Demo', apply }],
+				})
+			).toThrow(/apply/);
+		}
+	);
+	test.each([{ label: 'Example' }, { key: 'example', label: '   ' }])(
+		'rejects an incomplete example group %j',
+		(group) => {
+			expect(() =>
+				validateFeatures({ examples: { groups: [group] } })
+			).toThrow(/example key|capability label/);
+		}
+	);
+	test('preserves existing non-kebab example keys', () => {
+		expect(() =>
+			validateFeatures({
+				examples: {
+					groups: [{ key: 'Example_one', label: 'Example' }],
+				},
+			})
+		).not.toThrow();
+	});
+});
+test.each([
+	['resolved', async () => false],
+	[
+		'rejected',
+		async () => {
+			throw new Error('probe failed');
+		},
+	],
+])(
+	'%s promises from detect probes are reported as unknown',
+	async (_state, detect) => {
+		const feature = {
+			key: 'demo',
+			label: 'Demo',
+			detect,
+		};
+		const result = safeDetectMap({ features: [feature] }, {});
+		expect(result.map.demo).toBeNull();
+		expect(result.errors[0].message).toMatch(/synchronous/);
+	}
+);
+
+test.each([null, false, 1, '', '   ', {}])(
+	'rejects explicit invalid marker %j',
+	(marker) => {
+		expect(() => validateFeatures({ examples: { marker } })).toThrow(
+			/nonempty string/
+		);
+		expect(() =>
+			validateFeatures({
+				examples: { groups: [{ key: 'demo', label: 'Demo', marker }] },
+			})
+		).toThrow(/nonempty string/);
+	}
+);
