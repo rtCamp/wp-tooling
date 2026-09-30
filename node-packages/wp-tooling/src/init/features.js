@@ -970,6 +970,7 @@ const toggleFeatures = async (config, root, opts) => {
 module.exports = {
 	validateFeatures,
 	makeFeatureApi,
+	detectIndent,
 	detectFeature,
 	enableFeature,
 	disableFeature,

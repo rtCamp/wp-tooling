@@ -59,4 +59,22 @@ const capture = async (fn) => {
 	return { stdout, stderr };
 };
 
-module.exports = { makeRoot, touch, capture };
+/**
+ * Capture every fixture file, including its exact bytes.
+ *
+ * @param {string} root Fixture root.
+ * @return {Object} Relative paths and contents.
+ */
+const snapshot = (root) =>
+	Object.fromEntries(
+		fs
+			.readdirSync(root, { recursive: true })
+			.sort()
+			.filter((file) => fs.statSync(path.join(root, file)).isFile())
+			.map((file) => [
+				file,
+				fs.readFileSync(path.join(root, file)).toString('base64'),
+			])
+	);
+
+module.exports = { makeRoot, touch, capture, snapshot };
