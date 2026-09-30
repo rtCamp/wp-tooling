@@ -9,8 +9,9 @@
  *
  * Flow: confirm -> name (validated) -> review identity -> select capabilities
  * -> confirm changes -> apply identity/version/capabilities -> persist
- * `.wp-scaffold.json` -> composer dump-autoload -> cleanup -> optional git + hooks
- * -> initial commit.
+ * `.wp-scaffold.json` -> composer dump-autoload -> cleanup (first setup also
+ * applies `cleanup.replace` / `cleanup.unset`) -> optional git + hooks ->
+ * initial commit.
  */
 
 'use strict';
@@ -46,7 +47,11 @@ const {
 	IDENTITY_FILE,
 } = require('./persist');
 const { initRepo, commitAll, installGitHooks } = require('./git');
-const { runCleanup, resolveCleanupTargets } = require('./cleanup');
+const {
+	runCleanup,
+	resolveCleanupTargets,
+	runSetupCleanup,
+} = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
@@ -119,7 +124,8 @@ Query options (any time, before or after set up):
                    ({ mode, capabilities, features, warnings }).
 
 General:
-  -c, --clean      Run cleanup only (remove scaffolding files).
+  -c, --clean      Run cleanup only (remove scaffolding files). First-setup
+                   file moves and key removals do not run.
   -h, --help       Show this help.
 `);
 };
@@ -468,6 +474,11 @@ const setupSteps = (config, root, flags) => {
 			name: 'Cleanup',
 			skip: (c) => c.cancelled || !steps.cleanup,
 			async run() {
+				// Moves and key removals are a one-shot first-setup choice,
+				// like example removal; reinit must not redo them.
+				if (!existing) {
+					runSetupCleanup(root, config.cleanup, ui);
+				}
 				runCleanup(root, config.cleanup?.targets, ui);
 			},
 		},

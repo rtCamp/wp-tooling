@@ -12,7 +12,7 @@ const ui = require('../../src/ui');
 const fs = require('fs');
 const path = require('path');
 const { run } = require('../../src/init');
-const { makeRoot, touch, capture } = require('./_helpers');
+const { makeRoot, touch, capture, snapshot } = require('./_helpers');
 
 const config = {
 	kind: 'theme',
@@ -27,24 +27,6 @@ const config = {
 	},
 	steps: {},
 };
-
-/**
- * Capture every fixture file, including its exact bytes.
- *
- * @param {string} root Fixture root.
- * @return {Object} Relative paths and contents.
- */
-const snapshot = (root) =>
-	Object.fromEntries(
-		fs
-			.readdirSync(root, { recursive: true })
-			.sort()
-			.filter((file) => fs.statSync(path.join(root, file)).isFile())
-			.map((file) => [
-				file,
-				fs.readFileSync(path.join(root, file)).toString('base64'),
-			])
-	);
 
 describe('setup validates before mutation', () => {
 	let root;
@@ -540,4 +522,173 @@ describe('setup identity transaction', () => {
 			expect(snapshot(root)).toEqual(before);
 		}
 	);
+});
+
+describe('first-setup cleanup moves and key removals', () => {
+	let root;
+	const cleanupConfig = {
+		kind: 'theme',
+		source: { name: 'Starter Theme' },
+		cleanup: {
+			targets: ['CONTRIBUTING.md'],
+			replace: [{ from: 'README.theme.md', to: 'README.md' }],
+			unset: [{ file: 'package.json', keys: ['homepage', 'bugs'] }],
+		},
+		steps: { cleanup: true, git: true },
+	};
+	const starterReadme = '# Starter Theme starter kit\n';
+	const starterPackage = `${JSON.stringify(
+		{
+			name: 'starter-theme',
+			homepage: 'https://example.com/starter-theme',
+			bugs: { url: 'https://example.com/starter-theme/issues' },
+			license: 'GPL-2.0-or-later',
+		},
+		null,
+		'\t'
+	)}\n`;
+	const setupPackage = `${JSON.stringify(
+		{ name: 'acme-blog', license: 'GPL-2.0-or-later' },
+		null,
+		'\t'
+	)}\n`;
+	const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+	const exists = (rel) => fs.existsSync(path.join(root, rel));
+	const setUp = (argv, setupConfig = cleanupConfig) =>
+		capture(() => run(setupConfig, { root, argv }));
+
+	beforeEach(() => {
+		root = makeRoot();
+		touch(root, 'README.md', starterReadme);
+		touch(root, 'README.theme.md', '# Starter Theme\n');
+		touch(root, 'CONTRIBUTING.md', 'Contribute to the starter.');
+		touch(root, 'package.json', starterPackage);
+		process.exitCode = undefined;
+		jest.spyOn(ui, 'confirm').mockResolvedValue(true);
+		git.initRepo.mockReturnValue(true);
+		git.commitAll.mockReturnValue(true);
+	});
+	afterEach(() => {
+		jest.restoreAllMocks();
+		jest.clearAllMocks();
+		fs.rmSync(root, { recursive: true, force: true });
+		process.exitCode = undefined;
+	});
+
+	test('first setup applies the moves, key removals and targets before the initial commit', async () => {
+		let committed;
+		git.commitAll.mockImplementation(() => {
+			committed = {
+				readme: read('README.md'),
+				template: exists('README.theme.md'),
+				contributing: exists('CONTRIBUTING.md'),
+				pkg: read('package.json'),
+			};
+			return true;
+		});
+		await setUp(['--name=Acme Blog']);
+		expect(process.exitCode).toBeUndefined();
+		expect(git.commitAll).toHaveBeenCalledTimes(1);
+		expect(committed).toEqual({
+			readme: '# Acme Blog\n',
+			template: false,
+			contributing: false,
+			pkg: setupPackage,
+		});
+	});
+
+	test('a source folder that is also a target is emptied by the moves, then deleted', async () => {
+		touch(root, 'starter-docs/README.md', '# Starter Theme docs\n');
+		await setUp(['--yes', '--name=Acme Blog'], {
+			...cleanupConfig,
+			cleanup: {
+				targets: ['starter-docs'],
+				replace: [{ from: 'starter-docs/README.md', to: 'README.md' }],
+			},
+		});
+		expect(process.exitCode).toBeUndefined();
+		expect(read('README.md')).toBe('# Acme Blog docs\n');
+		expect(exists('starter-docs')).toBe(false);
+	});
+
+	test('reinit leaves an edited README, a new template and re-added keys alone', async () => {
+		await setUp(['--yes', '--name=Acme Blog']);
+		const ownPackage =
+			'{\n\t"homepage": "https://example.com/our-site"\n}\n';
+		touch(root, 'README.md', 'Our own README\n');
+		touch(root, 'README.theme.md', '# Template\n');
+		touch(root, 'package.json', ownPackage);
+		await setUp(['--reinit', '--yes', '--name=Cedar Blog']);
+		expect(process.exitCode).toBeUndefined();
+		expect(read('README.md')).toBe('Our own README\n');
+		expect(read('README.theme.md')).toBe('# Template\n');
+		expect(read('package.json')).toBe(ownPackage);
+	});
+
+	test('--clean removes the targets only, even on a fresh starter', async () => {
+		await setUp(['--clean']);
+		expect(exists('CONTRIBUTING.md')).toBe(false);
+		expect(read('README.md')).toBe(starterReadme);
+		expect(exists('README.theme.md')).toBe(true);
+		expect(read('package.json')).toBe(starterPackage);
+	});
+
+	test('a disabled cleanup step skips the moves and key removals', async () => {
+		await setUp(['--yes', '--name=Acme Blog'], {
+			...cleanupConfig,
+			steps: {},
+		});
+		expect(exists('README.theme.md')).toBe(true);
+		expect(exists('CONTRIBUTING.md')).toBe(true);
+		expect(JSON.parse(read('package.json')).homepage).toBe(
+			'https://example.com/acme-blog'
+		);
+	});
+
+	test('a cancelled setup leaves the starter unchanged', async () => {
+		ui.confirm.mockResolvedValue(false);
+		const before = snapshot(root);
+		await setUp(['--name=Acme Blog']);
+		expect(snapshot(root)).toEqual(before);
+		expect(process.exitCode).toBe(130);
+	});
+
+	test('a JSON file that fails to parse stops setup before any move and reports the partial setup', async () => {
+		touch(root, 'package.json', '{ broken');
+		const output = await capture(async () => {
+			await expect(
+				run(cleanupConfig, {
+					root,
+					argv: ['--yes', '--name=Acme Blog'],
+				})
+			).rejects.toThrow(/package\.json to be valid JSON/);
+		});
+		expect(process.exitCode).toBe(1);
+		expect(output.stdout + output.stderr).toContain(
+			'restore your starter backup'
+		);
+		expect(read('README.md')).toBe('# Acme Blog starter kit\n');
+		expect(exists('README.theme.md')).toBe(true);
+	});
+
+	test('an invalid move is rejected before setup changes anything', async () => {
+		const invalidConfig = {
+			...cleanupConfig,
+			cleanup: {
+				...cleanupConfig.cleanup,
+				replace: [{ from: 'README.theme.md', to: 'CONTRIBUTING.md' }],
+			},
+		};
+		const before = snapshot(root);
+		await capture(async () => {
+			await expect(
+				run(invalidConfig, {
+					root,
+					argv: ['--yes', '--name=Acme Blog'],
+				})
+			).rejects.toThrow(/outside cleanup target "CONTRIBUTING\.md"/);
+		});
+		expect(snapshot(root)).toEqual(before);
+		expect(process.exitCode).toBe(1);
+	});
 });
