@@ -9,7 +9,7 @@ Shared tooling for rtCamp WordPress projects. Consumed as an npm package by ever
 - Release scripts — version bump, changelog, package zip
 - Git hooks — commit-msg, pre-commit installer
 - Lint configs — `@rtcamp/eslint-config`, `@rtcamp/stylelint-config`
-- CI helpers — `detect-changes` and friends
+- CI helpers — `detect-changes` (bucket changed files) and `coverage-gate` (fail a PR when too few of its changed lines are covered; reads Clover or LCOV)
 - Version monitor — detectors, updaters, reporters for WordPress / PHP / Node
 
 ## Development
