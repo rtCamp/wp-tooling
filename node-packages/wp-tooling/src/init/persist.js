@@ -8,7 +8,7 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
+const { resolveWithin } = require('./transform');
 
 /** Name of the persisted identity file at the project root. */
 const IDENTITY_FILE = '.wp-scaffold.json';
@@ -31,18 +31,15 @@ class IdentityFileError extends Error {
 /**
  * Write the identity payload to `<root>/.wp-scaffold.json` (tab-indented).
  *
- * @param {string} root    - Project root.
- * @param {Object} payload - Identity payload to persist.
- * @param {Object} [ui]    - `@rtcamp/wp-tooling/ui` for an optional log line.
+ * @param {string}   root        - Project root.
+ * @param {Object}   payload     - Identity payload to persist.
+ * @param {Object}   [ui]        - `@rtcamp/wp-tooling/ui` for an optional log line.
+ * @param {Function} [writeFile] Synchronous writer (journaled during identity edits).
  * @return {string} Absolute path written.
  */
-const writeIdentityFile = (root, payload, ui) => {
-	const filePath = path.join(root, IDENTITY_FILE);
-	fs.writeFileSync(
-		filePath,
-		`${JSON.stringify(payload, null, '\t')}\n`,
-		'utf8'
-	);
+const writeIdentityFile = (root, payload, ui, writeFile = fs.writeFileSync) => {
+	const filePath = resolveWithin(root, IDENTITY_FILE);
+	writeFile(filePath, `${JSON.stringify(payload, null, '\t')}\n`, 'utf8');
 	if (ui) {
 		ui.info(`wrote ${IDENTITY_FILE}`);
 	}
@@ -59,7 +56,7 @@ const writeIdentityFile = (root, payload, ui) => {
  *                             discard it).
  */
 const readIdentityFile = (root) => {
-	const filePath = path.join(root, IDENTITY_FILE);
+	const filePath = resolveWithin(root, IDENTITY_FILE);
 	if (!fs.existsSync(filePath)) {
 		return null;
 	}
@@ -77,7 +74,7 @@ const readIdentityFile = (root) => {
 	} catch (err) {
 		throw new IdentityFileError(
 			`${IDENTITY_FILE} exists but does not contain a valid identity object (${err.message}). ` +
-				'Fix or delete the file, or pass --reinit to discard it.',
+				'Restore a valid identity file or use a fresh starter.',
 			{ path: filePath }
 		);
 	}
@@ -98,15 +95,16 @@ const readFeatures = (root) => {
  * Update only the `features` field of the persisted identity, preserving every
  * other field and the file's tab indentation.
  *
- * @param {string} root        - Project root.
- * @param {Object} featuresMap - Features map to persist.
- * @param {Object} [ui]        - UI for an optional log line.
+ * @param {string}   root        - Project root.
+ * @param {Object}   featuresMap - Features map to persist.
+ * @param {Object}   [ui]        - UI for an optional log line.
+ * @param {Function} [writeFile] Journaled synchronous writer.
  * @return {string} Absolute path written.
  */
-const writeFeatures = (root, featuresMap, ui) => {
+const writeFeatures = (root, featuresMap, ui, writeFile = fs.writeFileSync) => {
 	const identity = readIdentityFile(root) || {};
 	identity.features = featuresMap;
-	return writeIdentityFile(root, identity, ui);
+	return writeIdentityFile(root, identity, ui, writeFile);
 };
 
 module.exports = {

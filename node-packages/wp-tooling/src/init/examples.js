@@ -43,12 +43,20 @@ const expandGlob = (root, pattern) => {
 			let entries = [];
 			try {
 				entries = fs.readdirSync(base);
-			} catch {
+			} catch (error) {
+				if (!['ENOENT', 'ENOTDIR'].includes(error.code)) {
+					throw error;
+				}
 				return;
 			}
 			entries.forEach((name) => {
 				if (re.test(name)) {
-					next.push(path.join(base, name));
+					next.push(
+						resolveWithin(
+							root,
+							path.relative(root, path.join(base, name))
+						)
+					);
 				}
 			});
 		});
@@ -142,15 +150,7 @@ const applyExamples = (config, root, ui, removeKeys) => {
 		// Strip this group's markers from its registration files (drop the code too
 		// when removing). Only regions tagged with this group's marker are touched.
 		(group.strip || []).forEach((rel) => {
-			let file;
-			try {
-				file = resolveWithin(root, rel);
-			} catch (err) {
-				if (ui && ui.warn) {
-					ui.warn(err.message);
-				}
-				return;
-			}
+			const file = resolveWithin(root, rel);
 			if (!fs.existsSync(file)) {
 				return;
 			}

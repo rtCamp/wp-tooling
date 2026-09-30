@@ -15,7 +15,18 @@
 const fs = require('fs');
 const path = require('path');
 const { writeFeatures } = require('./persist');
-const { resolveWithin } = require('./transform');
+const { resolveWithin, validateRelativePath } = require('./transform');
+
+/**
+ * Whether a manifest value is a plain object rather than an array or scalar.
+ *
+ * @param {*} value Manifest value.
+ * @return {boolean} Whether the value is an object record.
+ */
+const isRecord = (value) =>
+	Boolean(value) &&
+	(Object.getPrototypeOf(value) === Object.prototype ||
+		Object.getPrototypeOf(value) === null);
 
 /**
  * Validate a config's feature manifest. Throws on first problem so the caller
@@ -26,11 +37,20 @@ const { resolveWithin } = require('./transform');
  */
 const validateFeatures = (config) => {
 	const features = config.features || [];
+	if (!Array.isArray(features)) {
+		throw new Error('Expected features to be an array.');
+	}
 	const keys = new Set();
 	const labels = new Set();
 
 	features.forEach((feature) => {
-		if (!feature.key || !/^[a-z][a-z0-9-]*$/.test(feature.key)) {
+		if (!isRecord(feature)) {
+			throw new Error('Expected each feature to be an object.');
+		}
+		if (
+			'string' !== typeof feature.key ||
+			!/^[a-z][a-z0-9-]*$/.test(feature.key)
+		) {
 			throw new Error(
 				`Feature key must match /^[a-z][a-z0-9-]*$/, got ${JSON.stringify(feature.key)}`
 			);
@@ -40,7 +60,7 @@ const validateFeatures = (config) => {
 		}
 		keys.add(feature.key);
 
-		if (!feature.label) {
+		if ('string' !== typeof feature.label || !feature.label.trim()) {
 			throw new Error(`Feature ${feature.key} is missing a label`);
 		}
 		if (labels.has(feature.label)) {
@@ -48,27 +68,99 @@ const validateFeatures = (config) => {
 		}
 		labels.add(feature.label);
 
-		((feature.apply && feature.apply.files) || []).forEach((file) => {
-			['from', 'to'].forEach((side) => {
-				const value = file[side];
-				if (
-					!value ||
-					path.isAbsolute(value) ||
-					value.split(/[\\/]/).includes('..')
-				) {
+		if (undefined !== feature.apply && !isRecord(feature.apply)) {
+			throw new Error(
+				`Feature ${feature.key}: expected apply to be an object.`
+			);
+		}
+		const apply = feature.apply || {};
+		if (undefined !== apply.files && !Array.isArray(apply.files)) {
+			throw new Error(
+				`Feature ${feature.key}: expected apply.files to be an array.`
+			);
+		}
+		for (const file of apply.files || []) {
+			validateRelativePath(file?.from);
+			validateRelativePath(file?.to);
+		}
+		for (const field of ['dependencies', 'devDependencies', 'scripts']) {
+			if (undefined !== apply[field] && !isRecord(apply[field])) {
+				throw new Error(
+					`Feature ${feature.key}: expected apply.${field} to be an object.`
+				);
+			}
+			for (const [name, value] of Object.entries(apply[field] || {})) {
+				if ('string' !== typeof value) {
 					throw new Error(
-						`Feature ${feature.key}: file.${side} must be a relative path without "..", got ${JSON.stringify(value)}`
+						`Feature ${feature.key}: expected apply.${field}.${name} to be a string, received ${JSON.stringify(value)}.`
 					);
 				}
-			});
-		});
+			}
+		}
 
+		for (const hook of ['onEnable', 'onDisable', 'detect']) {
+			if (
+				undefined !== feature[hook] &&
+				'function' !== typeof feature[hook]
+			) {
+				throw new Error(
+					`Feature ${feature.key}: expected ${hook} to be a function, received ${typeof feature[hook]}`
+				);
+			}
+		}
 		if (Boolean(feature.onEnable) !== Boolean(feature.onDisable)) {
 			throw new Error(
 				`Feature ${feature.key}: onEnable and onDisable must both be present or both absent`
 			);
 		}
 	});
+	const validateMarker = (marker, label) => {
+		if (
+			undefined !== marker &&
+			('string' !== typeof marker || !marker.trim())
+		) {
+			throw new Error(
+				`Expected ${label} to be a nonempty string, received ${JSON.stringify(marker)}`
+			);
+		}
+	};
+	validateMarker(config.examples?.marker, 'examples.marker');
+	const groups = config.examples?.groups || [];
+	if (!Array.isArray(groups)) {
+		throw new Error('Expected examples.groups to be an array.');
+	}
+	const groupKeys = new Set();
+	for (const group of groups) {
+		validateMarker(group?.marker, `example ${group?.key} marker`);
+		if (
+			!group ||
+			'string' !== typeof group.key ||
+			!group.key.trim() ||
+			groupKeys.has(group.key)
+		) {
+			throw new Error(
+				`Expected a unique example key, received ${JSON.stringify(group?.key)}`
+			);
+		}
+		if (
+			'string' !== typeof group.label ||
+			!group.label.trim() ||
+			labels.has(group.label)
+		) {
+			throw new Error(
+				`Expected a unique capability label, received ${JSON.stringify(group.label)}`
+			);
+		}
+		groupKeys.add(group.key);
+		labels.add(group.label);
+		for (const field of ['strip', 'remove']) {
+			if (undefined !== group[field] && !Array.isArray(group[field])) {
+				throw new Error(
+					`Example ${group.key}: expected ${field} to be an array.`
+				);
+			}
+		}
+	}
 };
 
 /**
@@ -339,24 +431,31 @@ const makeFeatureApi = (root, identity, ui) => {
 
 /**
  * Run `fn` inside the api journal; on throw, replay undo entries in reverse to
- * restore exactly what `fn` mutated, then rethrow.
+ * restore exactly what `fn` mutated, then rethrow. Nested successes retain their
+ * undo entries until the outer transaction commits.
  *
  * @param {Object}   api - FeatureApi.
- * @param {Function} fn  - Synchronous mutation function.
- * @return {void}
+ * @param {Function} fn  - Synchronous or asynchronous mutation function.
+ * @return {Promise<*>} Callback result, or rejection after rollback.
  */
-const runJournaled = (api, fn) => {
+const runJournaled = async (api, fn) => {
 	const start = api._journal.length;
 	const notesStart = (api._notes || []).length;
+	const depth = api._transactionDepth || 0;
+	api._transactionDepth = depth + 1;
 	try {
-		fn();
-		api._journal.length = start;
+		const result = await fn();
+		if (!depth) {
+			api._journal.length = start;
+		}
+		return result;
 	} catch (err) {
+		const rollbackErrors = [];
 		for (let i = api._journal.length - 1; i >= start; i--) {
 			try {
-				api._journal[i].undo();
-			} catch {
-				// Best-effort rollback; surface nothing further.
+				await api._journal[i].undo();
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
 			}
 		}
 		api._journal.length = start;
@@ -364,7 +463,15 @@ const runJournaled = (api, fn) => {
 		if (api._notes) {
 			api._notes.length = notesStart;
 		}
+		if (rollbackErrors.length) {
+			throw new AggregateError(
+				[err, ...rollbackErrors],
+				`${err.message}; rollback failed: ${rollbackErrors.map((error) => error.message).join('; ')}`
+			);
+		}
 		throw err;
+	} finally {
+		api._transactionDepth = depth;
 	}
 };
 
@@ -448,7 +555,7 @@ const unmergePackage = (pkg, apply, survivors = []) => {
 };
 
 /**
- * Whether a feature looks installed on disk.
+ * Whether a feature looks installed on disk. Detect probes must be synchronous.
  *
  * @param {Object} feature - Feature definition.
  * @param {Object} api     - FeatureApi.
@@ -456,7 +563,15 @@ const unmergePackage = (pkg, apply, survivors = []) => {
  */
 const detectFeature = (feature, api) => {
 	if (feature.detect) {
-		return Boolean(feature.detect(api));
+		const detected = feature.detect(api);
+		if (detected && 'function' === typeof detected.then) {
+			// Observe rejections so an invalid async probe cannot become unhandled.
+			Promise.resolve(detected).catch(() => {});
+			throw new Error(
+				`Feature ${feature.key}: detect must return a synchronous value, received a Promise.`
+			);
+		}
+		return Boolean(detected);
 	}
 	const apply = feature.apply || {};
 	const files = apply.files || [];
@@ -480,10 +595,10 @@ const detectFeature = (feature, api) => {
  * @param {Object} feature     - Feature definition.
  * @param {Object} api         - FeatureApi.
  * @param {string} featuresDir - Project-relative dir holding feature assets.
- * @return {void}
+ * @return {Promise<void>} Resolves after the feature is enabled.
  */
-const enableFeature = (feature, api, featuresDir) => {
-	runJournaled(api, () => {
+const enableFeature = async (feature, api, featuresDir) => {
+	await runJournaled(api, async () => {
 		const apply = feature.apply || {};
 
 		(apply.files || []).forEach((file) => {
@@ -505,7 +620,7 @@ const enableFeature = (feature, api, featuresDir) => {
 		}
 
 		if (feature.onEnable) {
-			feature.onEnable(api);
+			await feature.onEnable(api);
 		}
 	});
 };
@@ -517,12 +632,12 @@ const enableFeature = (feature, api, featuresDir) => {
  * @param {Object} feature   - Feature definition.
  * @param {Object} api       - FeatureApi.
  * @param {Array}  survivors - Features that remain enabled (shared keys are kept).
- * @return {void}
+ * @return {Promise<void>} Resolves after the feature is disabled.
  */
-const disableFeature = (feature, api, survivors = []) => {
-	runJournaled(api, () => {
+const disableFeature = async (feature, api, survivors = []) => {
+	await runJournaled(api, async () => {
 		if (feature.onDisable) {
-			feature.onDisable(api);
+			await feature.onDisable(api);
 		}
 		const apply = feature.apply || {};
 		(apply.files || []).forEach((file) => api.remove(file.to));
@@ -670,12 +785,14 @@ const toggleFeatures = async (config, root, opts) => {
 		unknown = r.unknown;
 	}
 
-	// Every exit goes through finalize: in manage mode it rewrites the persisted
-	// map from a fresh detect sweep, so intent trails disk and drift self-heals.
+	// Persist only when at least one transition succeeded. Failed, cancelled,
+	// and no-op requests must not rewrite identity just to reconcile drift.
 	const finalize = (changed, failed) => {
 		const finalMap = detectMap(config, api);
-		if ('manage' === mode) {
-			writeFeatures(root, finalMap, ui);
+		if ('manage' === mode && changed) {
+			writeFeatures(root, finalMap, ui, (file, body) =>
+				api.write(path.relative(root, file), body)
+			);
 		}
 		if (failed && failed.length) {
 			process.exitCode = 1;
@@ -764,53 +881,74 @@ const toggleFeatures = async (config, root, opts) => {
 		}
 	}
 
-	const featuresDir = config.featuresDir || 'bin/features';
-	const survivors = (config.features || []).filter((f) => wantOn.has(f.key));
-	const failed = [];
-	let depsChanged = false;
+	return runJournaled(api, async () => {
+		const featuresDir = config.featuresDir || 'bin/features';
+		const enabledKeys = new Set(
+			rows.filter((row) => row.on).map((row) => row.key)
+		);
+		const failed = [];
+		let depsChanged = false;
+		let changed = false;
 
-	// Disable before enable: frees files/deps before any re-add.
-	toDisable.forEach((r) => {
-		const spin = ui.spinner(`Disabling ${r.label}...`);
-		spin.start();
-		try {
-			disableFeature(r.feature, api, survivors);
-			spin.succeed(`Disabled ${r.label}`);
-			depsChanged = depsChanged || touchesPackage(r.feature);
-		} catch (err) {
-			spin.fail(`Failed to disable ${r.label}`);
-			ui.error(err.message);
-			failed.push(r.key);
+		// Disable before enable: frees files/deps before any re-add.
+		for (const r of toDisable) {
+			const spin = ui.spinner(`Disabling ${r.label}...`);
+			spin.start();
+			try {
+				const survivors = (config.features || []).filter(
+					(feature) =>
+						feature.key !== r.key &&
+						(enabledKeys.has(feature.key) ||
+							wantOn.has(feature.key))
+				);
+				await disableFeature(r.feature, api, survivors);
+				changed = true;
+				enabledKeys.delete(r.key);
+				spin.succeed(`Disabled ${r.label}`);
+				depsChanged = depsChanged || touchesPackage(r.feature);
+			} catch (err) {
+				spin.fail(`Failed to disable ${r.label}`);
+				ui.error(err.message);
+				failed.push(r.key);
+			}
+			if (failed.length) {
+				break;
+			}
 		}
-	});
-	toEnable.forEach((r) => {
-		const spin = ui.spinner(`Enabling ${r.label}...`);
-		spin.start();
-		try {
-			enableFeature(r.feature, api, featuresDir);
-			spin.succeed(`Enabled ${r.label}`);
-			depsChanged = depsChanged || touchesPackage(r.feature);
-		} catch (err) {
-			spin.fail(`Failed to enable ${r.label}`);
-			ui.error(err.message);
-			failed.push(r.key);
+		for (const r of toEnable) {
+			if (failed.length) {
+				break;
+			}
+			const spin = ui.spinner(`Enabling ${r.label}...`);
+			spin.start();
+			try {
+				await enableFeature(r.feature, api, featuresDir);
+				changed = true;
+				spin.succeed(`Enabled ${r.label}`);
+				depsChanged = depsChanged || touchesPackage(r.feature);
+			} catch (err) {
+				spin.fail(`Failed to enable ${r.label}`);
+				ui.error(err.message);
+				failed.push(r.key);
+			}
 		}
+
+		const result = finalize(changed, failed);
+		if (depsChanged) {
+			ui.warn('Dependencies changed -- run `npm install` to sync.');
+		}
+		// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
+		const notes = api._notes || [];
+		if (notes.length) {
+			ui.heading('Next steps');
+			notes.splice(0).forEach((message) => ui.info(message));
+		}
+		if (!failed.length) {
+			ui.success('Features updated.');
+		}
+
+		return result;
 	});
-
-	if (depsChanged) {
-		ui.warn('Dependencies changed -- run `npm install` to sync.');
-	}
-	// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
-	const notes = api._notes || [];
-	if (notes.length) {
-		ui.heading('Next steps');
-		notes.splice(0).forEach((message) => ui.info(message));
-	}
-	if (!failed.length) {
-		ui.success('Features updated.');
-	}
-
-	return finalize(true, failed);
 };
 
 module.exports = {

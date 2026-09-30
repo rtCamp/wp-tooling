@@ -10,6 +10,26 @@
 
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('crypto');
+
+/**
+ * Require a nonempty relative path without parent traversal.
+ *
+ * @param {string} value Configured path.
+ * @return {void}
+ */
+const validateRelativePath = (value) => {
+	if (
+		'string' !== typeof value ||
+		!value ||
+		path.isAbsolute(value) ||
+		value.split(/[\\/]/).includes('..')
+	) {
+		throw new Error(
+			`Expected a relative path without "..", received ${JSON.stringify(value)}`
+		);
+	}
+};
 
 /**
  * Resolve a project-relative path and assert it stays inside `root`, so a config
@@ -24,6 +44,26 @@ const resolveWithin = (root, rel) => {
 	const base = path.resolve(root);
 	const abs = path.resolve(base, rel);
 	if (abs !== base && !abs.startsWith(base + path.sep)) {
+		throw new Error(`Refusing path outside the project root: ${rel}`);
+	}
+	if (!fs.existsSync(base)) {
+		return abs;
+	}
+	const realBase = fs.realpathSync(base);
+	let ancestor = abs;
+	while (!fs.existsSync(ancestor)) {
+		if (
+			fs.lstatSync(ancestor, { throwIfNoEntry: false })?.isSymbolicLink()
+		) {
+			throw new Error(`Refusing unresolved symlink: ${rel}`);
+		}
+		ancestor = path.dirname(ancestor);
+	}
+	const realAncestor = fs.realpathSync(ancestor);
+	if (
+		realAncestor !== realBase &&
+		!realAncestor.startsWith(realBase + path.sep)
+	) {
 		throw new Error(`Refusing path outside the project root: ${rel}`);
 	}
 	return abs;
@@ -174,12 +214,7 @@ const PHP_RESERVED_WORDS = [
  * @return {string[]} Absolute file paths.
  */
 const collectFiles = (dir, ignore = DEFAULT_IGNORE) => {
-	let entries;
-	try {
-		entries = fs.readdirSync(dir, { withFileTypes: true });
-	} catch {
-		return [];
-	}
+	const entries = fs.readdirSync(dir, { withFileTypes: true });
 
 	let files = [];
 	entries.forEach((entry) => {
@@ -240,14 +275,62 @@ const applyReplacements = (text, replacements) => {
 };
 
 /**
+ * Run synchronous file edits with rollback on failure. Only written contents
+ * and completed renames are journaled; this is not a process-crash recovery log.
+ * Reverse order restores paths before earlier writes at those paths are undone.
+ *
+ * @param {Function} apply Callback receiving journaled writeFile and renameFile.
+ * @return {*} Callback result.
+ */
+const withFileRollback = (apply) => {
+	const undo = [];
+	const writeFile = (file, content, options) => {
+		const existed = fs.existsSync(file);
+		const original = existed ? fs.readFileSync(file) : null;
+		// Register before writing: a failed write may have truncated the file.
+		undo.push(() => {
+			if (existed) {
+				fs.writeFileSync(file, original);
+			} else {
+				fs.rmSync(file, { force: true });
+			}
+		});
+		fs.writeFileSync(file, content, options);
+	};
+	const renameFile = (from, to) => {
+		fs.renameSync(from, to);
+		undo.push(() => fs.renameSync(to, from));
+	};
+	try {
+		return apply({ writeFile, renameFile });
+	} catch (error) {
+		const rollbackErrors = [];
+		for (const restore of undo.reverse()) {
+			try {
+				restore();
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
+			}
+		}
+		if (rollbackErrors.length) {
+			throw new AggregateError(
+				[error, ...rollbackErrors],
+				`${error.message}; rollback failed: ${rollbackErrors.map((failure) => failure.message).join('; ')}. Inspect the project before retrying.`
+			);
+		}
+		throw error;
+	}
+};
+
+/**
  * Replace token content across files in place.
  *
  * @param {string[]}                files        - Absolute file paths.
  * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Object}                  ui           - `@rtcamp/wp-tooling/ui`.
+ * @param {Function}                [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {number} Count of files changed.
  */
-const replaceInFiles = (files, replacements, ui) => {
+const replaceInFiles = (files, replacements, writeFile = fs.writeFileSync) => {
 	let changed = 0;
 	files.forEach((filePath) => {
 		try {
@@ -258,43 +341,107 @@ const replaceInFiles = (files, replacements, ui) => {
 			const original = buffer.toString('utf8');
 			const updated = applyReplacements(original, replacements);
 			if (updated !== original) {
-				fs.writeFileSync(filePath, updated, 'utf8');
+				writeFile(filePath, updated, 'utf8');
 				changed++;
 			}
 		} catch (err) {
-			ui.warn(`Skipped ${path.basename(filePath)}: ${err.message}`);
+			throw new Error(`Could not replace ${filePath}: ${err.message}`, {
+				cause: err,
+			});
 		}
 	});
 	return changed;
 };
 
 /**
- * Rename files whose basename contains any token.
+ * Check every rename destination before any content or path changes.
  *
- * @param {string[]}                files        - Absolute file paths.
- * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Object}                  ui           - `@rtcamp/wp-tooling/ui`.
- * @return {number} Count of files renamed.
+ * @param {string[]} files        Source file paths.
+ * @param {Array}    replacements Literal replacement pairs.
+ * @return {Array} Validated source/destination pairs.
  */
-const renameFiles = (files, replacements, ui) => {
-	let renamed = 0;
-	files.forEach((filePath) => {
-		const base = path.basename(filePath);
-		const newBase = applyReplacements(base, replacements);
-		if (newBase === base) {
-			return;
+const planRenames = (files, replacements) => {
+	const renames = files
+		.map((from) => ({
+			from,
+			to: path.join(
+				path.dirname(from),
+				applyReplacements(path.basename(from), replacements)
+			),
+		}))
+		.filter(({ from, to }) => from !== to);
+	const sources = new Set(
+		renames.map(({ from }) => fs.realpathSync.native(from))
+	);
+	const destinations = new Set();
+	const caseSensitive = new Map();
+	for (const { from, to } of renames) {
+		const dir = path.dirname(to);
+		if (!caseSensitive.has(dir)) {
+			// Probe the actual directory's filesystem, not the host OS default.
+			const probe = fs.mkdtempSync(path.join(dir, '.wp-init-case-'));
+			try {
+				fs.writeFileSync(path.join(probe, 'probe'), '');
+				caseSensitive.set(
+					dir,
+					!fs.existsSync(path.join(probe, 'PROBE'))
+				);
+			} finally {
+				fs.rmSync(probe, { recursive: true, force: true });
+			}
 		}
-		try {
-			fs.renameSync(filePath, path.join(path.dirname(filePath), newBase));
-			// No per-file line here: the caller prints a "renamed N file(s)"
-			// summary. One line per renamed file is pure noise for a human and
-			// wasted tokens for an AI reading the run. Failures still warn below.
-			renamed++;
-		} catch (err) {
-			ui.warn(`Could not rename ${base}: ${err.message}`);
+		const key = caseSensitive.get(dir) ? to : to.toLowerCase();
+		const existing = fs.lstatSync(to, { throwIfNoEntry: false });
+		const vacated =
+			existing &&
+			!existing.isSymbolicLink() &&
+			sources.has(fs.realpathSync.native(to));
+		if (destinations.has(key) || (existing && !vacated)) {
+			throw new Error(
+				`Rename collision: expected an unused destination for ${from}, received ${to}`
+			);
 		}
-	});
-	return renamed;
+		destinations.add(key);
+	}
+	return renames;
+};
+
+/**
+ * Execute a validated plan, staging sources so chains and swaps cannot overwrite.
+ *
+ * @param {Array}    renames    Validated source/destination pairs.
+ * @param {Function} renameFile Journaled synchronous rename.
+ * @return {number} Number of logical renames.
+ */
+const executeRenames = (renames, renameFile) => {
+	const staged = renames.map((entry) => ({
+		...entry,
+		temp: path.join(
+			path.dirname(entry.from),
+			`.wp-init-rename-${randomUUID()}`
+		),
+	}));
+	for (const { from, temp } of staged) {
+		renameFile(from, temp);
+	}
+	for (const { temp, to } of staged) {
+		renameFile(temp, to);
+	}
+	return renames.length;
+};
+
+/**
+ * Plan and atomically apply a batch of file renames on synchronous failure.
+ *
+ * @param {string[]} files        Source paths.
+ * @param {Array}    replacements Literal replacement pairs.
+ * @return {number} Number of renamed files.
+ */
+const renameFiles = (files, replacements) => {
+	const plan = planRenames(files, replacements);
+	return withFileRollback(({ renameFile }) =>
+		executeRenames(plan, renameFile)
+	);
 };
 
 /**
@@ -312,21 +459,22 @@ const renameFiles = (files, replacements, ui) => {
  * @param {Array<{path: string, kind: string}>} versionFiles - Targets.
  * @param {string}                              version      - Version to apply.
  * @param {Object}                              ui           - `@rtcamp/wp-tooling/ui`.
+ * @param {Function}                            [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {void}
  */
-const applyVersion = (root, versionFiles, version, ui) => {
+const applyVersion = (
+	root,
+	versionFiles,
+	version,
+	ui,
+	writeFile = fs.writeFileSync
+) => {
 	if (!version || !Array.isArray(versionFiles)) {
 		return;
 	}
 
 	versionFiles.forEach((spec) => {
-		let filePath;
-		try {
-			filePath = resolveWithin(root, spec.path);
-		} catch (err) {
-			ui.warn(err.message);
-			return;
-		}
+		const filePath = resolveWithin(root, spec.path);
 		if (!fs.existsSync(filePath)) {
 			return;
 		}
@@ -347,15 +495,22 @@ const applyVersion = (root, versionFiles, version, ui) => {
 				);
 			}
 
-			fs.writeFileSync(filePath, content, 'utf8');
+			writeFile(filePath, content, 'utf8');
 			ui.info(`version ${version} -> ${spec.path}`);
 		} catch (err) {
-			ui.warn(`Could not set version in ${spec.path}: ${err.message}`);
+			throw new Error(
+				`Could not set version in ${spec.path}: ${err.message}`,
+				{ cause: err }
+			);
 		}
 	});
 };
 
 module.exports = {
+	withFileRollback,
+	validateRelativePath,
+	planRenames,
+	executeRenames,
 	resolveWithin,
 	collectFiles,
 	applyReplacements,
