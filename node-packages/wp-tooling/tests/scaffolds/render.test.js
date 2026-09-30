@@ -157,6 +157,13 @@ describe('render — sections', () => {
 });
 
 describe('applyTransform', () => {
+	it('json-escape round-trips quotes, backslashes and control characters', () => {
+		const value = '"quoted"\\path\n\t\r\u0000';
+		expect(JSON.parse(`"${applyTransform(value, 'json-escape')}"`)).toBe(
+			value
+		);
+	});
+
 	it('pascal-case from kebab', () => {
 		expect(applyTransform('qm-export', 'pascal-case')).toBe('QmExport');
 	});
@@ -186,6 +193,16 @@ describe('applyTransform', () => {
 		expect(applyTransform('NoBackslash', 'json-escape')).toBe(
 			'NoBackslash'
 		);
+	});
+
+	it('shell-escape leaves safe values bare and single-quotes the rest', () => {
+		expect(applyTransform('wp-content/plugins/x', 'shell-escape')).toBe(
+			'wp-content/plugins/x'
+		);
+		expect(applyTransform('.', 'shell-escape')).toBe('.');
+		expect(applyTransform('my plugin', 'shell-escape')).toBe("'my plugin'");
+		expect(applyTransform("it's", 'shell-escape')).toBe("'it'\\''s'");
+		expect(applyTransform('', 'shell-escape')).toBe("''");
 	});
 
 	it('returns value unchanged when no transform', () => {

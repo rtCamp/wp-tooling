@@ -1,0 +1,113 @@
+{
+	"slug": "block-interactive",
+	"category": "wp",
+	"name": "Interactive block",
+	"description": "Adds a server-rendered Gutenberg block driven by WordPress core's Interactivity API (core since WP 6.5). Generates block.json (supports.interactivity + viewScriptModule), a render.php emitting data-wp-* directives, a view.js store, the editor entry points, and a Registrable that registers the block from its build output and no-ops before WP 6.5.",
+	"source": "template",
+	"inputs": [
+		{
+			"key": "namespace",
+			"description": "PSR-4 namespace for the block class. Default 'Inc\\Blocks' matches the rtCamp skeleton.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Blocks"
+		},
+		{
+			"key": "base_path",
+			"description": "Directory for the block class file. Default 'includes/Blocks'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "includes/Blocks"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace for the test class. Default 'Inc\\Tests\\Blocks'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests\\Blocks"
+		},
+		{
+			"key": "tests_path",
+			"description": "Directory for the test file. Default 'tests/Blocks'.",
+			"default": "tests/Blocks"
+		},
+		{
+			"key": "blocks_dir",
+			"description": "Source directory for block.json + render.php + view.js + the editor scripts (the inputs to @wordpress/scripts). Default 'src/blocks'. Keep the rendered file at '<blocks_dir>/<slug>/render.php': the rtCamp PHPCS ruleset exempts exactly 'src/blocks/*/render.php' from the file-header and text-domain sniffs a block render file cannot satisfy.",
+			"default": "src/blocks"
+		},
+		{
+			"key": "build_dir",
+			"description": "Compiled-output directory WordPress actually registers, where block.json, the bundled view.js and render.php land after a build. Default 'build/blocks' matches wp-scripts' default `--output-path`. Override to the project's real build path (the rtCamp skeleton uses 'assets/build/blocks').",
+			"default": "build/blocks"
+		},
+		{
+			"key": "slug",
+			"description": "Block slug, kebab-case, no vendor prefix, e.g. 'faq-accordion'.",
+			"required": true
+		},
+		{
+			"key": "class",
+			"description": "PascalCase class name, derived from slug.",
+			"discover_from": "input:slug",
+			"transform": "pascal-case"
+		},
+		{
+			"key": "title",
+			"description": "Human-readable block title shown in the editor.",
+			"required": true
+		},
+		{
+			"key": "vendor",
+			"description": "Vendor prefix for the block name, e.g. 'rtcamp' produces 'rtcamp/faq-accordion'. Also the store namespace shared by render.php's data-wp-interactive and view.js's store().",
+			"default": "rtcamp"
+		}
+	],
+	"files": [
+		{
+			"src": "templates/block-registrar.php.mustache",
+			"dest": "{{base_path}}/{{class}}.php"
+		},
+		{
+			"src": "templates/block.json.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/block.json"
+		},
+		{
+			"src": "templates/index.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/index.js"
+		},
+		{
+			"src": "templates/edit.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/edit.js"
+		},
+		{
+			"src": "templates/render.php.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/render.php"
+		},
+		{
+			"src": "templates/view.js.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/view.js"
+		}
+	],
+	"wiring": [
+		{
+			"target_file": "{{base_path}}/../Modules/Blocks.php",
+			"anchor": "// scaffold:wp/block-dynamic:classes",
+			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
+			"description": "Add the block class to the Blocks module so the framework Loader registers it on init. Interactive blocks share the Blocks module with dynamic ones; if it does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Blocks --kind=block-dynamic`."
+		}
+	],
+	"tests": [
+		{
+			"src": "templates/test.php.mustache",
+			"dest": "{{tests_path}}/{{class}}Test.php",
+			"framework": "phpunit"
+		}
+	],
+	"composer_dependencies": {
+		"rtcamp/wp-framework": "^1.0"
+	},
+	"npm_dev_dependencies": {
+		"@wordpress/block-editor": "^16.0.0",
+		"@wordpress/blocks": "^15.0.0",
+		"@wordpress/i18n": "^6.0.0",
+		"@wordpress/interactivity": "^6.0.0"
+	}
+}

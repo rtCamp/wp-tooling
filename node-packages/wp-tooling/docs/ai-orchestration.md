@@ -57,7 +57,7 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - The engine is idempotent under `scaffold.dryRun: true`: identical inputs produce identical output across runs.
 - The engine never reads or writes any path outside `--cwd`. This is enforced: a rendered `dest`, test path, or feature-owned path that resolves outside the target directory (e.g. via `..` in a path input or a third-party remote manifest) fails with `EWRITEFAIL` (`errno: "EOUTSIDE"`) before anything touches the filesystem.
 - The engine never invokes `gh`, `git`, `composer`, `npm`, or any other external CLI on behalf of the caller.
-- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
+- `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring; the bundled examples are `utility/*`) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
 - `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds come from a repo's cached index (`sources.json` → each repo's `index.json`), so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`. `list` is online-preferred with a cache fallback: it reads the index (cached, ETag-validated), and a `warnings` array reports any source that was unreachable and uncached. The top-level `{ scaffolds, warnings }` shape carries those notes.
 - The engine core has zero dependency on the TTY UI kit. AI orchestration mode never loads any terminal-UI primitive. Skills can rely on the engine being usable from any context, including non-TTY containers, CI runners, and headless test harnesses.
 - File-based `discover_from` (`composer.json:<dot.path>`, `package.json:<dot.path>`, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` and `plugin-header:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
@@ -116,6 +116,27 @@ The requested `<category>/<slug>` is not in the merged catalogue.
 ```
 
 **Skill response:** read `missingDetails`, prompt or run discovery via `discover_from` (§6), retry the same `execute()` call with the resolved values added.
+
+### `EINVALIDINPUT`
+
+An input declaring an `enum` resolved to a value outside it. The check runs on the value *after* any
+`transform`, so it reflects what would have reached the templates.
+
+```json
+{
+    "code": "EINVALIDINPUT",
+    "message": "Invalid input values: mode='prender' (allowed: auto, prefetch, prerender)",
+    "scaffold": "wp-api/speculation",
+    "invalid": [
+        { "key": "mode", "value": "prender", "allowed": ["auto", "prefetch", "prerender"] }
+    ]
+}
+```
+
+**Skill response:** do **not** retry with a guessed value. Read `invalid[].allowed`, ask the
+developer to choose from that set (offering the closest match to `value` as the suggestion), and
+retry with the confirmed value. A value the developer supplied explicitly is a typo to surface, not
+one to silently correct.
 
 ### `EBADSCAFFOLD`
 
@@ -208,7 +229,7 @@ Rules the skill can rely on:
 
 - **Precedence is `supplied → discovered → default`.** An explicit `--namespace=...` (or any supplied input) always wins over engine discovery, which always wins over the manifest `default`. Passing values explicitly is therefore always authoritative and safe.
 - **Fail-safe.** A missing or malformed `composer.json` / `package.json` / `.wp-tooling.json` is ignored — the input falls back to its `default`, identical to behaviour before this feature existed. The engine never throws because a project file is absent or unparsable.
-- **Path inputs are not overwritten by `autoload.psr-4`.** Inputs whose key ends in `_path` or `_dir` (e.g. `base_path`) keep their `default`; only namespace-style inputs receive the PSR-4 root. This prevents a directory input from being set to a namespace string.
+- **Path inputs receive the PSR-4 *directory*, not the namespace.** Inputs whose key ends in `_path` or `_dir` (e.g. `base_path`) resolve from the same map entry's value, so a root of `Acme\Blog\` → `inc/` yields `namespace` `Acme\Blog\Services` **and** `base_path` `inc/Services`. Both come from one entry, so a class is never namespaced into the autoload root while being written outside it — and a directory input is never set to a namespace string.
 - **`autoload.psr-4` uses the first declared root, grafted onto the default's sub-namespace.** When a project declares multiple PSR-4 roots, the engine takes the first key (trailing `\` stripped) and substitutes it for the first segment of the manifest `default` (`Inc\Cli` + root `Acme\Blog` → `Acme\Blog\Cli`). If that is not the intended namespace for this class, pass `--namespace=...` explicitly, or — per §6 — ask the developer rather than letting the heuristic guess.
 
 **Confirm with the developer once per session.** Present discovered values as a single block:

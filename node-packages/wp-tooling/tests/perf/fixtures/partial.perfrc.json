@@ -1,0 +1,4 @@
+{
+	"urls": ["http://localhost:8888/"],
+	"lighthouse": { "enabled": false }
+}

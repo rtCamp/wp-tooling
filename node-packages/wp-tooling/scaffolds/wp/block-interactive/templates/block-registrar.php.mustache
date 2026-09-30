@@ -1,0 +1,71 @@
+<?php
+/**
+ * Interactive block: {{vendor}}/{{slug}} ({{title}}).
+ *
+ * Scaffolded by @rtcamp/wp-tooling.
+ *
+ * @link https://github.com/rtCamp/wp-framework
+ * @link https://developer.wordpress.org/block-editor/reference-guides/interactivity-api/
+ *
+ * @package {{namespace}}
+ */
+
+declare( strict_types = 1 );
+
+namespace {{namespace}};
+
+use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+
+/**
+ * Registers the {{vendor}}/{{slug}} block from its build output.
+ *
+ * Deliberately a plain Registrable rather than the framework's AbstractBlock:
+ * AbstractBlock forces a render_callback, which would override the
+ * `render: file:./render.php` this block relies on. Everything else the block
+ * needs -- the view script module, the interactivity support flag -- core reads
+ * straight out of block.json.
+ */
+final class {{class}} implements Registrable {
+
+	/**
+	 * Block name, matching block.json and view.js's store namespace.
+	 */
+	public const NAME = '{{vendor}}/{{slug}}';
+
+	/**
+	 * Register the block once WordPress is ready for it.
+	 */
+	public function register_hooks(): void {
+		add_action( 'init', [ $this, 'register_block' ] );
+	}
+
+	/**
+	 * Compiled block directory: the one holding block.json, the bundled
+	 * index.js, view.js and render.php after a build. Run the project's build
+	 * (`npm run build:blocks` in the rtCamp skeleton) to populate it.
+	 */
+	public function get_block_dir(): string {
+		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
+	}
+
+	/**
+	 * Register the block, and no-op when it cannot work.
+	 *
+	 * Skipped before WP 6.5, where the Interactivity API does not exist and
+	 * render.php's wp_interactivity_state() call would be fatal, and skipped
+	 * when the build has not run, since there is nothing to register yet.
+	 */
+	public function register_block(): void {
+		if ( ! function_exists( 'wp_interactivity_state' ) ) {
+			return;
+		}
+
+		$block_dir = $this->get_block_dir();
+
+		if ( ! is_dir( $block_dir ) ) {
+			return;
+		}
+
+		register_block_type( $block_dir );
+	}
+}
