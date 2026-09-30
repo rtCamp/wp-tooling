@@ -1,0 +1,44 @@
+diff --git a/inc/Modules/Cache.php b/inc/Modules/Cache.php
+index 1111111..2222222 100644
+--- a/inc/Modules/Cache.php
++++ b/inc/Modules/Cache.php
+@@ -11,0 +12,3 @@ class Cache {
++		$a = 1;
++		$b = 2;
++		$c = 3;
+@@ -22 +23 @@ class Cache {
+-		old();
++		new();
+@@ -30,2 +30,0 @@ class Cache {
+-		gone();
+-		gone();
+diff --git a/inc/New.php b/inc/New.php
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/inc/New.php
+@@ -0,0 +1,2 @@
++<?php
++echo 1;
+diff --git a/inc/Moved.php b/inc/Renamed.php
+similarity index 90%
+rename from inc/Moved.php
+rename to inc/Renamed.php
+--- a/inc/Moved.php
++++ b/inc/Renamed.php
+@@ -4 +4 @@
+-a();
++b();
+diff --git a/inc/Deleted.php b/inc/Deleted.php
+deleted file mode 100644
+--- a/inc/Deleted.php
++++ /dev/null
+@@ -1,2 +0,0 @@
+-<?php
+-x();
+diff --git "a/inc/Sp ace\"q.php" "b/inc/Sp ace\"q.php"
+--- "a/inc/Sp ace\"q.php"
++++ "b/inc/Sp ace\"q.php"
+@@ -1 +1 @@
+-a
++b

@@ -19,10 +19,12 @@ two-ecosystem layout, and release mechanics; this file does not repeat any of it
 
 ```
 src/
-  ci/               detect-changes.js, index.js — CI helper commands (change detection for CI pipelines)
-  cli/              index.js (dispatcher) + commands/ (11 files: add, cache, detect-changes,
-                    features, install-hooks, list, release-bump, release-changelog,
-                    release-zip, validate, version-monitor)
+  ci/               detect-changes.js, index.js, coverage-gate/ (cli, diff, errors, gate,
+                    index, render, reports) — CI helper commands (change detection and
+                    changed-line coverage gating for CI pipelines)
+  cli/              index.js (dispatcher) + commands/ (14 files: a11y, add, cache,
+                    coverage-gate, detect-changes, features, install-hooks, list, perf,
+                    release-bump, release-changelog, release-zip, validate, version-monitor)
   hooks/            index.js, install.js, templates/ — git hook installer + shell templates
                     (commit-msg, pre-commit)
   init/             cleanup.js, examples.js, features.js, git.js, identity.js, index.js,
