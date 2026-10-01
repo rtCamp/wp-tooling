@@ -31,9 +31,9 @@ on:
       - '.github/workflows/split-npm-packages.yml'
   workflow_dispatch:
 
-# Pushes branches to this repository; nothing else is needed.
+# Read-only by default; only the split job, which pushes the branches, gets write.
 permissions:
-  contents: write
+  contents: read
 
 # Branch pushes must not race each other.
 concurrency:
@@ -113,11 +113,16 @@ jobs:
     name: Split ${{ matrix.package_name }}
     needs: build-matrix
     runs-on: ubuntu-latest
+    # Pushes the npm/* branches of this repository; nothing else is needed.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false # one bad package must not hide the others
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
     steps:
-      - name: Checkout monorepo (full history)
+      # The persisted GITHUB_TOKEN is what the push below authenticates with, and
+      # this job uploads no artifacts, so there is nothing for it to leak into.
+      - name: Checkout monorepo (full history) # zizmor: ignore[artipacked]
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the split walks every commit that touched the subtree

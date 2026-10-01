@@ -4,8 +4,10 @@ name: Release Composer Packages
 # can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own repositories.
 # Fired by the tag that `vendor/bin/monorepo-builder release` pushes.
 #
-# splitsh.json is the single source of truth for mirror repo -> subdirectory;
-# to add or remove a package, edit that file, never this workflow.
+# splitsh.json is the single source of truth for mirror repo -> subdirectory.
+# To add a package, add it there and list its deploy-key secret in the split
+# step's env below (secrets are referenced by name so the job only receives
+# the deploy keys, never the whole secrets context).
 #
 # Each mirror is pushed with its own SSH deploy key (repo secret
 # SPLIT_KEY_<NAME>, "Allow write access" required) rather than a PAT bound to
@@ -26,6 +28,11 @@ on:
         default: "v0.0.0-test"
       force_push:
         description: "Force-push the mirrors (bootstrap an empty mirror, or re-push the same test tag)"
+        type: boolean
+        required: false
+        default: false
+      resync_branch:
+        description: "Only force the mirror branch back onto the split (repairs a diverged mirror); pushes no tag"
         type: boolean
         required: false
         default: false
@@ -159,7 +166,10 @@ jobs:
       - name: Split ${{ matrix.package_directory }} → ${{ matrix.mirror_repo }}
         shell: bash
         env:
-          SSH_KEY: ${{ secrets[matrix.secret_name] }}
+          # Named explicitly: a dynamic secrets[...] lookup would hand the job the
+          # whole secrets context. A new mirror's key has to be listed here.
+          SPLIT_KEY_PHPCS: ${{ secrets.SPLIT_KEY_PHPCS }}
+          SPLIT_KEY_PHPSTAN: ${{ secrets.SPLIT_KEY_PHPSTAN }}
           SECRET_NAME: ${{ matrix.secret_name }}
           PKG_PATH: ${{ matrix.package_directory }}
           ORG: ${{ needs.build-matrix.outputs.organization }}
@@ -167,11 +177,19 @@ jobs:
           BRANCH: ${{ needs.build-matrix.outputs.branch }}
           TAG: ${{ needs.build-matrix.outputs.tag }}
           FORCE_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.force_push }}
+          RESYNC_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.resync_branch }}
         run: |
           set -euo pipefail
 
+          # The name comes from splitsh.json, so check its shape before the
+          # indirect expansion reads a variable by that name.
+          if [[ ! "$SECRET_NAME" =~ ^SPLIT_KEY_[A-Z0-9_]+$ ]]; then
+            echo "::error::Refusing deploy-key secret name '$SECRET_NAME': it must look like SPLIT_KEY_<NAME>."
+            exit 1
+          fi
+          SSH_KEY="${!SECRET_NAME:-}"
           if [[ -z "$SSH_KEY" ]]; then
-            echo "::error::No deploy key in $SECRET_NAME. Add the private half of ${ORG}/${REPO}'s write-enabled deploy key as that repository secret."
+            echo "::error::No deploy key in $SECRET_NAME. Add the private half of ${ORG}/${REPO}'s write-enabled deploy key as that repository secret, and list it in this step's env."
             exit 1
           fi
 
@@ -215,7 +233,21 @@ jobs:
           fi
 
           remote="git@github.com:$ORG/$REPO.git"
-          "${push[@]}" "$remote" "$split_sha:refs/heads/$BRANCH"
+
+          # Repair mode: put the mirror branch back onto the split and stop, so a
+          # mirror that something else committed to (an org bot PR, a hand edit)
+          # can be fixed without minting a tag that Packagist would publish.
+          if [[ "$RESYNC_BRANCH" == "true" ]]; then
+            echo "::warning::resync_branch is on: $ORG/$REPO $BRANCH is being forced onto the split; no tag is pushed."
+            git push --force "$remote" "$split_sha:refs/heads/$BRANCH"
+            echo "- **$ORG/$REPO**: \`$BRANCH\` resynced to \`$split_sha\` (no tag)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if ! "${push[@]}" "$remote" "$split_sha:refs/heads/$BRANCH"; then
+            echo "::error::$ORG/$REPO $BRANCH did not fast-forward: something other than this workflow committed to the mirror. Inspect what it holds, then run this workflow by dispatch on the $TAG tag with resync_branch enabled, and re-run this release run."
+            exit 1
+          fi
           # Packagist versions a package from its tags, so this push is not optional.
           "${push[@]}" "$remote" "$split_sha:refs/tags/$TAG"
 
