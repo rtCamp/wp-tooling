@@ -1,7 +1,7 @@
 {
   "name": "@rtcamp/wp-tooling",
   "description": "Shared tooling for rtCamp WordPress plugin scaffolding — TTY UI, scaffold registry, release scripts, git hooks, CI helpers, version monitor.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "rtCamp",
   "bin": {
     "wp-tooling": "./bin/wp-tooling.js"
@@ -31,13 +31,13 @@
     "./perf": "./src/perf/index.js",
     "./version-monitor": "./src/version-monitor/index.js"
   },
-    "files": [
-        "bin",
-        "src",
-        "scaffolds",
-        "docs",
-        "README.md"
-    ],
+  "files": [
+    "bin",
+    "src",
+    "scaffolds",
+    "docs",
+    "README.md"
+  ],
   "homepage": "https://github.com/rtCamp/wp-tooling#readme",
   "keywords": [
     "cli",
@@ -54,7 +54,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rtCamp/wp-tooling.git"
+    "url": "git+https://github.com/rtCamp/wp-tooling.git",
+    "directory": "node-packages/wp-tooling"
   },
   "scripts": {
     "check": "npm run lint && npm test",
