@@ -336,3 +336,9 @@ describe('GitHub output heredocs', () => {
 		expect(formatGithubLine('php-files', [])).toBe('php-files=');
 	});
 });
+
+test('@rtcamp/wp-tooling/ci exposes DetectChangesError', () => {
+	const ci = require('../../src/ci');
+	expect(ci.DetectChangesError).toBe(DetectChangesError);
+	expect(new ci.DetectChangesError('x')).toBeInstanceOf(Error);
+});

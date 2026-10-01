@@ -6,6 +6,7 @@
 
 const {
 	detectChanges,
+	DetectChangesError,
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
 } = require('./detect-changes');
@@ -21,6 +22,7 @@ const {
 
 module.exports = {
 	detectChanges,
+	DetectChangesError,
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
 	computeGate,
