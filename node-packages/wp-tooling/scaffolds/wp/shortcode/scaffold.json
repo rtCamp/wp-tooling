@@ -2,7 +2,7 @@
 	"slug": "shortcode",
 	"category": "wp",
 	"name": "Shortcode",
-	"description": "Adds a shortcode class extending AbstractShortcode from rtcamp/wp-framework. One class per shortcode tag; the consumer's Shortcodes module instantiates it via the Loader.",
+	"description": "Adds a shortcode class extending AbstractShortcode from rtcamp/wp-primitives. One class per shortcode tag; the consumer's Shortcodes module instantiates it via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
@@ -63,6 +63,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

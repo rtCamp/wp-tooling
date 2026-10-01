@@ -2,7 +2,7 @@
 	"slug": "settings-page",
 	"category": "wp",
 	"name": "Settings Page",
-	"description": "Adds a Settings API page extending AbstractSettingsPage from rtcamp/wp-framework. Generates a page plus a worked example of register_setting() declarations.",
+	"description": "Adds a Settings API page extending AbstractSettingsPage from rtcamp/wp-primitives. Generates a page plus a worked example of register_setting() declarations.",
 	"source": "template",
 	"inputs": [
 		{
@@ -96,6 +96,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

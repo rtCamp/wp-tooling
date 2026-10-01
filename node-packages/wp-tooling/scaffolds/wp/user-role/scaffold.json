@@ -2,7 +2,7 @@
 	"slug": "user-role",
 	"category": "wp",
 	"name": "User Role",
-	"description": "Adds a versioned custom user role class extending AbstractUserRole from rtcamp/wp-framework. The framework re-registers the role only when get_version() increases.",
+	"description": "Adds a versioned custom user role class extending AbstractUserRole from rtcamp/wp-primitives. The framework re-registers the role only when get_version() increases.",
 	"source": "template",
 	"inputs": [
 		{
@@ -80,6 +80,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

@@ -121,7 +121,7 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	},
 	"npm_dev_dependencies": {
 		"@wordpress/block-editor": "^16.0.0",

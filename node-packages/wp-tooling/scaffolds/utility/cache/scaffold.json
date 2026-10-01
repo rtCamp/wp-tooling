@@ -2,9 +2,9 @@
 	"slug": "cache",
 	"category": "utility",
 	"name": "Cache utility",
-	"description": "Wires up the framework Cache utility from rtcamp/wp-framework via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Cache wraps the WordPress object cache with a per-plugin group namespace, group flushing, and the remember() / remember_swr() compute-once helpers.",
+	"description": "Wires up the framework Cache utility from rtcamp/wp-primitives via an accessor snippet. Writes no files: reports the Composer dependency and one accessor snippet for the developer or AI to paste in. Cache wraps the WordPress object cache with a per-plugin group namespace, group flushing, and the remember() / remember_swr() compute-once helpers.",
 	"source": "package",
-	"module_class": "rtCamp\\WPFramework\\Utils\\Cache",
+	"module_class": "rtCamp\\WPPrimitives\\Utils\\Cache",
 	"files": [],
 	"inputs": [
 		{
@@ -24,11 +24,11 @@
 		{
 			"target_file": "{{base_path}}/Helpers/Util.php",
 			"anchor": "// scaffold:utility/cache",
-			"snippet_template": "/**\n * The project's shared framework Cache, namespaced so its groups can never\n * collide with another consumer's.\n *\n * @return \\rtCamp\\WPFramework\\Utils\\Cache Shared cache.\n */\npublic static function cache(): \\rtCamp\\WPFramework\\Utils\\Cache {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPFramework\\Utils\\Cache( '{{context_slug}}' );\n\t}\n\n\treturn $instance;\n}",
-			"description": "Add a shared accessor for the framework Cache to the project's static helper class. The snippet is self-contained: paste it inside the existing helper class body and Util::cache()->remember( ... ) works with nothing further to wire. Do not add the framework Cache to a Modules class or to Main::CLASSES — it implements neither Registrable nor Shareable, so the framework Loader would construct it with an empty context. If the project instead shares services through the framework Shareable contract (a Core\\Cache class extending the framework Cache, listed in Main::CLASSES, the way the rtCamp skeleton does for Core\\Logger), translate the snippet to that pattern and add a one-line accessor there. If only one class needs the cache, skip this wiring and construct it inline in that class's constructor. Requires rtcamp/wp-framework to be installed first."
+			"snippet_template": "/**\n * The project's shared framework Cache, namespaced so its groups can never\n * collide with another consumer's.\n *\n * @return \\rtCamp\\WPPrimitives\\Utils\\Cache Shared cache.\n */\npublic static function cache(): \\rtCamp\\WPPrimitives\\Utils\\Cache {\n\tstatic $instance = null;\n\n\tif ( null === $instance ) {\n\t\t$instance = new \\rtCamp\\WPPrimitives\\Utils\\Cache( '{{context_slug}}' );\n\t}\n\n\treturn $instance;\n}",
+			"description": "Add a shared accessor for the framework Cache to the project's static helper class. The snippet is self-contained: paste it inside the existing helper class body and Util::cache()->remember( ... ) works with nothing further to wire. Do not add the framework Cache to a Modules class or to Main::CLASSES — it implements neither Registrable nor Shareable, so the framework Loader would construct it with an empty context. If the project instead shares services through the framework Shareable contract (a Core\\Cache class extending the framework Cache, listed in Main::CLASSES, the way the rtCamp skeleton does for Core\\Logger), translate the snippet to that pattern and add a one-line accessor there. If only one class needs the cache, skip this wiring and construct it inline in that class's constructor. Requires rtcamp/wp-primitives to be installed first."
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

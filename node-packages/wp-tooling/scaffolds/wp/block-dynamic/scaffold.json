@@ -2,7 +2,7 @@
 	"slug": "block-dynamic",
 	"category": "wp",
 	"name": "Dynamic block",
-	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-framework (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
+	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-primitives (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
 	"source": "template",
 	"inputs": [
 		{
@@ -119,6 +119,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

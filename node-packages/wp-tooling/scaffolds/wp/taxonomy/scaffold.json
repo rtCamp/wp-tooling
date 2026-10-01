@@ -2,7 +2,7 @@
 	"slug": "taxonomy",
 	"category": "wp",
 	"name": "Taxonomy",
-	"description": "Adds a taxonomy class extending AbstractTaxonomy from rtcamp/wp-framework. One class per taxonomy; the consumer's Taxonomies module instantiates it via the Loader.",
+	"description": "Adds a taxonomy class extending AbstractTaxonomy from rtcamp/wp-primitives. One class per taxonomy; the consumer's Taxonomies module instantiates it via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
@@ -96,6 +96,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

@@ -4,7 +4,7 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  *
  * @package {{tests_namespace}}
  */
@@ -15,7 +15,7 @@ namespace {{tests_namespace}};
 
 use {{namespace}}\{{class}};
 use WP_UnitTestCase;
-use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
  * Class {{class}}Test
@@ -59,11 +59,10 @@ final class {{class}}Test extends WP_UnitTestCase {
 	/**
 	 * The URL is the plugin root's, plus the build-relative path.
 	 *
-	 * Path and URL are derived at different dirname() depths, because
-	 * plugin_dir_url() takes a file and returns its directory's URL, so this
-	 * asserts the two still land on the same directory. A depth that has
-	 * drifted resolves above the plugin, to <plugins>/{{build_dir}}/..., and
-	 * 404s.
+	 * The plugin_dir_url() helper takes a file and returns its directory's URL,
+	 * so this asserts path and URL still land on the same directory. A root
+	 * that has drifted resolves outside the plugin, to
+	 * <plugins>/{{build_dir}}/..., and 404s.
 	 */
 	public function test_module_url_resolves_inside_the_plugin_directory(): void {
 		$instance   = new {{class}}();

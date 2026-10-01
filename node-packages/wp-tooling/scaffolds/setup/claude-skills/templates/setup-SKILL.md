@@ -133,7 +133,7 @@ Map each feature the developer mentioned to one or more scaffold IDs from the ca
 | CI pipeline | `ci/cd-wporg` (or other CI scaffold) |
 
 The `utility/*` scaffolds are `source: package`: they write no files and return the
-`rtcamp/wp-framework` dependency plus one accessor snippet for `<base_path>/Helpers/Util.php`.
+`rtcamp/wp-primitives` dependency plus one accessor snippet for `<base_path>/Helpers/Util.php`.
 Check whether the project already exposes that accessor before applying the wiring — pasting in a
 method name that already exists in `Helpers\Util` is a PHP fatal error (cannot redeclare method).
 

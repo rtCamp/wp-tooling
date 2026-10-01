@@ -2,7 +2,7 @@
 	"slug": "cpt",
 	"category": "wp",
 	"name": "Custom Post Type",
-	"description": "Adds a CPT class extending AbstractPostType from rtcamp/wp-framework. One class per post type; the consumer's PostTypes module instantiates it via the Loader.",
+	"description": "Adds a CPT class extending AbstractPostType from rtcamp/wp-primitives. One class per post type; the consumer's PostTypes module instantiates it via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
@@ -96,6 +96,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

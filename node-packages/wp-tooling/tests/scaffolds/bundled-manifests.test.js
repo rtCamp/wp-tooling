@@ -783,7 +783,7 @@ describe('utility/* package scaffolds', () => {
 			expect(result.ai.tests).toEqual([]);
 			expect(result.developer.secrets).toEqual([]);
 			expect(result.developer.install.composer).toEqual({
-				'rtcamp/wp-framework': '^1.0',
+				'rtcamp/wp-primitives': '^2.0',
 			});
 
 			expect(result.ai.wiring).toHaveLength(1);
@@ -791,7 +791,7 @@ describe('utility/* package scaffolds', () => {
 			expect(w.anchor).toBe(`// scaffold:${id}`);
 			expect(w.targetFile).toBe('includes/Helpers/Util.php');
 			expect(w.snippet).toContain(
-				`\\rtCamp\\WPFramework\\Utils\\${className}`
+				`\\rtCamp\\WPPrimitives\\Utils\\${className}`
 			);
 			// The engine passes `description` through verbatim, so it must not
 			// carry a placeholder that would reach the caller unresolved.
@@ -809,7 +809,7 @@ describe('utility/* package scaffolds', () => {
 			'rtcamp_project_name_features'
 		);
 		expect(result.ai.wiring[0].snippet).toContain(
-			"new \\rtCamp\\WPFramework\\Utils\\Cache( 'rtcamp_project_name_features' )"
+			"new \\rtCamp\\WPPrimitives\\Utils\\Cache( 'rtcamp_project_name_features' )"
 		);
 	});
 
@@ -848,7 +848,7 @@ describe('utility/* package scaffolds', () => {
 			{ dryRun: true, cwd: targetWithComposerName() }
 		);
 		const snippet = result.ai.wiring[0].snippet;
-		expect(snippet).toContain('new \\rtCamp\\WPFramework\\Utils\\Timer()');
+		expect(snippet).toContain('new \\rtCamp\\WPPrimitives\\Utils\\Timer()');
 		expect(snippet).not.toContain('rtcamp_project_name_features');
 	});
 });

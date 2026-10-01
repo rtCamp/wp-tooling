@@ -2,7 +2,7 @@
 	"slug": "admin-page",
 	"category": "wp",
 	"name": "Admin Page",
-	"description": "Adds a custom admin menu page extending AbstractAdminPage from rtcamp/wp-framework. Top-level by default; pass --parent_slug for a submenu.",
+	"description": "Adds a custom admin menu page extending AbstractAdminPage from rtcamp/wp-primitives. Top-level by default; pass --parent_slug for a submenu.",
 	"source": "template",
 	"inputs": [
 		{
@@ -96,6 +96,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

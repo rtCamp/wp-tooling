@@ -2,7 +2,7 @@
 	"slug": "cli",
 	"category": "wp",
 	"name": "WP-CLI command",
-	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-framework. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
+	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-primitives. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
 	"source": "template",
 	"inputs": [
 		{
@@ -68,6 +68,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

@@ -4,7 +4,7 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  * @link https://developer.wordpress.org/reference/functions/wp_register_script_module/
  *
  * @package {{namespace}}
@@ -14,7 +14,7 @@ declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
  * Registers and enqueues a Script Module (core since WP 6.5).
@@ -94,8 +94,8 @@ final class {{class}} implements Registrable {
 	/**
 	 * Filesystem path of the built module.
 	 *
-	 * The dirname() depth is derived from the scaffold's base_path, so a
-	 * custom autoload directory still resolves to the project root.
+	 * Resolved from this class's directory up to the project root, so update
+	 * it here and in get_module_url() if the class moves.
 	 */
 	public function get_module_path(): string {
 		return {{project_root}} . '/{{build_dir}}/{{module_slug}}.js';
@@ -104,9 +104,9 @@ final class {{class}} implements Registrable {
 	/**
 	 * Public URL of the built module.
 	 *
-	 * Plugin_dir_url() takes a file path and returns its directory's URL.
-	 * A file name appended to the derived project root gives it that directory;
-	 * no file is read, so the synthetic root-level path need not exist.
+	 * The plugin_dir_url() helper returns the URL of a file's directory, so it
+	 * gets a file name under the project root. The file is never read, so it
+	 * need not exist.
 	 */
 	public function get_module_url(): string {
 		return plugin_dir_url( {{project_root}} . '/{{class}}.php' ) . '{{build_dir}}/{{module_slug}}.js';

@@ -4,7 +4,7 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  *
  * @package {{namespace}}
  */
@@ -14,7 +14,7 @@ declare( strict_types = 1 );
 namespace {{namespace}};
 
 use WP_Block;
-use rtCamp\WPFramework\Contracts\Abstracts\AbstractBlock;
+use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractBlock;
 
 /**
  * Registers the {{vendor}}/{{slug}} dynamic block.
@@ -32,8 +32,7 @@ class {{class}} extends AbstractBlock {
 	 * Directory containing the compiled block.json + bundled index.js that
 	 * WordPress registers. Points at the build output (not the source tree),
 	 * so the editor receives the bundled assets and not raw ES modules.
-	 * Run `npm run build` to populate this directory. The root depth follows
-	 * base_path, including nested and root-level autoload directories.
+	 * Run `npm run build` to populate this directory.
 	 *
 	 * Protected to match AbstractBlock, which declares it protected and calls it
 	 * internally. Narrowed to a non-null `string` (the parent declares

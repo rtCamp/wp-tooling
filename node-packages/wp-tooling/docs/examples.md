@@ -95,7 +95,7 @@ Developer actions:
 
   composer dump-autoload --optimize
 
-  composer require rtcamp/wp-framework:^1.0
+  composer require rtcamp/wp-primitives:^2.0
   composer require --dev rtcamp/wp-phpcs:^1.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
   npm install --save-dev eslint@^10.0.0 @wordpress/eslint-plugin@^25.1.0 @rtcamp/eslint-config@^0.1.0
 
@@ -359,7 +359,7 @@ Tests:
 >   2. wp/taxonomy   → includes/Taxonomies/Category.php
 >   3. wp/rest       → includes/Rest/ProductController.php
 >
-> All three pull `rtcamp/wp-framework:^1.0`. Each class extends the matching abstract from the framework and is wired through the consumer's module.
+> All three pull `rtcamp/wp-primitives:^2.0`. Each class extends the matching abstract from the framework and is wired through the consumer's module.
 >
 > Confirm?
 
@@ -396,7 +396,7 @@ Files written: 6 (3 production + 3 tests).
 Wiring applied: 3 entries in includes/Plugin.php.
 
 Developer actions:
-  composer require rtcamp/wp-framework:^1.0
+  composer require rtcamp/wp-primitives:^2.0
   composer dump-autoload --optimize
 ```
 

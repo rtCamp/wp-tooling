@@ -90,7 +90,7 @@ class {{class}} { }
 
 ```mustache
 {{#with_logging}}use {{namespace}}\Services\Logger;
-{{/with_logging}}use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+{{/with_logging}}use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 ```
 
 `{{#key}}...{{/key}}` renders the inner block when `vars[key]` is truthy. Truthy means a non-empty string that is not one of `"false"`, `"no"`, `"0"` (case-insensitive).
@@ -232,7 +232,7 @@ declares `files: []`, the `composer_dependencies` entry that provides the class,
 snippet that constructs it. `execute()` reports `scaffold.kind: "package"` and writes nothing.
 
 - `module_class`: the fully qualified PHP class the scaffold wires up (e.g.
-  `rtCamp\\WPFramework\\Utils\\Cache` — doubled backslashes, since this is JSON). Manifest metadata
+  `rtCamp\\WPPrimitives\\Utils\\Cache` — doubled backslashes, since this is JSON). Manifest metadata
   documenting which vendor class the `wiring[]` snippet constructs. Optional, but set it on every
   package scaffold.
 
@@ -431,6 +431,6 @@ Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON p
 
 ---
 
-## When to involve `wp-framework`
+## When to involve `wp-primitives`
 
-If your new scaffold extends or uses a class from `rtcamp/wp-framework` that does not yet exist, add the contract to [docs/wp-framework-contract.md](wp-framework-contract.md) and open an issue on `wp-framework`. Do not ship a scaffold that references an unreleased class. It will break for consumers running `composer install`.
+If your new scaffold extends or uses a class from `rtcamp/wp-primitives` that does not yet exist, add the contract to [docs/wp-primitives-contract.md](wp-primitives-contract.md) and open an issue on `rtCamp/wp-primitives`. Do not ship a scaffold that references an unreleased class. It will break for consumers running `composer install`.
