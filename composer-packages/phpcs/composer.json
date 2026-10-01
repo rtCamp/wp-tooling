@@ -11,6 +11,17 @@
         "WordPress",
         "static analysis"
     ],
+    "homepage": "https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpcs",
+    "authors": [
+        {
+            "name": "rtCamp",
+            "homepage": "https://rtcamp.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/rtCamp/wp-tooling/issues",
+        "source": "https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpcs"
+    },
     "require": {
         "php": ">=8.2",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",

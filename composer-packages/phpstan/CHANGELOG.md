@@ -4,6 +4,14 @@ All notable changes to `rtcamp/wp-phpstan` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `homepage`, `authors` and `support` metadata in `composer.json`, so the Packagist
+  page links to the monorepo for issues and source (the mirror repository is a
+  read-only split).
+
 ## [1.0.0] - 2026-07-30
 
 ### Added
