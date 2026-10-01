@@ -216,6 +216,7 @@ describe('validate rejects a source the engine cannot resolve', () => {
 		'plugin-header:text-domain',
 		'config:cssDir',
 		'input:name',
+		'code:bootstrap-class',
 	])('accepts %s', (spec) => {
 		expect(errorsFor(spec)).toEqual([]);
 	});
