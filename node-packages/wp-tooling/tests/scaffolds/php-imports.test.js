@@ -42,11 +42,10 @@ function importsOf(source) {
 
 describe('compareImports', () => {
 	it('compares segment by segment, not as whole strings', () => {
-		// Whole-string strcmp would put `Acme\Blog` after `Acme_Blog`, because
-		// `\` (0x5C) sorts before `_` (0x5F). Segment-wise, the first segments
-		// `Acme` and `Acme_Blog` decide it, giving the same answer here — the
-		// point is that the segment walk is what runs.
-		expect(compareImports('Acme\\Blog', 'Acme_Blog')).toBeLessThan(0);
+		// Whole-string strcmp puts `Acme\Blog` after `AcmeZ`, because `\` (0x5C)
+		// sorts after `Z` (0x5A). Segment-wise, `Acme` is a prefix of `AcmeZ`, so
+		// it sorts first. Only the segment walk passes this.
+		expect(compareImports('Acme\\Blog', 'AcmeZ')).toBeLessThan(0);
 	});
 
 	it('sorts a prefix before a name that extends it', () => {
