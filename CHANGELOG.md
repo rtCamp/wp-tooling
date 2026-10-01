@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `lint/phpstan`: the generated `phpstan.neon.dist` marks the `node_modules`, `build` and `tests` excludes optional with `(?)`. PHPStan treats an excluded path that does not exist as a configuration error, so `composer analyse` failed in any project missing one of them.
 - Human-readable scaffold labels and the `wp/cli` command description now escape apostrophes and backslashes in PHP and JavaScript string literals, and quotes in block JSON metadata. Titles such as `Editor's "guide"` generate valid code while preserving the original display text.
 - Block and script module asset paths now derive the project root from `base_path`, so nested or root-level PSR-4 directories resolve build output correctly.
 - Generated block JavaScript follows the current shared ESLint formatting rules.
