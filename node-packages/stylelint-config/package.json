@@ -14,8 +14,8 @@
     "url": "https://github.com/rtCamp/wp-tooling/issues"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "engines": {
     "node": ">=22.19"
