@@ -9,7 +9,9 @@ parameters:
         - src
         - includes
     excludePaths:
+        # PHPStan rejects an excluded path that does not exist, so the ones a
+        # project may not have are marked optional with (?).
         - vendor
-        - node_modules
-        - build
-        - tests
+        - node_modules (?)
+        - build (?)
+        - tests (?)
