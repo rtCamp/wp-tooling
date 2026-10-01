@@ -1,6 +1,6 @@
 {
   "name": "@rtcamp/stylelint-config",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "rtCamp shareable Stylelint config for WordPress projects — extends @wordpress/stylelint-config (+ scss).",
   "license": "GPL-2.0-or-later",
   "author": "rtCamp",
