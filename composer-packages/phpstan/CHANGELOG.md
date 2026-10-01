@@ -4,6 +4,13 @@ All notable changes to `rtcamp/wp-phpstan` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- README: a header with the license, PHP and tool-version badges, and a note that the
+  mirror repository is read-only and issues and pull requests go to rtCamp/wp-tooling.
+
 ## [1.0.0] - 2026-07-30
 
 ### Added
