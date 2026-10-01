@@ -45,12 +45,6 @@
 	"wiring": [
 		{
 			"target_file": "composer.json",
-			"anchor": "\"repositories\"",
-			"snippet_template": "\"repositories\": [\n    {\n        \"type\": \"vcs\",\n        \"url\": \"https://github.com/rtCamp/wp-phpcs.git\",\n        \"no-api\": true\n    }\n]",
-			"description": "rtcamp/wp-phpcs is not on Packagist, so Composer only finds it through this repository. Add the entry to the existing repositories array unless the URL is already there, or create the array. Apply before installing the package."
-		},
-		{
-			"target_file": "composer.json",
 			"anchor": "\"allow-plugins\"",
 			"snippet_template": "\"config\": {\n    \"allow-plugins\": {\n        \"dealerdirect/phpcodesniffer-composer-installer\": true\n    }\n}",
 			"description": "rtcamp/wp-phpcs registers its standards through this Composer plugin, which Composer will not run until it is allowed. Merge the entry into the existing config.allow-plugins, or create it."
