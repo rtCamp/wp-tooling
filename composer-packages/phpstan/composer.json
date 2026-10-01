@@ -9,6 +9,17 @@
         "wordpress",
         "rtcamp"
     ],
+    "homepage": "https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpstan",
+    "authors": [
+        {
+            "name": "rtCamp",
+            "homepage": "https://rtcamp.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/rtCamp/wp-tooling/issues",
+        "source": "https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpstan"
+    },
     "require": {
         "php": ">=8.2",
         "phpstan/phpstan": "^2.0",

@@ -15,7 +15,7 @@ composer install                                                     # install s
 - `node-packages/tailwind-config/` — `@rtcamp/tailwind-config`, Tailwind v4 PostCSS config + `theme.json` webpack plugin
 - `composer-packages/phpcs/` — `rtcamp/wp-phpcs`, PHP_CodeSniffer standards (`rtCampWP`, `rtCampWP-Basic`)
 - `composer-packages/phpstan/` — `rtcamp/wp-phpstan`, shared PHPStan baseline for WordPress projects
-- `.github/workflows/` — the two subtree-split release workflows; no lint/test CI runs here
+- `.github/workflows/` holds `ci.yml` (lint + tests on every PR and push to main) and the two subtree-split release workflows
 
 ## Progressive discovery
 
@@ -53,7 +53,7 @@ For full release-mechanism details, see `.github/workflows/release-php.yml` and 
 - Subtree-split artifacts — the `npm/<dirname>` branches and the `wp-phpcs`/`wp-phpstan` mirror repos — are generated. Never hand-edit them; a diverged target fails the next split run instead of being silently rewritten.
 - `npm install @rtcamp/wp-tooling` does not resolve from the public npm registry today; the current install path is a git URL (`#npm/wp-tooling`). Don't assume a registry publish exists yet — see Architectural decisions above.
 - Every one of the six packages carries its own `LICENSE` file — `git subtree split` only carries history of files *inside* the split directory, so the root `LICENSE` never reaches a mirror repo or split branch.
-- No CI workflow lints or tests on every push — `.github/workflows/` only holds the two release/split workflows above. Run the Code quality commands locally before opening a PR.
+- `ci.yml` runs every workspace lint, every Jest suite with its coverage threshold (Node 22.19 and 24), and each `composer-packages/*` suite installed standalone (PHP 8.2, 8.3 and 8.4) on every PR and push to main. A red CI blocks the merge that would otherwise ship straight onto the `npm/*` branches.
 - `.vscode/extensions.json` only recommends extensions from verified publishers (Microsoft, GitHub, Red Hat, EditorConfig Foundation) — don't add others, regardless of popularity.
 
 ## PR instructions

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `homepage`, `authors` and `support` metadata in `composer.json`, so the Packagist
+  page links to the monorepo for issues and source (the mirror repository is a
+  read-only split).
+
 ### Changed
 
 - README: a header with the license, PHP and tool-version badges, and a note that the

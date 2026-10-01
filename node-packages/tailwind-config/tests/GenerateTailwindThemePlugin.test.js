@@ -360,3 +360,92 @@ describe('GenerateTailwindThemePlugin.generate()', () => {
 		);
 	});
 });
+
+describe('GenerateTailwindThemePlugin.apply()', () => {
+	/**
+	 * A webpack compiler double: records each hook's tapped callback.
+	 *
+	 * @return {Object} `{ compiler, taps }`.
+	 */
+	const fakeCompiler = () => {
+		const taps = {};
+		const hook = (name) => ({
+			tap: (pluginName, fn) => {
+				taps[name] = { pluginName, fn };
+			},
+		});
+		return {
+			taps,
+			compiler: {
+				hooks: {
+					run: hook('run'),
+					watchRun: hook('watchRun'),
+					afterEmit: hook('afterEmit'),
+				},
+			},
+		};
+	};
+
+	let plugin;
+	let generate;
+	const themeJsonPath = path.join(os.tmpdir(), 'apply-test', 'theme.json');
+
+	beforeEach(() => {
+		plugin = new GenerateTailwindThemePlugin({
+			themeJson: themeJsonPath,
+			tailwindCss: path.join(os.tmpdir(), 'apply-test', 'tailwind.css'),
+		});
+		generate = jest.spyOn(plugin, 'generate').mockImplementation(() => {});
+	});
+
+	afterEach(() => jest.restoreAllMocks());
+
+	test('taps run, watchRun and afterEmit under the plugin name', () => {
+		const { compiler, taps } = fakeCompiler();
+		plugin.apply(compiler);
+		expect(Object.keys(taps).sort()).toEqual([
+			'afterEmit',
+			'run',
+			'watchRun',
+		]);
+		for (const tap of Object.values(taps)) {
+			expect(tap.pluginName).toBe('GenerateTailwindThemePlugin');
+		}
+	});
+
+	test('a single build generates once', () => {
+		const { compiler, taps } = fakeCompiler();
+		plugin.apply(compiler);
+		taps.run.fn();
+		expect(generate).toHaveBeenCalledTimes(1);
+	});
+
+	test('watch mode generates on the first run and when theme.json changed', () => {
+		const { compiler, taps } = fakeCompiler();
+		plugin.apply(compiler);
+
+		taps.watchRun.fn({ modifiedFiles: undefined });
+		taps.watchRun.fn({ modifiedFiles: new Set([themeJsonPath]) });
+
+		expect(generate).toHaveBeenCalledTimes(2);
+	});
+
+	test('watch mode skips rebuilds that did not touch theme.json', () => {
+		const { compiler, taps } = fakeCompiler();
+		plugin.apply(compiler);
+
+		taps.watchRun.fn({ modifiedFiles: new Set(['/src/other.css']) });
+
+		expect(generate).not.toHaveBeenCalled();
+	});
+
+	test('every emit re-registers theme.json as a file dependency', () => {
+		const { compiler, taps } = fakeCompiler();
+		plugin.apply(compiler);
+		const compilation = { fileDependencies: new Set() };
+
+		taps.afterEmit.fn(compilation);
+
+		expect(compilation.fileDependencies.has(themeJsonPath)).toBe(true);
+	});
+});
