@@ -14,7 +14,7 @@
 		"stylelint": "^16.8.2",
 		"@wordpress/stylelint-config": "^23.37.0",
 		"stylelint-scss": "^6.4.0",
-		"@rtcamp/stylelint-config": "github:rtCamp/wp-tooling#npm/stylelint-config"
+		"@rtcamp/stylelint-config": "^1.1.0"
 	},
 	"scripts": {
 		"npm": {

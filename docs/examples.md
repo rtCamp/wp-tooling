@@ -70,7 +70,7 @@ npx wp-tooling add wp/cli             --non-interactive --json --cwd . --name=im
 
 **Developer:** yes.
 
-> For `lint/phpcs/full`, `rtcamp/wp-phpcs` is not on Packagist, so I would add its GitHub repository to `repositories` and allow `dealerdirect/phpcodesniffer-composer-installer` under `config.allow-plugins` in `composer.json`.
+> For `lint/phpcs/full`, I would allow `dealerdirect/phpcodesniffer-composer-installer` under `config.allow-plugins` in `composer.json`, the Composer plugin that registers the PHPCS standards.
 >
 > Apply? [yes / skip]
 
