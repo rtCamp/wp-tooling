@@ -543,10 +543,10 @@ describe('runCli', () => {
 			const written = fs.readFileSync(outPath, 'utf8');
 			expect(written).toMatch(/total-count=2/);
 			expect(written).toMatch(
-				/js-files<<EOF_WP_TOOLING\nsrc\/a\.js\nEOF_WP_TOOLING/
+				/js-files<<(ghadelim_[0-9a-f]{32})\nsrc\/a\.js\n\1/
 			);
 			expect(written).toMatch(
-				/css-files<<EOF_WP_TOOLING\nsrc\/b\.scss\nEOF_WP_TOOLING/
+				/css-files<<(ghadelim_[0-9a-f]{32})\nsrc\/b\.scss\n\1/
 			);
 			// Empty buckets serialise compactly as `key=` (no heredoc).
 			expect(written).toMatch(/php-files=\n/);
@@ -582,7 +582,7 @@ describe('runCli', () => {
 			const out = stdoutChunks.join('');
 			expect(out).toMatch(/\[dry-run\] would append/);
 			expect(out).toMatch(
-				/js-files<<EOF_WP_TOOLING\nsrc\/a\.js\nEOF_WP_TOOLING/
+				/js-files<<(ghadelim_[0-9a-f]{32})\nsrc\/a\.js\n\1/
 			);
 		} finally {
 			if (prev === undefined) {
