@@ -1,4 +1,21 @@
-# rtCamp WordPress PHPCS standards (`rtcamp/wp-phpcs`)
+<h1 align="center">wp-phpcs</h1>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg" alt="License: GPL-2.0-or-later"></a>
+  <img src="https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg" alt="PHP 8.2+">
+  <img src="https://img.shields.io/badge/PHP__CodeSniffer-3.x-orange.svg" alt="PHP_CodeSniffer 3.x">
+</p>
+
+<p align="center">
+  rtCamp's PHP_CodeSniffer standards for WordPress projects
+  (<code>rtcamp/wp-phpcs</code>): <code>rtCampWP-Basic</code> and the stricter <code>rtCampWP</code>.
+</p>
+
+---
+
+> **Developed in [rtCamp/wp-tooling](https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpcs).**
+> The [`rtCamp/wp-phpcs`](https://github.com/rtCamp/wp-phpcs) repository is a read-only mirror, split from
+> there on each release. Please open issues and pull requests in wp-tooling.
 
 Shared PHP_CodeSniffer standards for rtCamp WordPress projects. Each skeleton (plugin, theme,
 and future tracks) extends one of these instead of copying — and drifting — a long PHPCS

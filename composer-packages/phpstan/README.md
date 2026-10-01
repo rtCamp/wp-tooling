@@ -1,8 +1,22 @@
-# rtcamp/wp-phpstan
+<h1 align="center">wp-phpstan</h1>
 
-rtCamp's shared [PHPStan](https://phpstan.org/) baseline for WordPress projects.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg" alt="License: GPL-2.0-or-later"></a>
+  <img src="https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg" alt="PHP 8.2+">
+  <img src="https://img.shields.io/badge/PHPStan-2.x-blue.svg" alt="PHPStan 2.x">
+</p>
 
-It ships a single `phpstan.neon.dist` of rtCamp defaults (level 5, WordPress-aware
+<p align="center">
+  rtCamp's shared PHPStan baseline for WordPress projects (<code>rtcamp/wp-phpstan</code>).
+</p>
+
+---
+
+> **Developed in [rtCamp/wp-tooling](https://github.com/rtCamp/wp-tooling/tree/main/composer-packages/phpstan).**
+> The [`rtCamp/wp-phpstan`](https://github.com/rtCamp/wp-phpstan) repository is a read-only mirror, split from
+> there on each release. Please open issues and pull requests in wp-tooling.
+
+This package ships a single `phpstan.neon.dist` of rtCamp defaults (level 5, WordPress-aware
 rules) and pulls in [`szepeviktor/phpstan-wordpress`](https://github.com/szepeviktor/phpstan-wordpress),
 which loads the WordPress function stubs and dynamic return-type extensions PHPStan
 needs to understand core.
