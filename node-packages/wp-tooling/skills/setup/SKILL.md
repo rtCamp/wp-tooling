@@ -315,7 +315,7 @@ Developer actions (run these yourself):
   npm install --save-dev \
     eslint@^10.0.0 \
     @wordpress/eslint-plugin@^25.1.0 \
-    @rtcamp/eslint-config@^0.1.0
+    @rtcamp/eslint-config@github:rtCamp/wp-tooling#npm/eslint-config
 
 Scripts to add to composer.json:
 
