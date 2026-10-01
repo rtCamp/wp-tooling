@@ -194,6 +194,16 @@ const firstMissingAncestor = (dir) => {
 };
 
 /**
+ * Escape a literal for use inside a RegExp, so a dotenv key or define name
+ * such as `APP.DEBUG` matches only itself.
+ *
+ * @param {string} value - Literal text.
+ * @return {string} Pattern source matching exactly `value`.
+ */
+const escapeRegExp = (value) =>
+	String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * Build the FeatureApi handed to every hook / probe. All mutating calls record
  * an undo entry in `api._journal` so a feature can be rolled back on failure.
  *
@@ -361,7 +371,10 @@ const makeFeatureApi = (root, identity, ui) => {
 			}
 			const raw = fs.readFileSync(abs, 'utf8');
 			const match = raw.match(
-				new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*(.*)$`, 'm')
+				new RegExp(
+					`^[ \\t]*${escapeRegExp(key)}[ \\t]*=[ \\t]*(.*)$`,
+					'm'
+				)
 			);
 			return match ? match[1].trim().replace(/^["']|["']$/g, '') : null;
 		},
@@ -371,7 +384,10 @@ const makeFeatureApi = (root, identity, ui) => {
 		setEnv(rel, key, value) {
 			const raw = api.read(rel) || '';
 			const line = `${key}=${value}`;
-			const re = new RegExp(`^[ \\t]*${key}[ \\t]*=.*$`, 'm');
+			const re = new RegExp(
+				`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`,
+				'm'
+			);
 			let next;
 			if (re.test(raw)) {
 				next = raw.replace(re, line);
@@ -397,7 +413,7 @@ const makeFeatureApi = (root, identity, ui) => {
 			const raw = fs.readFileSync(abs, 'utf8');
 			const match = raw.match(
 				new RegExp(
-					`^[ \\t]*define\\(\\s*['"]${name}['"]\\s*,\\s*(true|false)\\s*\\)`,
+					`^[ \\t]*define\\(\\s*['"]${escapeRegExp(name)}['"]\\s*,\\s*(true|false)\\s*\\)`,
 					'im'
 				)
 			);
@@ -414,7 +430,7 @@ const makeFeatureApi = (root, identity, ui) => {
 				throw new Error(`setDefine: ${rel} not found`);
 			}
 			const re = new RegExp(
-				`(^[ \\t]*define\\(\\s*['"]${name}['"]\\s*,\\s*)(?:true|false)(\\s*\\))`,
+				`(^[ \\t]*define\\(\\s*['"]${escapeRegExp(name)}['"]\\s*,\\s*)(?:true|false)(\\s*\\))`,
 				'im'
 			);
 			if (!re.test(raw)) {
