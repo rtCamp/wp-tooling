@@ -40,7 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Human-readable scaffold labels now escape apostrophes and backslashes in PHP and JavaScript string literals, and quotes in block JSON metadata. Titles such as `Editor's "guide"` generate valid code while preserving the original display text.
+- Human-readable scaffold labels and the `wp/cli` command description now escape apostrophes and backslashes in PHP and JavaScript string literals, and quotes in block JSON metadata. Titles such as `Editor's "guide"` generate valid code while preserving the original display text.
 - Block and script module asset paths now derive the project root from `base_path`, so nested or root-level PSR-4 directories resolve build output correctly.
 - Generated block JavaScript follows the current shared ESLint formatting rules.
 - PHPCS scaffolds exclude intentionally broken AI evaluation fixtures. The standalone server profiler uses short arrays and documents the specific PHPCS exceptions required by WP-CLI evaluation, privileged CLI query data and STDERR diagnostics.
