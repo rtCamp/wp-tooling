@@ -44,6 +44,12 @@
 			"key": "description",
 			"description": "One-line command description shown in `wp help`.",
 			"default": "TODO: describe what this command does."
+		},
+		{
+			"key": "description_php",
+			"description": "Escaped description for the generated string literal. Derived from description.",
+			"discover_from": "input:description",
+			"transform": "php-escape"
 		}
 	],
 	"files": [

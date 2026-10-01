@@ -97,7 +97,7 @@ Developer actions:
 
   composer require rtcamp/wp-primitives:^2.0
   composer require --dev rtcamp/wp-phpcs:^1.0 phpunit/phpunit:^12.0 yoast/phpunit-polyfills:^4.0 brain/monkey:^2.6
-  npm install --save-dev eslint@^10.0.0 @wordpress/eslint-plugin@^25.1.0 @rtcamp/eslint-config@github:rtCamp/wp-tooling#npm/eslint-config
+  npm install --save-dev eslint@^10.0.0 @wordpress/eslint-plugin@^25.1.0 @rtcamp/eslint-config@^0.1.0
 
 Scripts to add to composer.json:
   "lint:php": "phpcs --standard=phpcs.xml.dist", "test": "phpunit", ...

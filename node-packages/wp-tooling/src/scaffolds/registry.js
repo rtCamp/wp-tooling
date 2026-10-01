@@ -457,7 +457,11 @@ class ScaffoldRegistry {
 			const targetFile = collapseModules(
 				path.posix.normalize(render(w.target_file, resolved))
 			);
-			if (targetFile.startsWith('../') || path.isAbsolute(targetFile)) {
+			if (
+				targetFile === '..' ||
+				targetFile.startsWith('../') ||
+				path.posix.isAbsolute(targetFile)
+			) {
 				warnings.push(
 					`wiring target resolves outside the project, skipped: ${targetFile}`
 				);

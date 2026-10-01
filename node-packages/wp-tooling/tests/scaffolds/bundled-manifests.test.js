@@ -71,6 +71,7 @@ describe('quoted display text', () => {
 		],
 		['wp/user-role', 'display_name', { slug: 'quote' }],
 		['wp-api/block-bindings', 'label', { name: 'quote' }],
+		['wp/cli', 'description', { name: 'quote' }],
 	])('escapes PHP display text in %s', async (id, key, inputs) => {
 		const cwd = makeTmpDir();
 		const result = await registry.execute(
@@ -180,6 +181,43 @@ describe('wiring targetFile normalisation', () => {
 		expect(result.ai.wiring).toEqual([]);
 		expect(result.warnings).toEqual([
 			'wiring target resolves outside the project, skipped: ../Modules/Cli.php',
+		]);
+	});
+
+	it('drops a wiring target that normalises to exactly `..`', async () => {
+		// `a/../..` normalises to `..`, with no trailing slash, so a
+		// `startsWith('../')` check alone would let it through.
+		const projectDir = makeTmpDir();
+		const sDir = path.join(projectDir, 'wp', 'probe');
+		fs.mkdirSync(sDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(sDir, 'scaffold.json'),
+			JSON.stringify({
+				slug: 'probe',
+				category: 'wp',
+				name: 'Probe',
+				description: 'Wires into a parent-directory target.',
+				source: 'template',
+				inputs: [
+					{ key: 'dir', description: 'Directory', default: 'a' },
+				],
+				files: [{ src: 'x.mustache', dest: 'out.php' }],
+				wiring: [
+					{ target_file: '{{dir}}/../..', snippet_template: 'x' },
+				],
+			}),
+			'utf8'
+		);
+		const r = new ScaffoldRegistry({ projectDir });
+		await r.scan();
+		const result = await r.execute(
+			'wp/probe',
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring).toEqual([]);
+		expect(result.warnings).toEqual([
+			'wiring target resolves outside the project, skipped: ..',
 		]);
 	});
 });

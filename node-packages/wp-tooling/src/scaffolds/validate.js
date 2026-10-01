@@ -88,6 +88,11 @@ const DISCOVER_SOURCES = [
 	'input',
 ];
 
+// Prefixes the orchestrating skill resolves before calling the engine, so the
+// engine never reads them (docs/ai-orchestration.md §6). Accepted here so a
+// project or remote manifest that declares them still validates.
+const SKILL_SOURCES = ['code'];
+
 /**
  * Does a `discover_from` spec name a source the engine can resolve?
  *
@@ -99,7 +104,8 @@ function isResolvableSource(spec) {
 	if (colon === -1 || colon === spec.length - 1) {
 		return false;
 	}
-	return DISCOVER_SOURCES.includes(spec.slice(0, colon));
+	const prefix = spec.slice(0, colon);
+	return DISCOVER_SOURCES.includes(prefix) || SKILL_SOURCES.includes(prefix);
 }
 
 /**
@@ -273,7 +279,7 @@ function validateInputs(inputs) {
 				// time and fall back to the default, silently — a manifest could
 				// declare discovery that never happened and nothing said so.
 				errors.push(
-					`${fieldPath}.discover_from: unknown source in "${entry.discover_from}" (supported: ${DISCOVER_SOURCES.join(', ')})`
+					`${fieldPath}.discover_from: unknown source in "${entry.discover_from}" (supported: ${[...DISCOVER_SOURCES, ...SKILL_SOURCES].join(', ')})`
 				);
 			}
 		}
