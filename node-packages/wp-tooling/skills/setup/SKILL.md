@@ -265,12 +265,7 @@ Create it? [yes / skip PSR-4 / give me the values to use]
 
 ### Wiring: composer.json for PHPCS
 
-The `lint/phpcs/*` wiring entries must be in `composer.json` before the developer runs `composer require`, or the install fails:
-
-1. `repositories` (`full` and `core` only) — a `vcs` entry for `https://github.com/rtCamp/wp-phpcs.git`, since `rtcamp/wp-phpcs` is not on Packagist. Append it to an existing array; skip it if that URL is already listed. `vip` needs none: `automattic/vipwpcs` is on Packagist.
-2. `config.allow-plugins` (all three) — `dealerdirect/phpcodesniffer-composer-installer: true`, the plugin that registers the standards. Merge it into an existing `config` block.
-
-Show the changes together, ask once, and merge rather than replace existing keys.
+All three `lint/phpcs/*` scaffolds need one wiring entry in `composer.json` before the developer runs `composer require`, or the install fails: `config.allow-plugins` with `dealerdirect/phpcodesniffer-composer-installer: true`, the plugin that registers the standards. Merge it into an existing `config` block rather than replacing it, and ask once.
 
 ### Wiring: feature scaffolds
 
@@ -315,7 +310,7 @@ Developer actions (run these yourself):
   npm install --save-dev \
     eslint@^10.0.0 \
     @wordpress/eslint-plugin@^25.1.0 \
-    @rtcamp/eslint-config@github:rtCamp/wp-tooling#npm/eslint-config
+    @rtcamp/eslint-config@^1.1.0
 
 Scripts to add to composer.json:
 

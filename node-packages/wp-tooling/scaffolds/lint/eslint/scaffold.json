@@ -13,7 +13,7 @@
 	"npm_dev_dependencies": {
 		"eslint": "^10.0.0",
 		"@wordpress/eslint-plugin": "^25.1.0",
-		"@rtcamp/eslint-config": "github:rtCamp/wp-tooling#npm/eslint-config"
+		"@rtcamp/eslint-config": "^1.1.0"
 	},
 	"scripts": {
 		"npm": {

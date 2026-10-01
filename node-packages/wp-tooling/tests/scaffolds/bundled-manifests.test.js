@@ -949,29 +949,23 @@ describe.each([
 		});
 	});
 
-	it('wires the repository and plugin permission Composer needs to install it', async () => {
+	it('wires only the plugin permission Composer needs to install it', async () => {
 		const result = await registry.execute(
 			id,
 			{},
 			{ dryRun: true, cwd: makeTmpDir() }
 		);
-		const [repositories, allowPlugins] = result.ai.wiring;
 
-		expect(result.ai.wiring.map((w) => w.targetFile)).toEqual([
-			'composer.json',
-			'composer.json',
-		]);
-		// Not on Packagist: without this entry the require cannot resolve.
-		expect(JSON.parse(`{${repositories.snippet}}`).repositories).toEqual([
-			{
-				type: 'vcs',
-				url: 'https://github.com/rtCamp/wp-phpcs.git',
-				'no-api': true,
+		// rtcamp/wp-phpcs resolves from Packagist, so no repositories entry.
+		expect(result.ai.wiring).toHaveLength(1);
+		expect(result.ai.wiring[0].targetFile).toBe('composer.json');
+		expect(JSON.parse(`{${result.ai.wiring[0].snippet}}`)).toEqual({
+			config: {
+				'allow-plugins': {
+					'dealerdirect/phpcodesniffer-composer-installer': true,
+				},
 			},
-		]);
-		expect(
-			JSON.parse(`{${allowPlugins.snippet}}`).config['allow-plugins']
-		).toEqual({ 'dealerdirect/phpcodesniffer-composer-installer': true });
+		});
 	});
 
 	it('falls back to defaults and leaves out the namespace prefix without PSR-4', async () => {
