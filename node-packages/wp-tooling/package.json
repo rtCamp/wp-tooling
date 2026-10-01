@@ -54,7 +54,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rtCamp/wp-tooling.git"
+    "url": "git+https://github.com/rtCamp/wp-tooling.git",
+    "directory": "node-packages/wp-tooling"
   },
   "scripts": {
     "check": "npm run lint && npm test",
