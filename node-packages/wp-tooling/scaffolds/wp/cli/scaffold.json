@@ -2,7 +2,7 @@
 	"slug": "cli",
 	"category": "wp",
 	"name": "WP-CLI command",
-	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-framework. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
+	"description": "Adds a WP-CLI command class implementing the CLICommand interface from rtcamp/wp-primitives. Static get_name / get_description / run; the consumer's Cli module wires it through WP_CLI::add_command().",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Cli'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Cli"
 		},
 		{
@@ -43,6 +44,12 @@
 			"key": "description",
 			"description": "One-line command description shown in `wp help`.",
 			"default": "TODO: describe what this command does."
+		},
+		{
+			"key": "description_php",
+			"description": "Escaped description for the generated string literal. Derived from description.",
+			"discover_from": "input:description",
+			"transform": "php-escape"
 		}
 	],
 	"files": [
@@ -67,6 +74,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

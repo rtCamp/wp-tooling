@@ -2,7 +2,7 @@
 	"slug": "rest",
 	"category": "wp",
 	"name": "REST controller",
-	"description": "Adds a REST API controller extending AbstractRESTController from rtcamp/wp-framework. The base extends WP_REST_Controller; the consumer's Rest module instantiates each controller via the Loader.",
+	"description": "Adds a REST API controller extending AbstractRESTController from rtcamp/wp-primitives. The base extends WP_REST_Controller; the consumer's Rest module instantiates each controller via the Loader.",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Rest'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Rest"
 		},
 		{
@@ -72,6 +73,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

@@ -10,6 +10,7 @@ const zlib = require('zlib');
 
 const {
 	zip,
+	plan,
 	zipPack,
 	crc32,
 	dosTimeDate,
@@ -326,3 +327,50 @@ describe('release/zip - integration', () => {
 });
 
 /* eslint-enable no-bitwise */
+
+describe('release/zip - oversized payload guard', () => {
+	let tmp;
+	afterEach(() => cleanup(tmp));
+
+	it('warns, naming the biggest directories, when the payload is huge', () => {
+		tmp = copyFixture('plugin-a');
+		// A vendor/ tree with dev requirements still installed is what this
+		// catches in the wild; 30 MB of it stands in for 2 GB of PHPUnit.
+		fs.mkdirSync(path.join(tmp, 'vendor', 'phpunit'), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmp, 'vendor', 'phpunit', 'big.bin'),
+			Buffer.alloc(30 * 1024 * 1024)
+		);
+
+		const result = zip({ cwd: tmp, dryRun: true });
+
+		expect(result.warnings).toHaveLength(2);
+		expect(result.warnings[0]).toMatch(/larger than a release should be/);
+		expect(result.warnings[0]).toContain('vendor');
+		expect(result.warnings[1]).toContain('composer install --no-dev');
+	});
+
+	it('stays quiet for a normally sized plugin', () => {
+		tmp = copyFixture('plugin-a');
+		expect(zip({ cwd: tmp, dryRun: true }).warnings).toEqual([]);
+	});
+
+	it('still ships vendor/ rather than excluding it by default', () => {
+		// Excluding it would break any plugin that autoloads its Composer
+		// dependencies, so the guard reports size instead of dropping files.
+		tmp = copyFixture('plugin-a');
+		fs.mkdirSync(path.join(tmp, 'vendor'), { recursive: true });
+		fs.writeFileSync(path.join(tmp, 'vendor', 'autoload.php'), '<?php\n');
+
+		const names = readZipEntryNames(
+			zipPack(
+				plan({ cwd: tmp }).files.map((f) => ({
+					name: `x/${f.relPath}`,
+					data: fs.readFileSync(f.absPath),
+					mtimeEpoch: 0,
+				}))
+			)
+		);
+		expect(names).toContain('x/vendor/autoload.php');
+	});
+});

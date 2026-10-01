@@ -157,6 +157,28 @@ describe('render — sections', () => {
 });
 
 describe('applyTransform', () => {
+	it('escapes PHP single-quoted text without changing double quotes', () => {
+		expect(applyTransform('Editor\'s "guide" \\ notes', 'php-escape')).toBe(
+			'Editor\\\'s "guide" \\\\ notes'
+		);
+	});
+
+	it('escapes JavaScript apostrophes and control characters', () => {
+		expect(applyTransform("Editor's\n\\notes", 'js-string')).toBe(
+			'"Editor\'s\\n\\\\notes"'
+		);
+	});
+
+	it.each([
+		['.', '__DIR__'],
+		['./', '__DIR__'],
+		['inc/Blocks', 'dirname( __DIR__, 2 )'],
+		['inc/Modules/Blocks', 'dirname( __DIR__, 3 )'],
+		['./inc/Modules/../Blocks/', 'dirname( __DIR__, 2 )'],
+	])('resolves the project root depth for %s', (directory, expected) => {
+		expect(applyTransform(directory, 'php-project-root')).toBe(expected);
+	});
+
 	it('json-escape round-trips quotes, backslashes and control characters', () => {
 		const value = '"quoted"\\path\n\t\r\u0000';
 		expect(JSON.parse(`"${applyTransform(value, 'json-escape')}"`)).toBe(

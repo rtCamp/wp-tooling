@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Blocks'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Blocks"
 		},
 		{
@@ -58,6 +59,24 @@
 			"key": "vendor",
 			"description": "Vendor prefix for the block name, e.g. 'rtcamp' produces 'rtcamp/faq-accordion'. Also the store namespace shared by render.php's data-wp-interactive and view.js's store().",
 			"default": "rtcamp"
+		},
+		{
+			"key": "title_js",
+			"description": "Escaped title for generated string literals. Derived from title.",
+			"discover_from": "input:title",
+			"transform": "js-string"
+		},
+		{
+			"key": "title_json",
+			"description": "Escaped title for generated string literals. Derived from title.",
+			"discover_from": "input:title",
+			"transform": "json-escape"
+		},
+		{
+			"key": "project_root",
+			"description": "PHP expression for the project root, derived from base_path.",
+			"discover_from": "input:base_path",
+			"transform": "php-project-root"
 		}
 	],
 	"files": [
@@ -102,7 +121,7 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	},
 	"npm_dev_dependencies": {
 		"@wordpress/block-editor": "^16.0.0",

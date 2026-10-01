@@ -4,7 +4,7 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  * @link https://developer.wordpress.org/reference/functions/wp_register_script_module/
  *
  * @package {{namespace}}
@@ -14,7 +14,7 @@ declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
  * Registers and enqueues a Script Module (core since WP 6.5).
@@ -94,24 +94,22 @@ final class {{class}} implements Registrable {
 	/**
 	 * Filesystem path of the built module.
 	 *
-	 * Assumes this class sits two levels below the plugin root (the default
-	 * '<plugin>/includes/Services/' layout). Adjust the dirname() depths here
-	 * and in get_module_url() together if the class lives somewhere else.
+	 * Resolved from this class's directory up to the project root, so update
+	 * it here and in get_module_url() if the class moves.
 	 */
 	public function get_module_path(): string {
-		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{module_slug}}.js';
+		return {{project_root}} . '/{{build_dir}}/{{module_slug}}.js';
 	}
 
 	/**
 	 * Public URL of the built module.
 	 *
-	 * The dirname() depth is one shallower than get_module_path()'s on
-	 * purpose: plugin_dir_url() takes a *file* and returns the URL of the
-	 * directory holding it, so passing '<plugin>/includes' yields the plugin
-	 * root URL. Both therefore describe the same directory.
+	 * The plugin_dir_url() helper returns the URL of a file's directory, so it
+	 * gets a file name under the project root. The file is never read, so it
+	 * need not exist.
 	 */
 	public function get_module_url(): string {
-		return plugin_dir_url( dirname( __DIR__ ) ) . '{{build_dir}}/{{module_slug}}.js';
+		return plugin_dir_url( {{project_root}} . '/{{class}}.php' ) . '{{build_dir}}/{{module_slug}}.js';
 	}
 
 	/**
@@ -120,7 +118,7 @@ final class {{class}} implements Registrable {
 	 * @return array<string,mixed>
 	 */
 	private function get_asset_meta(): array {
-		$asset_file = dirname( __DIR__, 2 ) . '/{{build_dir}}/{{module_slug}}.asset.php';
+		$asset_file = {{project_root}} . '/{{build_dir}}/{{module_slug}}.asset.php';
 
 		if ( ! is_readable( $asset_file ) ) {
 			return [];
@@ -139,7 +137,7 @@ final class {{class}} implements Registrable {
 	 *
 	 * @param array<int,mixed> $dependencies Raw dependency list.
 	 *
-	 * @return array<int,array<string,string>>
+	 * @return array<int,array{id:string,import?:string}>
 	 */
 	private function normalise_dependencies( array $dependencies ): array {
 		$normalised = [];
@@ -150,9 +148,19 @@ final class {{class}} implements Registrable {
 				continue;
 			}
 
-			if ( is_array( $dependency ) && isset( $dependency['id'] ) && is_string( $dependency['id'] ) ) {
-				$normalised[] = $dependency;
+			if ( ! is_array( $dependency ) || ! isset( $dependency['id'] ) || ! is_string( $dependency['id'] ) ) {
+				continue;
 			}
+
+			// Rebuilt key by key rather than passed through, so the result is
+			// exactly the shape core documents -- anything else it would ignore.
+			$entry = [ 'id' => $dependency['id'] ];
+
+			if ( isset( $dependency['import'] ) && is_string( $dependency['import'] ) ) {
+				$entry['import'] = $dependency['import'];
+			}
+
+			$normalised[] = $entry;
 		}
 
 		return $normalised;

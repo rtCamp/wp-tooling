@@ -4,16 +4,16 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  *
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Abstracts\AbstractModule;
+use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractModule;
 
 /**
  * Groups related Registrable classes for the framework Loader to boot.
@@ -26,7 +26,7 @@ final class {{class}} extends AbstractModule {
 	 *
 	 * @return array<int,class-string>
 	 */
-	public function get_classes(): array {
+	protected function get_classes(): array {
 		return [
 			// scaffold:wp/{{kind}}:classes (add classes here).
 		];

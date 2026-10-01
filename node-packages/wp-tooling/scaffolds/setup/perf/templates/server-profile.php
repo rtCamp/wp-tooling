@@ -1,4 +1,4 @@
-<?php
+<?php // phpcs:ignore SlevomatCodingStandard.TypeHints.DeclareStrictTypes -- WP-CLI eval-file cannot evaluate a strict_types declaration here.
 /**
  * Server-side XHProf profile of a front-end render path, for `wp eval-file`.
  *
@@ -25,7 +25,13 @@
  *
  * NOTE: no declare(strict_types) here — `wp eval-file` runs the file through
  * eval(), where a declare() is no longer the first statement of the script.
+ *
+ * @package rtCamp\WPTooling
  */
+
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals -- Standalone CLI diagnostic uses its own server_profile prefix and core's WP_USE_THEMES flag.
+// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Query data comes from privileged CLI arguments, not an HTTP form.
+// phpcs:disable WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- Diagnostics write only to STDERR, not the filesystem.
 
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 	exit( 'Run via: wp eval-file server-profile.php [<path>] [<top>]' . PHP_EOL );
@@ -38,7 +44,7 @@ $server_profile_backend = function_exists( 'xhprof_enable' )
 	: ( function_exists( 'tideways_xhprof_enable' ) ? 'tideways' : 'none' );
 
 if ( ! class_exists( \rtCamp\WPDevTools\Support\XHProfProfiler::class ) ) {
-	echo wp_json_encode( array() ) . PHP_EOL;
+	echo wp_json_encode( [] ) . PHP_EOL;
 	fwrite(
 		STDERR,
 		sprintf(

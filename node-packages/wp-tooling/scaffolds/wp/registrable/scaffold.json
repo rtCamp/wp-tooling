@@ -2,7 +2,7 @@
 	"slug": "registrable",
 	"category": "wp",
 	"name": "Registrable Service",
-	"description": "Escape hatch for hook-registering classes that don't fit a specific abstract. Generates a class implementing the Registrable interface from rtcamp/wp-framework with an empty register_hooks() body.",
+	"description": "Escape hatch for hook-registering classes that don't fit a specific abstract. Generates a class implementing the Registrable interface from rtcamp/wp-primitives with an empty register_hooks() body.",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Services"
 		},
 		{
@@ -62,6 +63,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

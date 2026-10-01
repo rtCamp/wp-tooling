@@ -2,7 +2,7 @@
 	"slug": "cron",
 	"category": "wp",
 	"name": "Cron job",
-	"description": "Adds a cron job class implementing the Registrable interface from rtcamp/wp-framework. The class schedules a wp-cron event in register_hooks() and binds its handler to the chosen action.",
+	"description": "Adds a cron job class implementing the Registrable interface from rtcamp/wp-primitives. The class schedules a wp-cron event in register_hooks() and binds its handler to the chosen action.",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Cron'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Cron"
 		},
 		{
@@ -73,6 +74,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

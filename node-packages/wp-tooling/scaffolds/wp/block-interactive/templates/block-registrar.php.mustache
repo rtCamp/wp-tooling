@@ -4,7 +4,7 @@
  *
  * Scaffolded by @rtcamp/wp-tooling.
  *
- * @link https://github.com/rtCamp/wp-framework
+ * @link https://github.com/rtCamp/wp-primitives
  * @link https://developer.wordpress.org/block-editor/reference-guides/interactivity-api/
  *
  * @package {{namespace}}
@@ -14,7 +14,7 @@ declare( strict_types = 1 );
 
 namespace {{namespace}};
 
-use rtCamp\WPFramework\Contracts\Interfaces\Registrable;
+use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
  * Registers the {{vendor}}/{{slug}} block from its build output.
@@ -45,7 +45,7 @@ final class {{class}} implements Registrable {
 	 * (`npm run build:blocks` in the rtCamp skeleton) to populate it.
 	 */
 	public function get_block_dir(): string {
-		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
+		return {{project_root}} . '/{{build_dir}}/{{slug}}';
 	}
 
 	/**

@@ -10,12 +10,13 @@
 const { bump } = require('./bump');
 const { changelog } = require('./changelog');
 const { zip } = require('./zip');
-const { loadContext, findPluginEntry } = require('./context');
+const { loadContext, findEntry, findPluginEntry } = require('./context');
 
 module.exports = {
 	bump,
 	changelog,
 	zip,
 	loadContext,
+	findEntry,
 	findPluginEntry,
 };
