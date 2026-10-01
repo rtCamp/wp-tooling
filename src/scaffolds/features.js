@@ -359,6 +359,7 @@ async function runInteractive(opts) {
 	const summaries = [];
 	for (const change of changes) {
 		const verb = change.target ? 'Enabling' : 'Disabling';
+		const action = change.target ? 'enable' : 'disable';
 		const s = spinner(`${verb} ${change.id}...`);
 		s.start();
 		try {
@@ -369,7 +370,7 @@ async function runInteractive(opts) {
 			s.succeed(`${summary.action} ${change.id}`);
 			summaries.push(summary);
 		} catch (err) {
-			s.fail(`Failed to ${verb.toLowerCase()} ${change.id}`);
+			s.fail(`Failed to ${action} ${change.id}`);
 			throw err;
 		}
 	}
@@ -461,7 +462,10 @@ function printHumanReport(summaries, opts) {
 				writeln(
 					'  re-run the install yourself once the cause is fixed:'
 				);
-				for (const [p, v] of [...prod, ...dev]) {
+				for (const [p, v] of prod) {
+					writeln(`    npm install ${p}@${v}`);
+				}
+				for (const [p, v] of dev) {
 					writeln(`    npm install --save-dev ${p}@${v}`);
 				}
 			} else if (s.installed) {

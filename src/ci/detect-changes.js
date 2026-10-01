@@ -13,6 +13,7 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 
 /**
@@ -38,6 +39,19 @@ const DEFAULT_IGNORE =
 	/\.github\/(?!workflows)(?!actions)|\.wordpress-org\/|docs\//;
 
 /**
+ * Thrown in strict mode when the changed files cannot be computed, so a caller
+ * that gates jobs on the counts fails instead of reading "nothing changed".
+ */
+class DetectChangesError extends Error {
+	constructor(message, details = {}) {
+		super(message);
+		this.name = 'DetectChangesError';
+		this.code = 'EDIFFFAIL';
+		Object.assign(this, details);
+	}
+}
+
+/**
  * Compute per-bucket change counts (and optionally file lists) for a set of files.
  *
  * @param {Object}             [options]
@@ -45,14 +59,16 @@ const DEFAULT_IGNORE =
  * @param {RegExp|string|null} [options.ignore]       Override default ignore regex. `null` disables ignoring.
  * @param {string}             [options.base]         Override the diff base ref.
  * @param {boolean}            [options.includeFiles] When true, include `<bucket>-files` arrays alongside counts.
+ * @param {boolean}            [options.strict]       When true, a failed `git diff` throws DetectChangesError instead of counting as no changes.
  * @return {Object} Counts keyed `<bucket>-count`. When `includeFiles` is true, matching `<bucket>-files` arrays are included.
+ * @throws {DetectChangesError} In strict mode, when `git diff` fails.
  */
 function detectChanges(options = {}) {
 	const ignore = resolveIgnore(options.ignore);
 	const files =
 		options.files !== undefined
 			? normaliseFiles(options.files)
-			: gitDiffFiles(options.base);
+			: gitDiffFiles(options.base, options.strict === true);
 
 	const ignored = [];
 	const relevant = [];
@@ -143,13 +159,17 @@ function normaliseFiles(input) {
 /**
  * Run `git diff --name-only` against the resolved base ref.
  *
- * Fails soft -- on any git error (shallow clone, missing ref) writes a clear
- * message to stderr and returns an empty list rather than throwing.
+ * By default it fails soft: on any git error (shallow clone, missing ref) it
+ * writes a clear message to stderr and returns an empty list. That reads as
+ * "nothing changed", which skips every gated job green, so CI callers should
+ * pass `strict` and get a DetectChangesError instead.
  *
- * @param {string} [explicitBase]
- * @return {string[]} Changed file paths, or `[]` on failure.
+ * @param {string}  [explicitBase]
+ * @param {boolean} [strict=false] Throw instead of returning `[]` on failure.
+ * @return {string[]} Changed file paths, or `[]` on a soft failure.
+ * @throws {DetectChangesError} When `strict` and `git diff` fails.
  */
-function gitDiffFiles(explicitBase) {
+function gitDiffFiles(explicitBase, strict = false) {
 	const base = explicitBase || resolveBaseRef();
 	try {
 		const out = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], {
@@ -159,6 +179,12 @@ function gitDiffFiles(explicitBase) {
 		return out.split(/\r?\n/).filter(Boolean);
 	} catch (err) {
 		const detail = (err.stderr || err.message || '').toString().trim();
+		if (strict) {
+			throw new DetectChangesError(
+				`git diff failed against "${base}" (${detail})`,
+				{ base, detail }
+			);
+		}
 		process.stderr.write(
 			`detect-changes: git diff failed against "${base}" (${detail}). Treating as no changes.\n`
 		);
@@ -304,6 +330,9 @@ function parseArgs(argv) {
 			case '--include-files':
 				opts.includeFiles = true;
 				break;
+			case '--strict':
+				opts.strict = true;
+				break;
 			case '--help':
 			case '-h':
 				opts.help = true;
@@ -329,14 +358,26 @@ function readFilesArg(filesArg) {
 	return fs.readFileSync(filesArg, 'utf8');
 }
 
-/** GHA heredoc delimiter. File paths cannot contain newlines, so a fixed sentinel is safe. */
-const GHA_HEREDOC = 'EOF_WP_TOOLING';
+/**
+ * A fresh, unguessable heredoc delimiter for one multi-line output.
+ *
+ * The file list comes from the pull request, so a fixed sentinel is forgeable:
+ * a PR adding a file named after it closes the heredoc early, and a following
+ * file named `php-count=0` then overrides the real count, skipping the jobs
+ * gated on it.
+ *
+ * @return {string} Delimiter of the form `ghadelim_<32 hex chars>`.
+ */
+function makeHeredocDelimiter() {
+	return `ghadelim_${crypto.randomBytes(16).toString('hex')}`;
+}
 
 /**
  * Render one `$GITHUB_OUTPUT` line for a scalar or array value.
  *
- * Arrays use the GitHub Actions heredoc syntax for multi-line outputs.
- * Empty arrays render as `key=` (no heredoc) for compactness.
+ * Arrays use the GitHub Actions heredoc syntax for multi-line outputs, under a
+ * random delimiter that no value line may equal. Empty arrays render as `key=`
+ * (no heredoc) for compactness.
  *
  * @param {string}                 key
  * @param {number|string|string[]} value
@@ -347,7 +388,11 @@ function formatGithubLine(key, value) {
 		if (value.length === 0) {
 			return `${key}=`;
 		}
-		return `${key}<<${GHA_HEREDOC}\n${value.join('\n')}\n${GHA_HEREDOC}`;
+		let delimiter = makeHeredocDelimiter();
+		while (value.includes(delimiter)) {
+			delimiter = makeHeredocDelimiter();
+		}
+		return `${key}<<${delimiter}\n${value.join('\n')}\n${delimiter}`;
 	}
 	return `${key}=${value}`;
 }
@@ -416,6 +461,7 @@ function printUsage() {
 			'  --files <path|->              Read newline-delimited file list from a path',
 			'                                or stdin (`-`); skip git entirely.',
 			'  --include-files               Include the matching file paths per bucket in the output.',
+			'  --strict                      Exit 1 when git diff fails instead of reporting no changes.',
 			'  --dry-run                     With --output github, preview to stdout (no file write).',
 			'  --help, -h                    Print this help.',
 			'',
@@ -427,7 +473,7 @@ function printUsage() {
  * Run the CLI. Returns the intended exit code.
  *
  * @param {string[]} argv argv slice (without `node` and script path).
- * @return {number} Process exit code (0 on success, 1 on I/O failure, 2 on usage error).
+ * @return {number} Process exit code (0 on success, 1 on I/O failure or a strict-mode diff failure, 2 on usage error).
  */
 function runCli(argv) {
 	let opts;
@@ -473,12 +519,24 @@ function runCli(argv) {
 		}
 	}
 
-	const result = detectChanges({
-		files,
-		ignore: opts.ignore,
-		base: opts.base,
-		includeFiles: opts.includeFiles === true,
-	});
+	let result;
+	try {
+		result = detectChanges({
+			files,
+			ignore: opts.ignore,
+			base: opts.base,
+			includeFiles: opts.includeFiles === true,
+			strict: opts.strict === true,
+		});
+	} catch (err) {
+		if (err instanceof DetectChangesError) {
+			process.stderr.write(
+				`detect-changes: ${err.message}. Failing because --strict is set.\n`
+			);
+			return 1;
+		}
+		throw err;
+	}
 
 	emit(result, opts.output, opts.dryRun === true);
 	return 0;
@@ -489,6 +547,7 @@ module.exports = {
 	runCli,
 	takeValue,
 	formatGithubLine,
+	DetectChangesError,
 	DEFAULT_PATTERNS,
 	DEFAULT_IGNORE,
 };
