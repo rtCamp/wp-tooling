@@ -30,6 +30,8 @@
 
 'use strict';
 
+const path = require('path');
+
 class RenderError extends Error {
 	constructor(message, details = {}) {
 		super(message);
@@ -225,6 +227,27 @@ const TRANSFORMS = {
 	'upper-snake-case': (s) => splitWords(s).join('_').toUpperCase(),
 	// Escape JSON string contents; templates supply the surrounding quotes.
 	'json-escape': (s) => JSON.stringify(String(s)).slice(1, -1),
+	// Templates supply single quotes; PHP recognises only \\ and \' escapes.
+	'php-escape': (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"),
+	// Emit the complete literal, choosing the quotes Prettier would prefer.
+	'js-string': (s) => {
+		const value = String(s);
+		const json = JSON.stringify(value);
+		if (
+			(value.match(/'/g) || []).length > (value.match(/"/g) || []).length
+		) {
+			return json;
+		}
+		return `'${json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, "\\'")}'`;
+	},
+	// Derive a PHP expression without embedding the supplied path in code.
+	'php-project-root': (s) => {
+		const depth = path.posix
+			.normalize(String(s))
+			.split('/')
+			.filter((part) => part && part !== '.').length;
+		return depth ? `dirname( __DIR__, ${depth} )` : '__DIR__';
+	},
 	// POSIX-shell quote a single argument, only when it needs quoting.
 	'shell-escape': (s) => {
 		const v = String(s);

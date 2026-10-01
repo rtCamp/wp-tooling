@@ -5,27 +5,65 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
 use {{namespace}}\{{class}};
+use ReflectionMethod;
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
-	public function test_get_classes_returns_array(): void {
-		$this->assertIsArray( ( new {{class}}() )->get_classes() );
+	/**
+	 * The Loader walks the list positionally, so it must be a list.
+	 */
+	public function test_get_classes_returns_a_list(): void {
+		$classes = $this->get_module_classes();
+
+		$this->assertSame( array_values( $classes ), $classes, 'get_classes() must return a list, not a keyed map.' );
 	}
 
-	public function test_each_listed_class_is_loadable(): void {
-		foreach ( ( new {{class}}() )->get_classes() as $class ) {
-			$this->assertTrue( class_exists( $class ), "Class {$class} should be loadable" );
+	/**
+	 * Every listed class is autoloadable, so the Loader can instantiate it.
+	 *
+	 * Compares whole arrays rather than asserting inside the loop: a freshly
+	 * scaffolded module lists nothing, and a loop body that never runs leaves
+	 * the case with no assertion at all -- risky, which consumers fail on.
+	 */
+	public function test_every_listed_class_is_loadable(): void {
+		$classes  = $this->get_module_classes();
+		$loadable = [];
+
+		foreach ( $classes as $class ) {
+			if ( class_exists( $class ) ) {
+				$loadable[] = $class;
+			}
 		}
+
+		$this->assertSame( $classes, $loadable, 'Every class listed by get_classes() must be autoloadable.' );
+	}
+
+	/**
+	 * Read the module's class list.
+	 *
+	 * AbstractModule declares get_classes() protected and the generated module
+	 * is final, so neither a direct call nor a test subclass can reach it.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_module_classes(): array {
+		$method = new ReflectionMethod( {{class}}::class, 'get_classes' );
+
+		return (array) $method->invoke( new {{class}}() );
 	}
 }

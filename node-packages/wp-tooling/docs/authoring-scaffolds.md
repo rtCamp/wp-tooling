@@ -139,7 +139,13 @@ exactly as if `discover_from` were not set).
 
 - `input:<other-key>` — derive from another resolved input (e.g. `class` from `name`, with a `pascal-case` transform).
 - `composer.json:<dot.path>` / `package.json:<dot.path>` — a string value at a dotted path. The special selector `autoload.psr-4` (or `autoload.psr-0`) yields the **root namespace** for ordinary inputs (first map key, trailing `\` stripped) and the **root directory** for path inputs (that same entry's value; the first element if it is a list). Either way the discovered root replaces only the *first segment* of the input's `default`, keeping the scaffold's sub-namespace or sub-directory: with a map of `Acme\Blog\` → `inc/`, a `namespace` default of `Inc\Cli` yields `Acme\Blog\Cli` and a `base_path` default of `includes/Cli` yields `inc/Cli`. Both come from the same map entry, so a class is never namespaced into the autoload root while being written outside it. A path input whose `default` has no sub-directory resolves to the root directory itself, and a PSR-4 target of `./` leaves just the sub-directory.
+- `composer.json:autoload-dev.psr-4` — the same graft against the **dev** autoload map, which is where a project declares its test tree. Use it for `tests_path`: a dev map of `Acme\Blog\Tests\` → `tests/php/` turns a default of `tests/Cli` into `tests/php/Cli`, so the generated test lands where the project's PHPUnit testsuite actually looks. Without it a test is written to the manifest default and is silently never collected.
+- `plugin-header:<header-name>` — a value from the project's WordPress entry header, named lowercased with spaces hyphenated: `plugin-header:text-domain` reads `Text Domain:`. The engine looks for a root-level `*.php` carrying `Plugin Name:` and falls back to a theme's `style.css` carrying `Theme Name:`, so this resolves for plugins and themes alike. Only the header comment is scanned, so a `Foo: bar` in the code below is never mistaken for a header.
 - `config:<dot.path>` — a string value from the project's `.wp-tooling.json` (e.g. `config:textDomain`).
+
+`validate` rejects a `discover_from` whose prefix is not one of the above. An unrecognised
+source used to resolve to nothing and fall through to the `default` in silence, which is how
+seven scaffolds shipped for months declaring a text-domain lookup that never ran.
 
 Example — auto-fill the namespace from the consuming project's composer.json, falling back to a sensible default:
 
@@ -163,6 +169,9 @@ Available via `transform`:
 - `snake-case`: `qm-export` → `qm_export`
 - `upper-snake-case`: `wporg-username` → `WPORG_USERNAME`
 - `json-escape`: `Acme\Blog` → `Acme\\Blog` (embed a PHP namespace in a JSON snippet)
+- `php-escape`: escapes backslashes and apostrophes for a PHP string enclosed in single quotes.
+- `js-string`: emits a complete JavaScript string literal, escaping control characters and choosing the quote style used by the formatter. Templates do not add surrounding quotes.
+- `php-project-root`: derives a PHP expression from a project-relative directory (`inc/Blocks` → `dirname( __DIR__, 2 )`, `.` → `__DIR__`). Block and script module scaffolds use it to find their project root with custom source layouts.
 - `shell-escape`: `my plugin` → `'my plugin'` (POSIX-quote one shell argument; safe values like `wp-content/plugins/x` stay bare)
 
 Transforms are applied after the value is resolved. Add new transforms in `src/scaffolds/render.js` (`TRANSFORMS` map).
@@ -207,8 +216,8 @@ The engine never edits existing files. When a scaffold needs to register itself 
 
 Each entry:
 
-- `target_file`: path to the file. Placeholders allowed.
-- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling.
+- `target_file`: path to the file, relative to the project root. Placeholders allowed. The engine normalises the rendered path, so `{{base_path}}/../Modules/Cli.php` reaches the AI as `includes/Modules/Cli.php` — write the `..` form rather than duplicating a path input. An entry whose path still resolves outside the project after normalising is dropped with a warning.
+- `anchor`: grep-able string that hints at insertion point (e.g. `// scaffold:cli-commands`). Anchors are useful but not load-bearing; the AI falls back to pattern sampling. Either way it refuses to insert inside a `// wp:example:<key>` … `:end` region, since `wp-tooling init` deletes those body and all.
 - `snippet_template`: the snippet to insert. Mustache placeholders are rendered before the snippet is emitted.
 - `description`: explains intent. The AI uses this when asking the developer for consent.
 

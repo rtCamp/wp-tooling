@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,18 +17,31 @@ use {{namespace}}\{{class}}Controller;
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}ControllerTest
+ *
  * @covers \{{namespace}}\{{class}}Controller
  */
 final class {{class}}ControllerTest extends WP_UnitTestCase {
 
+	/**
+	 * Routes are registered on rest_api_init, the only hook where register_rest_route() is safe.
+	 */
 	public function test_register_hooks_attaches_to_rest_api_init(): void {
 		$instance = new {{class}}Controller();
 		$instance->register_hooks();
 		$this->assertNotFalse( has_action( 'rest_api_init', [ $instance, 'register_routes' ] ) );
 	}
 
+	/**
+	 * The route lands in the REST server's table under its namespaced path.
+	 *
+	 * Goes through the hook rather than calling register_routes() directly:
+	 * register_rest_route() emits a _doing_it_wrong notice outside rest_api_init,
+	 * and WP_UnitTestCase fails the case on an unexpected notice.
+	 */
 	public function test_route_is_registered_after_rest_api_init(): void {
-		( new {{class}}Controller() )->register_routes();
+		( new {{class}}Controller() )->register_hooks();
+		do_action( 'rest_api_init' );
 		$routes = rest_get_server()->get_routes();
 		$this->assertArrayHasKey( '/{{rest_namespace}}/v{{rest_version}}/{{name}}', $routes );
 	}

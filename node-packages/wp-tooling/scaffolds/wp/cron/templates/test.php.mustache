@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,16 +17,24 @@ use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * Booting the class schedules its event, so the job runs unattended.
+	 */
 	public function test_register_hooks_schedules_event(): void {
 		( new {{class}}() )->register_hooks();
 		$this->assertNotFalse( wp_next_scheduled( {{class}}::HOOK ) );
 		wp_clear_scheduled_hook( {{class}}::HOOK );
 	}
 
+	/**
+	 * The scheduled hook resolves to this class's handler, not just to an empty event.
+	 */
 	public function test_register_hooks_binds_run_handler(): void {
 		$instance = new {{class}}();
 		$instance->register_hooks();

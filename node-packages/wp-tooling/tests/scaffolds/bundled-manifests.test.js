@@ -5,7 +5,8 @@
  *     (json-escape derived input)
  *   - wp/cli namespace + tests_namespace discovery grafts the project's
  *     PSR-4 root onto the kind sub-namespace
- *   - wiring targetFile paths are normalised (no `..` segments)
+ *   - wiring targetFile paths are normalised (no `..` segments), and a
+ *     target that still escapes the project is dropped with a warning
  *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
@@ -15,6 +16,11 @@
  *     reuse an existing wiring anchor rather than minting a new one
  *   - utility/* are source: package — zero files, a Composer dep and one
  *     accessor snippet, with context_slug discovered from composer.json:name
+ *   - lint/phpcs/full and lint/phpcs/core extend rtCampWP and rtCampWP-Basic,
+ *     fill testVersion, minimum_wp_version, text domain and prefixes from the
+ *     project, and wire the Composer repository rtcamp/wp-phpcs installs from;
+ *     lint/phpcs/vip wires only the Composer plugin permission
+ *   - setup/phpunit names the bootstrap's @package after the test namespace
  */
 
 'use strict';
@@ -47,6 +53,61 @@ let registry;
 beforeAll(async () => {
 	registry = new ScaffoldRegistry({ defaultsDir: DEFAULTS_DIR });
 	await registry.scan();
+});
+
+describe('quoted display text', () => {
+	it.each([
+		['wp/admin-page', 'page_title', { slug: 'quote', menu_title: 'Quote' }],
+		[
+			'wp/settings-page',
+			'menu_title',
+			{ slug: 'quote', page_title: 'Quote', option_name: 'quote' },
+		],
+		['wp/cpt', 'singular', { slug: 'quote', plural: 'Quotes' }],
+		[
+			'wp/taxonomy',
+			'plural',
+			{ slug: 'quote', singular: 'Quote', object_type: 'post' },
+		],
+		['wp/user-role', 'display_name', { slug: 'quote' }],
+		['wp-api/block-bindings', 'label', { name: 'quote' }],
+	])('escapes PHP display text in %s', async (id, key, inputs) => {
+		const cwd = makeTmpDir();
+		const result = await registry.execute(
+			id,
+			{ ...inputs, [key]: "Editor's \\guide" },
+			{ cwd }
+		);
+		const file = result.engine.wrote.find((name) => name.endsWith('.php'));
+		const php = fs.readFileSync(path.join(cwd, file), 'utf8');
+		expect(php).toContain("'Editor\\'s \\\\guide'");
+		expect(result.engine.inputs[key]).toBe("Editor's \\guide");
+	});
+
+	it.each(['wp/block-dynamic', 'wp/block-interactive'])(
+		'preserves quotes and backslashes in block metadata for %s',
+		async (id) => {
+			const cwd = makeTmpDir();
+			const title = 'Editor\'s "guide" \\ notes';
+			const result = await registry.execute(
+				id,
+				{ slug: 'quote', title },
+				{ cwd }
+			);
+			const json = result.engine.wrote.find((name) =>
+				name.endsWith('block.json')
+			);
+			expect(
+				JSON.parse(fs.readFileSync(path.join(cwd, json), 'utf8')).title
+			).toBe(title);
+			const edit = result.engine.wrote.find((name) =>
+				name.endsWith('edit.js')
+			);
+			expect(fs.readFileSync(path.join(cwd, edit), 'utf8')).toContain(
+				"Editor\\'s"
+			);
+		}
+	);
 });
 
 describe('setup/psr4 wiring snippet', () => {
@@ -104,6 +165,22 @@ describe('wiring targetFile normalisation', () => {
 		const target = result.ai.wiring[0].targetFile;
 		expect(target).toBe('includes/Modules/Cli.php');
 		expect(target).not.toContain('..');
+	});
+
+	it('drops a wiring target that normalises outside the project', async () => {
+		const r = registry;
+		// `wp/cli` wires into `{{base_path}}/../Modules/Cli.php`. A single
+		// path segment leaves nothing for the `..` to consume, so the target
+		// would escape the project the AI was pointed at.
+		const result = await r.execute(
+			'wp/cli',
+			{ name: 'export-things', base_path: '.' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.ai.wiring).toEqual([]);
+		expect(result.warnings).toEqual([
+			'wiring target resolves outside the project, skipped: ../Modules/Cli.php',
+		]);
 	});
 });
 
@@ -773,5 +850,139 @@ describe('utility/* package scaffolds', () => {
 		const snippet = result.ai.wiring[0].snippet;
 		expect(snippet).toContain('new \\rtCamp\\WPFramework\\Utils\\Timer()');
 		expect(snippet).not.toContain('rtcamp_project_name_features');
+	});
+});
+
+/**
+ * A project whose PSR-4 root is inc/ and whose plugin header declares a text
+ * domain, the layout both first-party consumers use.
+ *
+ * @return {string} Path to the project.
+ */
+function makeIncProject() {
+	const target = makeTmpDir();
+	fs.writeFileSync(
+		path.join(target, 'composer.json'),
+		JSON.stringify({
+			autoload: { 'psr-4': { 'Acme\\Blog\\': 'inc/' } },
+			'autoload-dev': {
+				'psr-4': { 'Acme\\Blog\\Tests\\': 'tests/php/' },
+			},
+		}),
+		'utf8'
+	);
+	fs.writeFileSync(
+		path.join(target, 'acme-blog.php'),
+		'<?php\n/**\n * Plugin Name: Acme Blog\n * Text Domain: acme-blog\n */\n',
+		'utf8'
+	);
+	return target;
+}
+
+describe.each([
+	['lint/phpcs/full', 'rtCampWP'],
+	['lint/phpcs/core', 'rtCampWP-Basic'],
+])('%s', (id, standard) => {
+	it(`extends ${standard} and configures it from the project`, async () => {
+		const target = makeIncProject();
+		fs.writeFileSync(
+			path.join(target, 'acme-blog.php'),
+			'<?php\n/**\n * Plugin Name: Acme Blog\n * Requires at least: 6.6\n * Requires PHP: 8.3\n * Text Domain: acme-blog\n */\n',
+			'utf8'
+		);
+		const result = await registry.execute(id, {}, { cwd: target });
+		const xml = fs.readFileSync(
+			path.join(target, 'phpcs.xml.dist'),
+			'utf8'
+		);
+
+		expect(xml).toContain(`<rule ref="${standard}"/>`);
+		// PHPCompatibility aborts every file when testVersion is unset.
+		expect(xml).toContain('<config name="testVersion" value="8.3-"/>');
+		expect(xml).toContain(
+			'<config name="minimum_wp_version" value="6.6"/>'
+		);
+		expect(xml).toContain('<element value="acme-blog"/>');
+		expect(xml).toContain('<element value="acme_blog"/>');
+		expect(xml).toContain('<element value="Acme\\Blog"/>');
+		// The package bundles PHPCS and every sniff it references.
+		expect(result.developer.install.composerDev).toEqual({
+			'rtcamp/wp-phpcs': '^1.0',
+		});
+	});
+
+	it('wires the repository and plugin permission Composer needs to install it', async () => {
+		const result = await registry.execute(
+			id,
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		const [repositories, allowPlugins] = result.ai.wiring;
+
+		expect(result.ai.wiring.map((w) => w.targetFile)).toEqual([
+			'composer.json',
+			'composer.json',
+		]);
+		// Not on Packagist: without this entry the require cannot resolve.
+		expect(JSON.parse(`{${repositories.snippet}}`).repositories).toEqual([
+			{
+				type: 'vcs',
+				url: 'https://github.com/rtCamp/wp-phpcs.git',
+				'no-api': true,
+			},
+		]);
+		expect(
+			JSON.parse(`{${allowPlugins.snippet}}`).config['allow-plugins']
+		).toEqual({ 'dealerdirect/phpcodesniffer-composer-installer': true });
+	});
+
+	it('falls back to defaults and leaves out the namespace prefix without PSR-4', async () => {
+		const target = makeTmpDir();
+		await registry.execute(id, {}, { cwd: target });
+		const xml = fs.readFileSync(
+			path.join(target, 'phpcs.xml.dist'),
+			'utf8'
+		);
+
+		expect(xml).toContain('<config name="testVersion" value="8.2-"/>');
+		expect(xml).toContain(
+			'<config name="minimum_wp_version" value="6.5"/>'
+		);
+		expect(xml).toContain('<element value="my-plugin"/>');
+		expect(xml).toContain(
+			'<element value="my_plugin"/>\n\t\t\t</property>'
+		);
+	});
+});
+
+describe('lint/phpcs/vip', () => {
+	it('allows the Composer plugin that registers the standards, without a repository', async () => {
+		const result = await registry.execute(
+			'lint/phpcs/vip',
+			{},
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+
+		// automattic/vipwpcs resolves from Packagist, so only the plugin needs allowing.
+		expect(result.ai.wiring).toHaveLength(1);
+		expect(result.ai.wiring[0].targetFile).toBe('composer.json');
+		expect(JSON.parse(`{${result.ai.wiring[0].snippet}}`)).toEqual({
+			config: {
+				'allow-plugins': {
+					'dealerdirect/phpcodesniffer-composer-installer': true,
+				},
+			},
+		});
+	});
+});
+
+describe('setup/phpunit', () => {
+	it("names the bootstrap's package after the project's test namespace", async () => {
+		const target = makeIncProject();
+		await registry.execute('setup/phpunit', {}, { cwd: target });
+
+		expect(
+			fs.readFileSync(path.join(target, 'tests/bootstrap.php'), 'utf8')
+		).toContain(' * @package Acme\\Blog\\Tests\n');
 	});
 });

@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -26,7 +26,7 @@ final class {{class}} extends AbstractModule {
 	 *
 	 * @return array<int,class-string>
 	 */
-	public function get_classes(): array {
+	protected function get_classes(): array {
 		return [
 			// scaffold:wp/{{kind}}:classes (add classes here).
 		];

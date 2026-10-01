@@ -14,7 +14,7 @@
 		},
 		{
 			"key": "base_path",
-			"description": "Directory for the registration class. Default 'includes/Services'. The class derives the plugin root by walking two levels up from itself, so keep it two levels deep or adjust the dirname() depth it documents.",
+			"description": "Directory for the registration class. Default 'includes/Services'. The project root is derived from this path.",
 			"discover_from": "composer.json:autoload.psr-4",
 			"default": "includes/Services"
 		},
@@ -27,6 +27,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Services"
 		},
 		{
@@ -60,13 +61,22 @@
 			"key": "enqueue_hook",
 			"description": "Hook the module is enqueued on: 'wp_enqueue_scripts' for front-end requests, 'enqueue_block_assets' to cover the editor as well.",
 			"default": "wp_enqueue_scripts",
-			"enum": ["wp_enqueue_scripts", "enqueue_block_assets"]
+			"enum": [
+				"wp_enqueue_scripts",
+				"enqueue_block_assets"
+			]
 		},
 		{
 			"key": "text_domain",
 			"description": "Vendor half of the module id, conventionally the project text domain, producing '@my-plugin/lightbox'. The engine cannot read a plugin header, so pass it explicitly when it is not 'my-plugin'.",
 			"discover_from": "plugin-header:text-domain",
 			"default": "my-plugin"
+		},
+		{
+			"key": "project_root",
+			"description": "PHP expression for the project root, derived from base_path.",
+			"discover_from": "input:base_path",
+			"transform": "php-project-root"
 		}
 	],
 	"files": [

@@ -19,6 +19,12 @@
 			"key": "source_dir",
 			"description": "Directory containing the PHP source to include in coverage (relative to project root, no trailing slash).",
 			"default": "includes"
+		},
+		{
+			"key": "tests_namespace",
+			"description": "PSR-4 namespace of the test suite, used as the bootstrap's @package. Default 'Inc\\Tests'.",
+			"discover_from": "composer.json:autoload.psr-4",
+			"default": "Inc\\Tests"
 		}
 	],
 	"composer_dev_dependencies": {

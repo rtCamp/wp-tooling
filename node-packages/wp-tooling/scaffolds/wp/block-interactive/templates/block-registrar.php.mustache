@@ -45,7 +45,7 @@ final class {{class}} implements Registrable {
 	 * (`npm run build:blocks` in the rtCamp skeleton) to populate it.
 	 */
 	public function get_block_dir(): string {
-		return dirname( __DIR__, 2 ) . '/{{build_dir}}/{{slug}}';
+		return {{project_root}} . '/{{build_dir}}/{{slug}}';
 	}
 
 	/**

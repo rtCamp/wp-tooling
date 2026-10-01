@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -43,8 +43,6 @@ class {{class}}Controller extends AbstractRESTController {
 
 	/**
 	 * Register REST routes. Called by the framework on rest_api_init.
-	 *
-	 * @return void
 	 */
 	public function register_routes(): void {
 		register_rest_route(
@@ -85,7 +83,7 @@ class {{class}}Controller extends AbstractRESTController {
 	 *
 	 * @param \WP_REST_Request $request The REST request.
 	 *
-	 * @return bool
+	 * @return bool True when the current user may read the collection.
 	 */
 	public function get_items_permissions_check( $request ) {
 		return current_user_can( 'read' );

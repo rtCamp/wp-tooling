@@ -10,7 +10,7 @@
 
 'use strict';
 
-const { spinner, CancelledError } = require('../../ui');
+const { spinner, warn, CancelledError } = require('../../ui');
 const { zip } = require('../../release/zip');
 
 function parseArgs(argv) {
@@ -95,6 +95,9 @@ function runCli(argv) {
 		s.succeed(
 			`${verb} ${result.outputPath} (${result.fileCount} files, ${formatSize(result.byteSize)})`
 		);
+		for (const warning of result.warnings || []) {
+			warn(warning);
+		}
 		return 0;
 	} catch (err) {
 		s.fail('Zip build failed');

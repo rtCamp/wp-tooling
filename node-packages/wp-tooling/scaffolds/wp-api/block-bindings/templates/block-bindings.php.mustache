@@ -67,7 +67,7 @@ final class {{class}} implements Registrable {
 		register_block_bindings_source(
 			self::SOURCE_NAME,
 			[
-				'label'              => __( '{{label}}', '{{text_domain}}' ),
+				'label'              => __( '{{label_php}}', '{{text_domain}}' ),
 				'get_value_callback' => [ $this, 'get_value' ],
 				'uses_context'       => self::USES_CONTEXT,
 			]

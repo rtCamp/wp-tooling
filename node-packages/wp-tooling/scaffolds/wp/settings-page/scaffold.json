@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Settings'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Settings"
 		},
 		{
@@ -59,6 +60,18 @@
 			"key": "option_name",
 			"description": "Sample option_name registered via register_setting(). Add more by editing get_settings().",
 			"required": true
+		},
+		{
+			"key": "menu_title_php",
+			"description": "Escaped menu_title for generated string literals. Derived from menu_title.",
+			"discover_from": "input:menu_title",
+			"transform": "php-escape"
+		},
+		{
+			"key": "page_title_php",
+			"description": "Escaped page_title for generated string literals. Derived from page_title.",
+			"discover_from": "input:page_title",
+			"transform": "php-escape"
 		}
 	],
 	"files": [

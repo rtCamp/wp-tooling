@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/PostTypes'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/PostTypes"
 		},
 		{
@@ -59,6 +60,18 @@
 			"key": "menu_icon",
 			"description": "Dashicon class or SVG URL for the admin sidebar.",
 			"default": "dashicons-admin-post"
+		},
+		{
+			"key": "singular_php",
+			"description": "Escaped singular for generated string literals. Derived from singular.",
+			"discover_from": "input:singular",
+			"transform": "php-escape"
+		},
+		{
+			"key": "plural_php",
+			"description": "Escaped plural for generated string literals. Derived from plural.",
+			"discover_from": "input:plural",
+			"transform": "php-escape"
 		}
 	],
 	"files": [

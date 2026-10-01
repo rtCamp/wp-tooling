@@ -5,29 +5,42 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
 use {{namespace}}\{{class}};
-use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
 use PHPUnit\Framework\TestCase;
+use rtCamp\WPFramework\Contracts\Interfaces\CLICommand;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends TestCase {
 
+	/**
+	 * The class satisfies the framework's CLICommand contract, so the CLI module can boot it.
+	 */
 	public function test_implements_cli_command(): void {
 		$this->assertTrue( in_array( CLICommand::class, class_implements( {{class}}::class ), true ) );
 	}
 
+	/**
+	 * The command name is the one WP_CLI dispatches on.
+	 */
 	public function test_name_matches_manifest(): void {
 		$this->assertSame( '{{name}}', {{class}}::get_name() );
 	}
 
+	/**
+	 * WP_CLI prints the description in `wp help`, so an empty one ships a blank entry.
+	 */
 	public function test_description_is_non_empty(): void {
 		$this->assertNotEmpty( {{class}}::get_description() );
 	}

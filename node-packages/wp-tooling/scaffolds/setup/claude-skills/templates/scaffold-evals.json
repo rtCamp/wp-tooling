@@ -91,6 +91,22 @@
         "The wiring snippet targets the Services module on the // scaffold:wp/registrable:classes anchor.",
         "The skill does NOT run composer install, composer require or npm install."
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Add a service that warms the homepage cache on publish. Register it the way the other services are registered.",
+      "expected_output": "wp/registrable scaffolds the class and its PHPUnit test under the project's Services namespace. The wiring lands in Main::CLASSES, but NOT between a // wp:example:<key> marker and its :end -- those regions are deleted body and all when the capability is dropped, which would silently take the new class with them. The skill inserts after the last entry that sits outside every region and says which line it chose and why.",
+      "files": [],
+      "expectations": [
+        "The skill picks the wp/registrable scaffold rather than hand-writing a Registrable class.",
+        "The wiring snippet is NOT inserted between a // wp:example:<key> line and its matching // wp:example:<key>:end line, even though the last existing entry in the array sits inside one.",
+        "The chosen insertion point is after the last entry that is outside every wp:example region -- for Main::CLASSES that is the last line of the always-loaded core block.",
+        "The skill explains the placement, naming the example-region hazard rather than silently picking a different line than the developer would expect.",
+        "Consent is requested before the wiring edit is applied, showing the target file, the line, and the snippet.",
+        "The class lands under the project's Services namespace and base path, read from the PSR-4 roots.",
+        "The generated test is expanded rather than left as the stub, and no markTestIncomplete or markTestSkipped survives.",
+        "The skill does NOT run composer install, composer require or npm install."
+      ]
     }
   ]
 }

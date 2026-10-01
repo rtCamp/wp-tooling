@@ -60,7 +60,7 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - `scaffold.kind` is `"package"` for `source: "package"` scaffolds (no files written, only deps and wiring; the bundled examples are `utility/*`) and `"template"` otherwise. Remote (sources) scaffolds also report `kind: "template"` — they render Mustache the same way as local ones; where the scaffold lives is an implementation detail the orchestrator does not need to branch on. Callers branch on `kind` rather than checking `engine.wrote.length === 0`.
 - `wp-tooling list --json` entries carry an `origin` of `"default"`, `"project"`, or `"remote"`. Remote scaffolds come from a repo's cached index (`sources.json` → each repo's `index.json`), so their `counts` is `null` (unknown until `add`); local scaffolds carry real `counts`. `list` is online-preferred with a cache fallback: it reads the index (cached, ETag-validated), and a `warnings` array reports any source that was unreachable and uncached. The top-level `{ scaffolds, warnings }` shape carries those notes.
 - The engine core has zero dependency on the TTY UI kit. AI orchestration mode never loads any terminal-UI primitive. Skills can rely on the engine being usable from any context, including non-TTY containers, CI runners, and headless test harnesses.
-- File-based `discover_from` (`composer.json:<dot.path>`, `package.json:<dot.path>`, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` and `plugin-header:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
+- File-based `discover_from` (`composer.json:<dot.path>` including `autoload.psr-4` and `autoload-dev.psr-4`, `package.json:<dot.path>`, `plugin-header:<header-name>` from the plugin or theme entry header, `config:<key>` from `.wp-tooling.json`) is resolved by the engine itself, before manifest defaults are applied, with precedence **`supplied → discovered → default`**. A value the skill passes explicitly always wins. A missing or malformed source file is ignored and the input falls back to its `default` — the engine never throws because a project file is absent or unparsable. `code:*` sources are **not** engine-resolved and remain the skill's responsibility (§6).
 - A scaffold may carry an optional `feature` block, marking it a **toggleable feature** (the bundled example is `setup/tailwind`). This block is **invisible to `add`/`execute`**: it never appears in the result, and `add` behaves identically whether or not it is present. Turning features on and off is a separate surface (§13).
 
 ## 4. Skill responsibilities
@@ -264,6 +264,20 @@ Fall through these in order:
 2. **Anchor missing but pattern sampling found a clear insertion neighbourhood.** Insert immediately after the last sampled occurrence of the same pattern. This is the common case for cleaned-up rtCamp-skeleton projects and for client projects with their own conventions.
 3. **No anchor and no clear pattern neighbourhood.** The bootstrap method exists (from §6) but there are no prior examples of this scaffold type. Insert at a sensible position in the bootstrap method (typically just before the closing brace), and explicitly tell the developer this is a best-effort placement.
 4. **No bootstrap method either.** Skip wiring, surface the snippet as a manual instruction in the report, let the developer place it.
+
+Levels 2 and 3 place the snippet relative to code that may not survive. rtCamp
+skeletons wrap each optional capability in `// wp:example:<key>` … `//
+wp:example:<key>:end` markers, and `wp-tooling init` deletes a marked region
+**including its body** when the developer drops that capability
+(`src/init/examples.js`). The last sampled occurrence of a pattern is very often
+the last line inside such a region, so appending after it puts the newly wired
+class inside a block that later disappears — silently, and long after the run
+that placed it.
+
+**Never place the snippet between a `// wp:example:<key>` opener and its
+`:end`.** Insert after the last occurrence that sits outside every region
+instead, and say which line you chose and why. This holds at level 1 too: an
+anchor can itself sit inside a region.
 
 At every level the skill **shows the developer the snippet, the target file, the chosen line range, and the reason for the choice** before applying. The developer can apply, redirect to a different location, edit the snippet, or skip.
 

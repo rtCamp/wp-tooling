@@ -5,9 +5,11 @@
  * Scaffolded by @rtcamp/wp-tooling.
  *
  * @link https://github.com/rtCamp/wp-framework
+ *
+ * @package {{tests_namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{tests_namespace}};
 
@@ -15,14 +17,22 @@ use {{namespace}}\{{class}};
 use WP_UnitTestCase;
 
 /**
+ * Class {{class}}Test
+ *
  * @covers \{{namespace}}\{{class}}
  */
 final class {{class}}Test extends WP_UnitTestCase {
 
+	/**
+	 * The slug the class exposes is the one the page is registered under.
+	 */
 	public function test_slug_matches_manifest(): void {
 		$this->assertSame( '{{slug}}', {{class}}::get_slug() );
 	}
 
+	/**
+	 * Registration is deferred to admin_menu, where add_menu_page() is available.
+	 */
 	public function test_register_hooks_attaches_to_admin_menu(): void {
 		$instance = new {{class}}();
 		$instance->register_hooks();

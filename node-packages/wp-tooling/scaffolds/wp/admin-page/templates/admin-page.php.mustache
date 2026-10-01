@@ -9,7 +9,7 @@
  * @package {{namespace}}
  */
 
-declare(strict_types=1);
+declare( strict_types = 1 );
 
 namespace {{namespace}};
 
@@ -22,8 +22,6 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Get the menu slug (page identifier).
-	 *
-	 * @return string
 	 */
 	public static function get_slug(): string {
 		return '{{slug}}';
@@ -31,20 +29,16 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Get the page title (shown in the browser tab).
-	 *
-	 * @return string
 	 */
 	public function get_page_title(): string {
-		return __( '{{page_title}}', '{{text_domain}}' );
+		return __( '{{page_title_php}}', '{{text_domain}}' );
 	}
 
 	/**
 	 * Get the menu title (shown in the admin sidebar).
-	 *
-	 * @return string
 	 */
 	public function get_menu_title(): string {
-		return __( '{{menu_title}}', '{{text_domain}}' );
+		return __( '{{menu_title_php}}', '{{text_domain}}' );
 	}
 {{#parent_slug}}
 	/**
@@ -55,8 +49,6 @@ class {{class}} extends AbstractAdminPage {
 	 * returning null) applies: returning a concrete value from a ?string
 	 * override would make the return type too wide for PHPStan level 5's
 	 * checkTooWideReturnTypesInProtectedAndPublicMethods rule.
-	 *
-	 * @return string
 	 */
 	public function get_parent_slug(): string {
 		return '{{parent_slug}}';
@@ -64,8 +56,6 @@ class {{class}} extends AbstractAdminPage {
 {{/parent_slug}}
 	/**
 	 * Capability required to view the page.
-	 *
-	 * @return string
 	 */
 	public function get_capability(): string {
 		return 'manage_options';
@@ -73,8 +63,6 @@ class {{class}} extends AbstractAdminPage {
 
 	/**
 	 * Render the page body. Replace with your markup.
-	 *
-	 * @return void
 	 */
 	public function render(): void {
 		?>

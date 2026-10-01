@@ -73,8 +73,8 @@ final class {{class}}Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * register_block() is safe to call whatever the environment: before WP 6.5
-	 * or before a build it registers nothing instead of failing.
+	 * Registration is safe to call whatever the environment: before WP 6.5 or
+	 * before a build, register_block() registers nothing instead of failing.
 	 */
 	public function test_register_block_is_a_no_op_without_build_output(): void {
 		$instance = new {{class}}();
