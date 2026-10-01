@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-01
+
 ### Added
 
 - `detect-changes --strict` (library: `detectChanges({ strict: true })`): a failed `git diff` exits 1 (throws the new `DetectChangesError`, code `EDIFFFAIL`, exported from `@rtcamp/wp-tooling/ci`) instead of reporting zero changes, which skipped every job gated on the counts and left the run green. Off by default, so existing callers see no change; CI callers should turn it on. The stderr wording keeps the "git diff failed" phrase that rtCamp/wp-shared-workflows matches today.
