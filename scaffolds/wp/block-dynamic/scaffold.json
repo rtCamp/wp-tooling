@@ -2,7 +2,7 @@
 	"slug": "block-dynamic",
 	"category": "wp",
 	"name": "Dynamic block",
-	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-framework (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
+	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-primitives (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Blocks'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Blocks"
 		},
 		{
@@ -58,6 +59,30 @@
 			"key": "vendor",
 			"description": "Vendor prefix for the block name, e.g. 'rtcamp' produces 'rtcamp/hero-banner'.",
 			"default": "rtcamp"
+		},
+		{
+			"key": "title_js",
+			"description": "Escaped title for generated string literals. Derived from title.",
+			"discover_from": "input:title",
+			"transform": "js-string"
+		},
+		{
+			"key": "title_json",
+			"description": "Escaped title for generated string literals. Derived from title.",
+			"discover_from": "input:title",
+			"transform": "json-escape"
+		},
+		{
+			"key": "title_php",
+			"description": "Escaped title for generated string literals. Derived from title.",
+			"discover_from": "input:title",
+			"transform": "php-escape"
+		},
+		{
+			"key": "project_root",
+			"description": "PHP expression for the project root, derived from base_path.",
+			"discover_from": "input:base_path",
+			"transform": "php-project-root"
 		}
 	],
 	"files": [
@@ -94,6 +119,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

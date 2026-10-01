@@ -2,7 +2,7 @@
 	"slug": "user-role",
 	"category": "wp",
 	"name": "User Role",
-	"description": "Adds a versioned custom user role class extending AbstractUserRole from rtcamp/wp-framework. The framework re-registers the role only when get_version() increases.",
+	"description": "Adds a versioned custom user role class extending AbstractUserRole from rtcamp/wp-primitives. The framework re-registers the role only when get_version() increases.",
 	"source": "template",
 	"inputs": [
 		{
@@ -26,6 +26,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Roles'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Roles"
 		},
 		{
@@ -49,6 +50,12 @@
 			"key": "display_name",
 			"description": "Human-readable role name, e.g. 'Shop Manager'.",
 			"required": true
+		},
+		{
+			"key": "display_name_php",
+			"description": "Escaped display_name for generated string literals. Derived from display_name.",
+			"discover_from": "input:display_name",
+			"transform": "php-escape"
 		}
 	],
 	"files": [
@@ -73,6 +80,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

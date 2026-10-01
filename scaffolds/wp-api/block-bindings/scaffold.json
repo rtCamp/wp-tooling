@@ -27,6 +27,7 @@
 		{
 			"key": "tests_path",
 			"description": "Directory for the test file. Default 'tests/Services'.",
+			"discover_from": "composer.json:autoload-dev.psr-4",
 			"default": "tests/Services"
 		},
 		{
@@ -61,6 +62,12 @@
 			"description": "Text domain for the label string. The engine cannot read a plugin header, so pass it explicitly when it is not 'my-plugin'.",
 			"discover_from": "plugin-header:text-domain",
 			"default": "my-plugin"
+		},
+		{
+			"key": "label_php",
+			"description": "Escaped label for generated string literals. Derived from label.",
+			"discover_from": "input:label",
+			"transform": "php-escape"
 		}
 	],
 	"files": [
@@ -85,6 +92,6 @@
 		}
 	],
 	"composer_dependencies": {
-		"rtcamp/wp-framework": "^1.0"
+		"rtcamp/wp-primitives": "^2.0"
 	}
 }

@@ -19,11 +19,11 @@
  */
 import { store, getContext } from '@wordpress/interactivity';
 
-store( '{{vendor}}/{{slug}}', {
+store('{{vendor}}/{{slug}}', {
 	actions: {
 		toggle() {
 			const context = getContext();
-			context.isOpen = ! context.isOpen;
+			context.isOpen = !context.isOpen;
 		},
 	},
-} );
+});

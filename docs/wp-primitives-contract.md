@@ -1,10 +1,10 @@
-# wp-framework contract
+# wp-primitives contract
 
-The scaffolds under `scaffolds/wp/` and `scaffolds/block/` in `@rtcamp/wp-tooling` generate PHP code that extends abstract base classes shipped by `rtcamp/wp-framework`. This document specifies the class surface those scaffolds expect.
+The scaffolds under `scaffolds/wp/` and `scaffolds/block/` in `@rtcamp/wp-tooling` generate PHP code that extends abstract base classes shipped by `rtcamp/wp-primitives`. This document specifies the class surface those scaffolds expect.
 
-If you are working in `wp-framework`, treat this as the requirements list. If you are authoring a new `wp/...` or `block/...` scaffold here, treat it as the available API.
+If you are working in `wp-primitives`, treat this as the requirements list. If you are authoring a new `wp/...` or `block/...` scaffold here, treat it as the available API.
 
-The framework was previously published as `rtcamp/wp-php-toolkit` and renamed before its 1.0 release. References to the old name should be considered historical.
+The package shipped as `rtcamp/wp-framework` for 1.0.x and was renamed to `rtcamp/wp-primitives` in 2.0.0.
 
 ---
 
@@ -12,11 +12,11 @@ The framework was previously published as `rtcamp/wp-php-toolkit` and renamed be
 
 ```
 "require": {
-    "rtcamp/wp-framework": "^1.0"
+    "rtcamp/wp-primitives": "^2.0"
 }
 ```
 
-Namespace root: `rtCamp\WPFramework`.
+Namespace root: `rtCamp\WPPrimitives`.
 
 ---
 
@@ -34,7 +34,7 @@ The `Loader` also recognises `ConditionallyRegistrable` (skip when `can_register
 
 ## Abstract classes the scaffolds target
 
-All paths below sit under `rtCamp\WPFramework\Contracts\Abstracts\`.
+All paths below sit under `rtCamp\WPPrimitives\Contracts\Abstracts\`.
 
 ### `AbstractPostType` (extended by `scaffolds/wp/cpt`)
 
@@ -148,7 +148,7 @@ Wiring: `register_hooks()` attaches `register_routes()` to `rest_api_init`.
 
 ### `AbstractModule` (extended by `scaffolds/wp/module`)
 
-Required: `public get_classes(): array` returning a list of class strings.
+Required: `protected get_classes(): array` returning a list of class strings. The base declares it `abstract protected`; scaffolded modules match that visibility, so tests reach it through reflection.
 
 Wiring: the framework's `Loader` instantiates each listed class and calls `register_hooks()` if it implements `Registrable`.
 
@@ -156,7 +156,7 @@ Wiring: the framework's `Loader` instantiates each listed class and calls `regis
 
 ## Interfaces
 
-All paths below sit under `rtCamp\WPFramework\Contracts\Interfaces\`.
+All paths below sit under `rtCamp\WPPrimitives\Contracts\Interfaces\`.
 
 ### `Registrable` (implemented by `scaffolds/wp/cron`, `scaffolds/wp/registrable`)
 
@@ -192,7 +192,7 @@ interface CLICommand {
 
 ## Utility classes (targeted by `scaffolds/utility/*`)
 
-All under `rtCamp\WPFramework\Utils\`. These are **plain classes with public constructors** — not
+All under `rtCamp\WPPrimitives\Utils\`. These are **plain classes with public constructors** — not
 `Registrable`, not `Shareable`, not singletons, and none needs the `Container`. That is why the
 `utility/*` scaffolds wire them through an accessor on the consumer's static helper
 (`<base_path>/Helpers/Util.php`) rather than adding them to an `AbstractModule` or `Main::CLASSES`:
@@ -226,7 +226,7 @@ instance (laps; the flag registry), so they must be shared rather than construct
 
 ## Anchor convention
 
-Every scaffold that produces a class registers via the consumer's `AbstractModule` subclass. The module file contains a marker comment inside `get_classes()`; the scaffold's `wiring` block inserts the new class string immediately above the marker.
+Every scaffold that produces a class registers via the consumer's `AbstractModule` subclass. The module file contains a marker comment inside `get_classes()`; the scaffold's `wiring` block inserts the new class string immediately after the marker.
 
 Marker pattern: `// scaffold:<scaffold-id>:classes`. Examples:
 

@@ -54,6 +54,9 @@ const ALLOWED_INPUT_TRANSFORMS = [
 	'snake-case',
 	'upper-snake-case',
 	'json-escape',
+	'php-escape',
+	'js-string',
+	'php-project-root',
 	'shell-escape',
 ];
 
@@ -294,6 +297,12 @@ const SCAFFOLD_SCHEMA = {
 
 module.exports = {
 	SCAFFOLD_SCHEMA,
+	INPUT_ENTRY,
+	WIRING_ENTRY,
+	FILE_ENTRY,
+	TEST_ENTRY,
+	SECRET_ENTRY,
+	FEATURE_BLOCK,
 	REQUIRED_FIELDS,
 	ALLOWED_SOURCES,
 	ALLOWED_WIZARD_STEPS,

@@ -12,8 +12,8 @@ import { __ } from '@wordpress/i18n';
 export default function Edit() {
 	const blockProps = useBlockProps();
 	return (
-		<div { ...blockProps }>
-			<p>{ __( '{{title}}', '{{vendor}}-{{slug}}' ) }</p>
+		<div {...blockProps}>
+			<p>{__({{title_js}}, '{{vendor}}-{{slug}}')}</p>
 		</div>
 	);
 }
