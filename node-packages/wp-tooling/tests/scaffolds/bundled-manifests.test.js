@@ -71,6 +71,7 @@ describe('quoted display text', () => {
 		],
 		['wp/user-role', 'display_name', { slug: 'quote' }],
 		['wp-api/block-bindings', 'label', { name: 'quote' }],
+		['wp/cli', 'description', { name: 'quote' }],
 	])('escapes PHP display text in %s', async (id, key, inputs) => {
 		const cwd = makeTmpDir();
 		const result = await registry.execute(
