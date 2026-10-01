@@ -36,9 +36,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **BREAKING:** PHP scaffolds now target `rtcamp/wp-primitives` `^2.0` and the `rtCamp\WPPrimitives\` namespace. Projects on `rtcamp/wp-framework` `^1.0` must [migrate to wp-primitives 2.0](https://github.com/rtCamp/wp-primitives/blob/main/docs/upgrading.md) before generating new classes.
+- `publishConfig` targets the public npm registry (`https://registry.npmjs.org/`, `public` access) instead of GitHub Packages, so the package installs from npm without authentication.
 
 ### Fixed
 
+- The `bin` entry is written as `bin/wp-tooling.js`. `npm publish` treats the previous `./bin/wp-tooling.js` as invalid and drops it from the published metadata, which would leave `npx wp-tooling` with no command to run.
 - Human-readable scaffold labels now escape apostrophes and backslashes in PHP and JavaScript string literals, and quotes in block JSON metadata. Titles such as `Editor's "guide"` generate valid code while preserving the original display text.
 - Block and script module asset paths now derive the project root from `base_path`, so nested or root-level PSR-4 directories resolve build output correctly.
 - Generated block JavaScript follows the current shared ESLint formatting rules.

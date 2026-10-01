@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- `publishConfig` targets the public npm registry (`https://registry.npmjs.org/`, `public` access) instead of GitHub Packages, so the package installs from npm without authentication.
 - `engines.node` raised to `>=22.19` to match the rest of the monorepo (`@rtcamp/wp-tooling` needs it for Lighthouse 13).
 
 ## [1.0.0] - 2026-07-30

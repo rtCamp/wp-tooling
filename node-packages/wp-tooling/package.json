@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "author": "rtCamp",
   "bin": {
-    "wp-tooling": "./bin/wp-tooling.js"
+    "wp-tooling": "bin/wp-tooling.js"
   },
   "bugs": {
     "url": "https://github.com/rtCamp/wp-tooling/issues"
@@ -49,8 +49,8 @@
   ],
   "license": "GPL-2.0-or-later",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "repository": {
     "type": "git",
