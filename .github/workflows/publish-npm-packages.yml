@@ -1,0 +1,255 @@
+name: Publish npm Packages
+
+# Publishes each node-packages/* workspace to the public npm registry when the
+# version in its package.json is not on npm yet. Releasing a package is a pull
+# request that bumps its "version" and cuts its CHANGELOG heading. Merging it
+# to main starts this workflow, and the publish job waits for a maintainer to
+# approve it in the protected `npm` environment. Nothing is tagged, and
+# re-running a workflow publishes nothing new.
+#
+# Authenticates with npm trusted publishing (GitHub OIDC): no token is stored,
+# and npm attaches a provenance attestation to every version it publishes.
+#
+# One-time setup:
+#   1. Repository settings → Environments → `npm`: add required reviewers and
+#      limit deployment branches to `main`.
+#   2. For each package, an npm org owner publishes the FIRST version by hand
+#      from a clean checkout of main, because a trusted publisher can only be
+#      added to a package that already exists on npm:
+#
+#        npm publish --workspace node-packages/<dir>
+#
+#   3. On the package's settings page on npmjs.com, add a trusted publisher:
+#      organization rtCamp, repository wp-tooling, workflow
+#      publish-npm-packages.yml, environment npm. Any mismatch makes publishing
+#      fail with E404.
+#
+# Until step 2 is done, a package is skipped with a warning instead of failing
+# the run.
+#
+# Runs alongside split-npm-packages.yml, which keeps the npm/<dirname> branches
+# that git-URL consumers install from.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # A release always bumps "version", so only manifest changes can publish.
+      - 'node-packages/*/package.json'
+      - '.github/workflows/publish-npm-packages.yml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only preview with `npm publish --dry-run`'
+        type: boolean
+        default: true
+
+# Grant nothing by default; each job asks for what it needs.
+permissions: {}
+
+# Two runs must not both try to publish the same version, and a release in
+# progress is never cancelled.
+concurrency:
+  group: publish-npm-packages
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Find versions not yet on npm
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare each workspace's version with npm
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Same discovery as split-npm-packages.yml: the root workspaces globs
+          # are the source of truth, and only single-level "dir/*" globs are used.
+          globs=$(jq -r '.workspaces[]? // empty' package.json)
+          if [[ -z "$globs" ]]; then
+            echo "::error::No workspaces defined in package.json. Nothing to publish."
+            exit 1
+          fi
+
+          entries=()
+          while IFS= read -r glob; do
+            [[ -n "$glob" ]] || continue
+
+            case "$glob" in
+              */\*) ;;
+              *)
+                echo "::error::Unsupported workspace glob '$glob' — expected the form 'dir/*'."
+                exit 1
+                ;;
+            esac
+
+            for dir in $glob; do
+              [[ -f "$dir/package.json" ]] || continue
+
+              name=$(jq -r '.name // empty' "$dir/package.json")
+              version=$(jq -r '.version // empty' "$dir/package.json")
+              if [[ -z "$name" || -z "$version" ]]; then
+                echo "::error::$dir/package.json needs both \"name\" and \"version\"."
+                exit 1
+              fi
+
+              if [[ "$(jq -r '.private // false' "$dir/package.json")" == "true" ]]; then
+                echo "::notice::Skipping $name — marked private."
+                continue
+              fi
+
+              # A missing package and a missing version both 404 for name@version,
+              # so ask for the package's version list and check it here. With
+              # --json, npm prints errors to stdout as {"error":{"code":...}}.
+              if ! published=$(npm view "$name" versions --json 2>/dev/null); then
+                code=$(jq -r '.error.code? // empty' <<<"$published" 2>/dev/null || true)
+                if [[ "$code" == "E404" ]]; then
+                  echo "::warning::$name is not on npm yet. Publish $version by hand once and add this workflow as its trusted publisher (see this workflow's header)."
+                  continue
+                fi
+                echo "::error::Could not read $name from npm (${code:-no error code}). Refusing to guess whether $version is published."
+                exit 1
+              fi
+
+              if jq -e --arg v "$version" '(if type == "array" then . else [.] end) | index($v) != null' <<<"$published" >/dev/null; then
+                echo "::notice::$name@$version is already on npm."
+                continue
+              fi
+
+              # Prereleases (1.2.0-beta.1) must not become what `npm install` picks.
+              dist_tag=latest
+              [[ "$version" == *-* ]] && dist_tag=next
+
+              entries+=("$(jq -cn --arg d "$dir" --arg n "$name" --arg v "$version" --arg t "$dist_tag" \
+                '{package_directory:$d, package_name:$n, version:$v, dist_tag:$t}')")
+            done
+          done <<< "$globs"
+
+          if [[ ${#entries[@]} -eq 0 ]]; then
+            matrix='{"include":[]}'
+          else
+            matrix=$(printf '%s\n' "${entries[@]}" | jq -cs '{include: .}')
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "count=${#entries[@]}" >> "$GITHUB_OUTPUT"
+          jq . <<<"$matrix"
+
+  check:
+    name: Lint, test and preview
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No dependency cache anywhere in this workflow: a poisoned cache would
+      # run attacker code in a release.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Lint and test every workspace
+        run: npm run check
+
+      # Trusted publishing needs npm 11.5.1 or later; .nvmrc's Node ships npm 10.
+      # The preview below must run the same npm as the publish job.
+      - name: Update npm
+        run: npm install --global npm@^11.5.1
+
+      - name: Preview each publish
+        shell: bash
+        env:
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          while IFS=$'\t' read -r dir name version tag; do
+            echo "::group::$name@$version"
+            preview=$(npm publish --workspace "$dir" --tag "$tag" --dry-run 2>&1)
+            echo "$preview"
+            echo "::endgroup::"
+
+            # npm only warns when it rewrites a manifest field it considers
+            # invalid, so the published metadata can silently differ from the
+            # committed package.json. Fail before anyone is asked to approve
+            # the release.
+            if grep -q 'auto-corrected some errors' <<<"$preview"; then
+              echo "::error::npm would rewrite $name's package.json while publishing. Run \`npm pkg fix\` in $dir and commit the result."
+              failed=1
+              continue
+            fi
+
+            echo "- **$name@$version** — ready to publish as \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+          done < <(jq -r '.include[] | [.package_directory, .package_name, .version, .dist_tag] | @tsv' <<<"$MATRIX")
+
+          exit "$failed"
+
+  publish:
+    name: Publish ${{ matrix.package_name }}@${{ matrix.version }}
+    needs: [plan, check]
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+    runs-on: ubuntu-24.04
+    # Required reviewers on this environment approve each release, and the
+    # trusted publisher on npm only accepts runs from it.
+    environment: npm
+    # id-token is what npm trusted publishing exchanges for a publish token.
+    # Nothing is installed in this job, so no dependency's install script runs
+    # while that permission is held.
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false # one bad package must not hold back the others
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Update npm
+        run: npm install --global npm@^11.5.1
+
+      - name: Publish ${{ matrix.package_directory }}
+        shell: bash
+        env:
+          PKG_PATH: ${{ matrix.package_directory }}
+          PKG_NAME: ${{ matrix.package_name }}
+          VERSION: ${{ matrix.version }}
+          DIST_TAG: ${{ matrix.dist_tag }}
+        run: |
+          set -euo pipefail
+
+          # Access and registry come from the package's publishConfig.
+          npm publish --workspace "$PKG_PATH" --tag "$DIST_TAG"
+
+          echo "- **$PKG_NAME@$VERSION** — published as \`$DIST_TAG\`: https://www.npmjs.com/package/$PKG_NAME/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"
