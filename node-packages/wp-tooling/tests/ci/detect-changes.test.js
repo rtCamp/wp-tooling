@@ -72,6 +72,28 @@ describe('detectChanges', () => {
 		expect(r['php-count']).toBe(0);
 	});
 
+	test('ES-module and TypeScript files count as js', () => {
+		const js = [
+			'src/a.js',
+			'src/b.cjs',
+			'src/c.mjs',
+			'src/d.jsx',
+			'src/e.ts',
+			'src/f.cts',
+			'src/g.mts',
+			'src/h.tsx',
+			'src/types.d.ts',
+			'eslint.config.mjs',
+			'src/__snapshots__/a.test.js.snap',
+		];
+		const notJs = ['tsconfig.json', 'src/data.json', 'src/a.jsonc'];
+		const r = detectChanges({
+			files: [...js, ...notJs],
+			includeFiles: true,
+		});
+		expect(r['js-files']).toEqual(js);
+	});
+
 	test('phpstan.neon and phpstan.neon.dist count as php', () => {
 		const r = detectChanges({
 			files: ['phpstan.neon', 'phpstan.neon.dist'],

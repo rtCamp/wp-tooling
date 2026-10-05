@@ -19,6 +19,8 @@ const fs = require('fs');
 /**
  * Default bucket regexes. A file is counted in a bucket if its path matches.
  *
+ * `js` covers .js/.cjs/.mjs, .ts/.cts/.mts, .jsx/.tsx and Jest snapshots.
+ *
  * `gha` avoids `.+\.yml$`, which was quadratic twice over: `.` also matches
  * `/`, and an unbounded tail let every `/.github/actions/` in the path walk the
  * remainder before `\.yml$` failed. `[^/]` and the count bound fix one each.
@@ -26,7 +28,7 @@ const fs = require('fs');
  */
 const DEFAULT_PATTERNS = {
 	css: /\.s?css$|(?:^|\/)package(?:-lock)?\.json$/,
-	js: /\.(?:js|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
+	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
 	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
 	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+){0,3}\.yml$/,
 };

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `detect-changes` counts `.cjs`, `.mjs`, `.jsx`, `.ts`, `.cts`, `.mts` and `.tsx` files in the `js` bucket, not just `.js` and Jest snapshots, so ES-module and TypeScript changes trigger the jobs gated on `js-count`.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added
