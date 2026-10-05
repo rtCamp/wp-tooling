@@ -186,10 +186,22 @@ jobs:
 
           failed=0
           while IFS=$'\t' read -r dir name version tag; do
+            # --tag only for prereleases: an explicit `--tag latest` skips npm's
+            # refusal to publish below the highest published version.
+            tag_args=()
+            [[ "$tag" != latest ]] && tag_args=(--tag "$tag")
+
             echo "::group::$name@$version"
-            preview=$(npm publish --workspace "$dir" --tag "$tag" --dry-run 2>&1)
+            status=0
+            preview=$(npm publish --workspace "$dir" "${tag_args[@]}" --dry-run 2>&1) || status=$?
             echo "$preview"
             echo "::endgroup::"
+
+            if [[ $status -ne 0 ]]; then
+              echo "::error::npm would refuse to publish $name@$version. Its output is above."
+              failed=1
+              continue
+            fi
 
             # npm only warns when it rewrites a manifest field it considers
             # invalid, so the published metadata can silently differ from the
@@ -250,6 +262,9 @@ jobs:
           set -euo pipefail
 
           # Access and registry come from the package's publishConfig.
-          npm publish --workspace "$PKG_PATH" --tag "$DIST_TAG"
+          # --tag only for prereleases, as in the check job's preview.
+          tag_args=()
+          [[ "$DIST_TAG" != latest ]] && tag_args=(--tag "$DIST_TAG")
+          npm publish --workspace "$PKG_PATH" "${tag_args[@]}"
 
           echo "- **$PKG_NAME@$VERSION** — published as \`$DIST_TAG\`: https://www.npmjs.com/package/$PKG_NAME/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"
