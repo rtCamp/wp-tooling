@@ -14,6 +14,10 @@
  *   - the modern WP API scaffolds (wp/block-interactive, wp-api/block-bindings,
  *     wp-api/script-module) render every file of their layout, in order, and
  *     reuse an existing wiring anchor rather than minting a new one
+ *   - the VIP integration scaffolds (integration/vip-*) declare their lens,
+ *     derive every prefixed name from the project's text domain, reuse the
+ *     wiring anchor of the primitive they build on, and reject a timeout or
+ *     TTL outside the values VIP accepts
  *   - utility/* are source: package — zero files, a Composer dep and one
  *     accessor snippet, with context_slug discovered from composer.json:name
  *   - lint/phpcs/full and lint/phpcs/core extend rtCampWP and rtCampWP-Basic,
@@ -916,6 +920,151 @@ function makeIncProject() {
 	);
 	return target;
 }
+
+/**
+ * The error a dry run of a bundled scaffold throws.
+ *
+ * @param {string} id     Scaffold id.
+ * @param {Object} inputs Inputs to run it with.
+ * @return {Promise<Error>} The error; fails the test if nothing is thrown.
+ */
+async function rejection(id, inputs) {
+	return registry
+		.execute(id, inputs, { dryRun: true, cwd: makeTmpDir() })
+		.then(
+			() => {
+				throw new Error('should have thrown');
+			},
+			(caught) => caught
+		);
+}
+
+describe('integration/vip-remote-request', () => {
+	it('renders a Services class with VIP-safe defaults and no wiring', async () => {
+		const result = await registry.execute(
+			'integration/vip-remote-request',
+			{ name: 'events-feed' },
+			{ dryRun: true, cwd: makeIncProject() }
+		);
+		expect(result.scaffold.lens).toEqual([
+			'vip-readiness',
+			'performance',
+			'security',
+		]);
+		expect(result.engine.inputs).toMatchObject({
+			namespace: 'Acme\\Blog\\Services',
+			text_domain: 'acme-blog',
+			cache_group: 'events-feed',
+			timeout: '3',
+			cache_ttl: '900',
+		});
+		expect(result.engine.wrote).toEqual(['inc/Services/EventsFeed.php']);
+		expect(result.ai.tests[0].path).toBe(
+			'tests/php/Services/EventsFeedTest.php'
+		);
+		// A plain service, instantiated by its callers: nothing to wire.
+		expect(result.ai.wiring).toEqual([]);
+	});
+
+	it('rejects a timeout above the 3 seconds VIP accepts', async () => {
+		const err = await rejection('integration/vip-remote-request', {
+			name: 'events-feed',
+			timeout: '5',
+		});
+		expect(err.code).toBe('EINVALIDINPUT');
+		expect(err.invalid).toEqual([
+			{ key: 'timeout', value: '5', allowed: ['1', '2', '3'] },
+		]);
+	});
+
+	it('rejects a cache TTL below the 300 seconds VIP accepts', async () => {
+		const err = await rejection('integration/vip-remote-request', {
+			name: 'events-feed',
+			cache_ttl: '60',
+		});
+		expect(err.code).toBe('EINVALIDINPUT');
+		expect(err.invalid[0]).toMatchObject({ key: 'cache_ttl', value: '60' });
+	});
+});
+
+describe('integration/vip-search', () => {
+	it('renders a Services class, prefixes its fallback action and reuses the registrable anchor', async () => {
+		const result = await registry.execute(
+			'integration/vip-search',
+			{ name: 'event-search', post_type: 'event' },
+			{ dryRun: true, cwd: makeIncProject() }
+		);
+		expect(result.scaffold.lens).toEqual(['vip-readiness', 'performance']);
+		expect(result.engine.inputs).toMatchObject({
+			post_type: 'event',
+			hook_prefix: 'acme_blog',
+			hook_name: 'event_search',
+		});
+		expect(result.engine.wrote).toEqual(['inc/Services/EventSearch.php']);
+		const wiring = result.ai.wiring[0];
+		expect(wiring.targetFile).toBe('inc/Modules/Services.php');
+		expect(wiring.anchor).toBe('// scaffold:wp/registrable:classes');
+	});
+});
+
+describe('integration/vip-webhook', () => {
+	it('renders a Rest controller with a prefixed hook and secret name', async () => {
+		const result = await registry.execute(
+			'integration/vip-webhook',
+			{ name: 'crm-contacts', rest_namespace: 'acme' },
+			{ dryRun: true, cwd: makeIncProject() }
+		);
+		expect(result.scaffold.lens).toEqual([
+			'security',
+			'vip-readiness',
+			'performance',
+		]);
+		expect(result.engine.inputs).toMatchObject({
+			class: 'CrmContacts',
+			route: 'crm-contacts',
+			hook_prefix: 'acme_blog',
+			hook_name: 'crm_contacts',
+			secret_prefix: 'ACME_BLOG',
+			secret_name: 'CRM_CONTACTS',
+			signature_header: 'x-signature',
+		});
+		expect(result.engine.wrote).toEqual([
+			'inc/Rest/CrmContactsWebhookController.php',
+		]);
+		expect(result.ai.wiring[0].anchor).toBe('// scaffold:wp/rest:classes');
+		// The secret is a developer action, never rendered into a file.
+		expect(result.developer.secrets).toEqual([]);
+	});
+
+	it('wires into the REST module file the project names', async () => {
+		const target = async (cwd, inputs = {}) =>
+			(
+				await registry.execute(
+					'integration/vip-webhook',
+					{ name: 'crm-contacts', rest_namespace: 'acme', ...inputs },
+					{ dryRun: true, cwd }
+				)
+			).ai.wiring[0].targetFile;
+
+		// The file `wp/module --name=Rest` creates, under the PSR-4 root.
+		expect(await target(makeTmpDir())).toBe('includes/Modules/Rest.php');
+		expect(await target(makeIncProject())).toBe('inc/Modules/Rest.php');
+		// features-plugin-skeleton's module is REST.php, a different file on Linux.
+		expect(
+			await target(makeIncProject(), {
+				base_path: 'inc/Modules/REST',
+				module_path: 'inc/Modules/REST.php',
+			})
+		).toBe('inc/Modules/REST.php');
+	});
+
+	it('requires a REST namespace', async () => {
+		const err = await rejection('integration/vip-webhook', {
+			name: 'crm-contacts',
+		});
+		expect(err.message).toMatch(/rest_namespace/);
+	});
+});
 
 describe.each([
 	['lint/phpcs/full', 'rtCampWP'],

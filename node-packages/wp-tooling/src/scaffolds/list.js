@@ -97,6 +97,10 @@ function makeId(s) {
 	return s.category ? `${s.category}/${s.slug}` : s.slug;
 }
 
+function lensOf(s) {
+	return Array.isArray(s.lens) ? [...s.lens] : null;
+}
+
 function applyFilters(scaffolds, opts) {
 	let out = scaffolds;
 	if (opts.category) {
@@ -121,6 +125,8 @@ function summarise(scaffold) {
 			description: scaffold.description,
 			kind: 'template',
 			origin: 'remote',
+			// Like `counts`, the lens lives in the manifest `list` never fetches.
+			lens: null,
 			counts: null,
 			// Remote manifests are not fetched during `list`, so the full input
 			// schema is unknown until `add` hydrates them (mirrors `counts: null`).
@@ -135,6 +141,7 @@ function summarise(scaffold) {
 		description: scaffold.description,
 		kind: scaffold.source === 'package' ? 'package' : 'template',
 		origin: scaffold.origin,
+		lens: lensOf(scaffold),
 		counts: {
 			inputs: Array.isArray(scaffold.inputs) ? scaffold.inputs.length : 0,
 			wiring: Array.isArray(scaffold.wiring) ? scaffold.wiring.length : 0,
