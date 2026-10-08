@@ -122,6 +122,24 @@ final class {{class}}WebhookControllerTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A retry arrives in a later request, after the runtime object cache is
+	 * gone. It must still be acknowledged, not queued again or refused with 503.
+	 */
+	public function test_acknowledges_a_retry_in_a_later_request(): void {
+		$request = $this->signed_request( '{"id":3}' );
+		$first   = $this->controller()->receive( $request );
+
+		wp_cache_flush_runtime();
+
+		$retry = $this->controller()->receive( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $first );
+		$this->assertSame( 202, $first->get_status() );
+		$this->assertInstanceOf( WP_REST_Response::class, $retry );
+		$this->assertSame( 200, $retry->get_status() );
+	}
+
+	/**
 	 * A controller whose shared secret is SECRET.
 	 */
 	private function controller(): {{class}}WebhookController {

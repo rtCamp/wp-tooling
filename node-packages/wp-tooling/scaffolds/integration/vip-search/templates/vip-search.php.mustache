@@ -15,6 +15,7 @@ declare( strict_types = 1 );
 namespace {{namespace}};
 
 use WP_Query;
+use WP_Tax_Query;
 use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
@@ -77,17 +78,66 @@ final class {{class}} implements Registrable {
 	 * Whether the main query should be answered by the search index.
 	 *
 	 * Picks front-end queries on POST_TYPE that filter by meta or taxonomy, the
-	 * shape MySQL handles worst on large tables. Narrow it to your own archives.
+	 * shape MySQL handles worst on large tables, term archives included: their
+	 * URL fills the parsed tax_query, never the tax_query query var. Narrow it
+	 * to your own archives.
 	 *
 	 * @param \WP_Query $query The query about to run.
 	 * @return bool True to send the query to the index.
 	 */
 	public function should_offload( WP_Query $query ): bool {
-		if ( is_admin() || self::POST_TYPE !== $query->get( 'post_type' ) ) {
+		if ( is_admin() || self::POST_TYPE !== $this->queried_post_type( $query ) ) {
 			return false;
 		}
 
-		return ! empty( $query->get( 'meta_query' ) ) || ! empty( $query->get( 'tax_query' ) );
+		$filters_by_term = ! empty( $query->get( 'tax_query' ) )
+			|| ( $query->tax_query instanceof WP_Tax_Query && ! empty( $query->tax_query->queries ) );
+
+		return ! empty( $query->get( 'meta_query' ) ) || $filters_by_term;
+	}
+
+	/**
+	 * The one post type the query fetches, or an empty string for several or any.
+	 *
+	 * An archive URL leaves post_type empty for WP_Query to fill in later, so
+	 * this resolves it the way WP_Query does: any type on a search, the
+	 * searchable types using the queried taxonomies on a custom taxonomy
+	 * archive, and post on every other listing, category and tag archives
+	 * included.
+	 *
+	 * @param \WP_Query $query The query about to run.
+	 * @return string The post type, or an empty string.
+	 */
+	private function queried_post_type( WP_Query $query ): string {
+		$post_type = $query->get( 'post_type' );
+
+		if ( is_array( $post_type ) ) {
+			return 1 === count( $post_type ) ? (string) reset( $post_type ) : '';
+		}
+
+		if ( ! empty( $post_type ) ) {
+			return (string) $post_type;
+		}
+
+		if ( $query->is_search() ) {
+			return '';
+		}
+
+		if ( $query->is_tax() ) {
+			$taxonomies = $query->tax_query instanceof WP_Tax_Query ? array_keys( $query->tax_query->queried_terms ) : [];
+			$post_types = array_filter(
+				get_post_types( [ 'exclude_from_search' => false ] ),
+				static fn ( string $type ): bool => [] !== array_intersect( $taxonomies, get_object_taxonomies( $type ) )
+			);
+
+			return 1 === count( $post_types ) ? (string) reset( $post_types ) : '';
+		}
+
+		if ( $query->is_attachment() ) {
+			return 'attachment';
+		}
+
+		return $query->is_page() ? 'page' : 'post';
 	}
 
 	/**

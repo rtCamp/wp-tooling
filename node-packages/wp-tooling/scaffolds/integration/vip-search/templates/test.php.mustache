@@ -68,6 +68,44 @@ final class {{class}}Test extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A term archive URL leaves post_type empty and filters through the parsed
+	 * tax_query, never the tax_query query var. It is offloaded all the same.
+	 */
+	public function test_offloads_a_term_archive_of_the_post_type(): void {
+		if ( ! post_type_exists( {{class}}::POST_TYPE ) ) {
+			register_post_type( {{class}}::POST_TYPE, [ 'public' => true ] );
+		}
+		register_taxonomy( 'offload_test_genre', {{class}}::POST_TYPE, [ 'public' => true ] );
+		self::factory()->term->create(
+			[
+				'taxonomy' => 'offload_test_genre',
+				'slug'     => 'fiction',
+			]
+		);
+		add_action( 'pre_get_posts', [ new {{class}}(), 'offload' ] );
+
+		$this->go_to( add_query_arg( 'offload_test_genre', 'fiction', home_url( '/' ) ) );
+
+		$this->assertTrue( $GLOBALS['wp_query']->is_tax( 'offload_test_genre' ) );
+		$this->assertTrue( $GLOBALS['wp_query']->get( 'ep_integrate' ) );
+	}
+
+	/**
+	 * Category and tag archives query posts, and a search queries every type.
+	 */
+	public function test_resolves_the_post_type_an_archive_queries(): void {
+		$search   = new {{class}}();
+		$category = new WP_Query();
+		$searched = new WP_Query();
+
+		$category->parse_query( 'cat=1' );
+		$searched->parse_query( 's=book&cat=1' );
+
+		$this->assertSame( 'post' === {{class}}::POST_TYPE, $search->should_offload( $category ) );
+		$this->assertFalse( $search->should_offload( $searched ) );
+	}
+
+	/**
 	 * A secondary query is never changed, however it is filtered: it opts in where it is built.
 	 */
 	public function test_leaves_secondary_queries_alone(): void {

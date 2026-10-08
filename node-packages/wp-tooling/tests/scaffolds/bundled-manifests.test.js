@@ -16,8 +16,8 @@
  *     reuse an existing wiring anchor rather than minting a new one
  *   - the VIP integration scaffolds (integration/vip-*) declare their lens,
  *     derive every prefixed name from the project's text domain, reuse the
- *     wiring anchor of the primitive they build on, and reject a timeout, TTL
- *     or schedule outside the values VIP accepts
+ *     wiring anchor of the primitive they build on, and reject a timeout or
+ *     TTL outside the values VIP accepts
  *   - utility/* are source: package — zero files, a Composer dep and one
  *     accessor snippet, with context_slug discovered from composer.json:name
  *   - lint/phpcs/full and lint/phpcs/core extend rtCampWP and rtCampWP-Basic,
@@ -1004,43 +1004,6 @@ describe('integration/vip-search', () => {
 		const wiring = result.ai.wiring[0];
 		expect(wiring.targetFile).toBe('inc/Modules/Services.php');
 		expect(wiring.anchor).toBe('// scaffold:wp/registrable:classes');
-	});
-});
-
-describe('integration/vip-cron', () => {
-	it('renders into the Cron layout, reuses the wp/cron anchor and asks for wp-primitives', async () => {
-		const result = await registry.execute(
-			'integration/vip-cron',
-			{ name: 'sync-feed' },
-			{ dryRun: true, cwd: makeIncProject() }
-		);
-		expect(result.scaffold.lens).toEqual(['vip-readiness', 'performance']);
-		expect(result.engine.inputs).toMatchObject({
-			namespace: 'Acme\\Blog\\Cron',
-			hook_prefix: 'acme_blog',
-			hook_name: 'sync_feed',
-			schedule: 'hourly',
-		});
-		expect(result.engine.wrote).toEqual(['inc/Cron/SyncFeed.php']);
-		expect(result.ai.wiring[0].anchor).toBe('// scaffold:wp/cron:classes');
-		expect(result.developer.install.composer).toEqual({
-			'rtcamp/wp-primitives': '^2.0',
-		});
-	});
-
-	it('rejects a schedule WP-Cron does not register', async () => {
-		const err = await rejection('integration/vip-cron', {
-			name: 'sync-feed',
-			schedule: 'every_minute',
-		});
-		expect(err.code).toBe('EINVALIDINPUT');
-		expect(err.invalid).toEqual([
-			{
-				key: 'schedule',
-				value: 'every_minute',
-				allowed: ['hourly', 'twicedaily', 'daily', 'weekly'],
-			},
-		]);
 	});
 });
 

@@ -264,7 +264,7 @@ project may prefer.
 - **A recommendation, not a dependency.** The list includes lenses a given project may not have installed; the orchestrating skill runs the ones it finds. That is also why the enum can name a lens before it ships, without a wp-tooling release for each new one.
 - **Optional.** Omit it and `execute()` and `list --json` report `lens: null`, leaving the choice to the orchestrating skill.
 
-Order by what the generated code most needs checked. `integration/vip-webhook` leads with `security` because signature verification is its riskiest code; `integration/vip-cron` leads with `vip-readiness` because Cron Control is what it exists to satisfy.
+Order by what the generated code most needs checked. `integration/vip-webhook` leads with `security` because signature verification is its riskiest code.
 
 To add a lens, extend `ALLOWED_LENSES` in `src/scaffolds/schema.js` — `validate.js` and the schema-parity test read it from there.
 
@@ -332,7 +332,7 @@ Use nesting when a scaffold has multiple variants of the same concept (PHPCS sta
 
 `wp` holds the framework-shaped kinds (a CPT, a REST controller, a CLI command). `wp-api` holds scaffolds that customise a **modern WordPress core API** — code whose shape is dictated by core's own hooks and which must be guarded against the WordPress version that introduced them (`wp-api/speculation`, Speculation Rules, WP 6.8; `wp-api/block-bindings` and `wp-api/script-module`, both WP 6.5). Those pair with `"wizard_step": "wp-apis"`.
 
-`integration` holds opinionated integrations with a specific platform or service, where the value is encoding that platform's rules rather than a WordPress primitive (`integration/vip-search`, `integration/vip-remote-request`, `integration/vip-cron`, `integration/vip-webhook`). Each builds on a `wp` kind and reuses its wiring anchor — `vip-cron` wires where `wp/cron` does, `vip-webhook` where `wp/rest` does — and must degrade to working, standard behaviour off the platform instead of fataling. They pair with `"wizard_step": "integrations"`. Prefer a scaffold here only when the output is code the project owns and keeps; configuring an existing plugin, or an ongoing sync, is skill-shaped rather than scaffold-shaped.
+`integration` holds opinionated integrations with a specific platform or service, where the value is encoding that platform's rules rather than a WordPress primitive (`integration/vip-search`, `integration/vip-remote-request`, `integration/vip-webhook`). Each builds on a `wp` kind and reuses its wiring anchor — `vip-search` wires where `wp/registrable` does, `vip-webhook` where `wp/rest` does — and must degrade to working, standard behaviour off the platform instead of fataling. They pair with `"wizard_step": "integrations"`. Prefer a scaffold here only when the output is code the project owns and keeps; configuring an existing plugin, or an ongoing sync, is skill-shaped rather than scaffold-shaped.
 
 A block stays in `wp` even when its behaviour comes from a modern core API: `wp/block-interactive` uses the Interactivity API, but what it generates is a block directory, so it sits beside `wp/block-dynamic` and shares its wiring anchor rather than opening a `block` category.
 
@@ -448,9 +448,9 @@ Look at these existing scaffolds when authoring a new one:
 | Workflow / YAML scaffold with secrets | `ci/cd-wporg` |
 | Platform-specific code that no-ops or falls back off the platform | `integration/vip-search`, `integration/vip-remote-request` |
 | Service class with no wiring, instantiated by its callers | `integration/vip-remote-request` |
-| Input constrained to values a coding standard accepts (`enum`) | `integration/vip-remote-request` (`timeout`, `cache_ttl`), `integration/vip-cron` (`schedule`) |
+| Input constrained to values a coding standard accepts (`enum`) | `integration/vip-remote-request` (`timeout`, `cache_ttl`) |
 | Hook and constant names prefixed from the project's text domain | `integration/vip-*` (`hook_prefix` / `secret_prefix` derived via `input:text_domain`) |
-| Extending a `wp` kind and reusing its wiring anchor | `integration/vip-cron` (`wp/cron`), `integration/vip-webhook` (`wp/rest`) |
+| Extending a `wp` kind and reusing its wiring anchor | `integration/vip-search` (`wp/registrable`), `integration/vip-webhook` (`wp/rest`) |
 | Scaffold hosted in another repo (sources + index) | `scaffolds/sources.json` + `tests/fixtures/scaffolds-sources/sources.json` |
 
 Copy the closest match, rename, adjust. Most scaffolds are 20-50 lines of JSON plus one template file plus a test stub.

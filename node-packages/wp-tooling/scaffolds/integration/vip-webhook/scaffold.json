@@ -111,7 +111,7 @@
 			"target_file": "{{module_path}}",
 			"anchor": "// scaffold:wp/rest:classes",
 			"snippet_template": "\\{{namespace}}\\{{class}}WebhookController::class,",
-			"description": "Add the controller to the REST module so the framework Loader registers its route on rest_api_init. Edit the module file that exists, matching its case; if the project has none, scaffold it first via `wp-tooling add wp/module --name=Rest --kind=rest`. Deliveries are refused until the secret named by the controller's SECRET_NAME constant is set: as a VIP environment variable on VIP, or a constant in wp-config.php elsewhere. Process payloads in a job on the controller's HOOK, e.g. one from `wp-tooling add integration/vip-cron`."
+			"description": "Add the controller to the REST module so the framework Loader registers its route on rest_api_init. Edit the module file that exists, matching its case; if the project has none, scaffold it first via `wp-tooling add wp/module --name=Rest --kind=rest`. Deliveries are refused until the secret named by the controller's SECRET_NAME constant is set: as a VIP environment variable on VIP, or a constant in wp-config.php elsewhere. Process payloads in a callback hooked to the controller's HOOK, which receives the decoded payload as its only argument."
 		}
 	],
 	"tests": [
