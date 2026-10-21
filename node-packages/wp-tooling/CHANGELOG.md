@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `discover_from` sources `entry-file:<type>` and `exists:<path>`. `entry-file:plugin` resolves to the main plugin file's name and `entry-file:theme` to `style.css`, each only for that type of project. `exists:<path>` resolves to the path as written when it exists inside the project, with a trailing `/` matching only a directory; an absolute path or one that climbs out with `..` never resolves.
+
+### Fixed
+
+- `lint/phpstan`: the generated `phpstan.neon.dist` lists the project's own PHP as found at scaffold time instead of a hardcoded `src` and `includes`. That is the main plugin file, a theme's `functions.php`, `uninstall.php`, and whichever of `framework/`, `inc/`, `includes/`, `patterns/`, `src/`, `template-parts/` and `templates/` exist. PHPStan stops with `Path … does not exist` on a missing `paths` entry, and `(?)` only works in `excludePaths`, so `composer analyse` failed in every project without both directories, including the rtCamp plugin and theme skeletons, which use `inc/`. The `excludePaths` block is gone: it only filters files inside `paths`, and none of its entries were.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added
