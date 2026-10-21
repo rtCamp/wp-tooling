@@ -61,6 +61,14 @@ final class ConfigTest extends TestCase
         self::assertStringContainsString('should return int but returns string', $output);
     }
 
+    public function test_baseline_runs_at_level_8(): void
+    {
+        [$exitCode, $output] = $this->analyse(__DIR__ . '/fixtures/nullable.php');
+
+        self::assertNotSame(0, $exitCode, "Expected the nullable fixture to fail analysis. PHPStan output:\n" . $output);
+        self::assertStringContainsString('Cannot access property $post_title on WP_Post|null', $output);
+    }
+
     private function makeConsumerProject(): string
     {
         $project = tempnam(sys_get_temp_dir(), 'wp-phpstan-consumer-');

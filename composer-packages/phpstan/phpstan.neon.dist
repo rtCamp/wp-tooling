@@ -7,14 +7,18 @@ includes:
     - ../../szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
-    level: 5
+    level: 8
+    # Analyse against the whole supported PHP range: the 8.2 floor up to 8.5.
+    phpVersion:
+        min: 80200
+        max: 80500
     # WordPress doc-blocks are unreliable; don't treat their types as certain.
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true
     # Wrong-case function/method calls and provably wrong @var tags.
     checkFunctionNameCase: true
     reportWrongPhpDocTypeInVarTag: true
-    # Low-noise correctness checks — stricter than bare level 5, not a level bump.
+    # Low-noise correctness checks on top of what the level enables.
     inferPrivatePropertyTypeFromConstructor: true
     checkInternalClassCaseSensitivity: true
     checkExplicitMixedMissingReturn: true
