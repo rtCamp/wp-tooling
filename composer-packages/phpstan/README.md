@@ -40,20 +40,11 @@ includes:
     - vendor/rtcamp/wp-phpstan/phpstan.neon.dist
 
 parameters:
-    # Constants define()d in the main plugin file are only known if it is loaded.
-    bootstrapFiles:
-        - my-plugin.php
+    # Every file and directory holding your own PHP. Dependencies resolve
+    # through Composer's autoloader, so vendor/ needs no entry.
     paths:
         - my-plugin.php
         - inc/
-    excludePaths:
-        # Not reported on, but still scanned so their classes and functions resolve.
-        analyse:
-            - tests/ (?)
-            - vendor/
-        # Neither reported on nor scanned. (?) stops PHPStan failing when the path is absent.
-        analyseAndScan:
-            - node_modules (?)
     # Project-specific overrides and suppressions go here.
 ```
 
@@ -62,10 +53,6 @@ That single include is all you need. Run the analysis with:
 ```bash
 vendor/bin/phpstan analyse
 ```
-
-On PHP 8.3 and newer, PHPStan loads its bundled Turbo extension automatically (`vendor/bin/phpstan diagnose` shows its status); PHP 8.2 runs without it. For fast CI runs, set `tmpDir` to a path inside the project and cache it between runs: PHPStan only throws the whole result cache away when PHPStan itself or your config changes.
-
-If the project registers WP-CLI commands, also `composer require --dev php-stubs/wp-cli-stubs` and add `vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php` under `scanFiles`. The baseline doesn't do this for you because `wp-cli-stubs` 2.12 caps `php-stubs/wordpress-stubs` at `^6.0`, which would hold every consumer back from the WordPress 7 stubs.
 
 > **The WordPress extension must load exactly once.** This baseline already
 > includes `szepeviktor/phpstan-wordpress`, and loading it twice fails PHPStan.
@@ -82,11 +69,9 @@ If the project registers WP-CLI commands, also `composer require --dev php-stubs
 
 ## Overriding
 
-Anything you set under `parameters` *after* the includes wins, so a project can
-change the level, add `paths`, or add `ignoreErrors` without forking this baseline.
+Anything you set under `parameters` in your own neon overrides this baseline, so a
+project can change the level, add `paths`, or add `ignoreErrors` without forking it.
 Per-project suppressions belong in your own neon — keep this shared file clean.
-
-An existing project moving up to level 8 can record its current errors with `vendor/bin/phpstan analyse --generate-baseline` and include the generated `phpstan-baseline.neon`, so only new code has to pass, or set `level` lower in its own neon until it catches up.
 
 ## License
 
