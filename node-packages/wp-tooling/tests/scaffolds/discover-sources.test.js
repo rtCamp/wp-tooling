@@ -2,6 +2,8 @@
  * Tests for the `discover_from` sources added alongside the psr-4 resolvers:
  *   - plugin-header:<header-name>      -> a value from the plugin/theme entry header
  *   - composer.json:autoload-dev.psr-4 -> the dev autoload map, for test paths
+ *   - entry-file:<type>                -> the plugin's main file, or a theme's style.css
+ *   - exists:<path>                    -> the path, when it exists in the project
  *
  * Plus the authoring-time guard that keeps the set of sources a manifest may
  * declare in step with the set registry.js can actually resolve — the failure
@@ -197,6 +199,117 @@ describe('discover_from: composer.json:autoload-dev.psr-4', () => {
 	});
 });
 
+// Resolves each `[key, discover_from]` pair against `targetDir`, with an empty
+// default, and returns the resolved inputs by key.
+async function resolve(targetDir, pairs) {
+	const projectDir = makeTmpDir();
+	const sDir = path.join(projectDir, 'wp', 'probe');
+	fs.mkdirSync(sDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(sDir, 'scaffold.json'),
+		JSON.stringify({
+			...SCAFFOLD,
+			inputs: pairs.map(([key, discoverFrom]) => ({
+				key,
+				description: key,
+				discover_from: discoverFrom,
+				default: '',
+			})),
+			files: [{ src: 'x.mustache', dest: 'x.php' }],
+			wiring: [],
+		}),
+		'utf8'
+	);
+	const r = new ScaffoldRegistry({ projectDir });
+	await r.scan();
+	const result = await r.execute(
+		'wp/probe',
+		{},
+		{ dryRun: true, cwd: targetDir }
+	);
+	fs.rmSync(projectDir, { recursive: true, force: true });
+	return result.engine.inputs;
+}
+
+describe('discover_from: entry-file:<type>', () => {
+	const PAIRS = [
+		['plugin', 'entry-file:plugin'],
+		['theme', 'entry-file:theme'],
+	];
+
+	it('names the main plugin file, not another root PHP file', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(path.join(target, 'helpers.php'), '<?php\n');
+		fs.writeFileSync(
+			path.join(target, 'acme-blog.php'),
+			'<?php\n/**\n * Plugin Name: Acme Blog\n */\n'
+		);
+		expect(await resolve(target, PAIRS)).toEqual({
+			plugin: 'acme-blog.php',
+			theme: '',
+		});
+	});
+
+	it("names a theme's style.css", async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(
+			path.join(target, 'style.css'),
+			'/*\nTheme Name: Elementary\n*/\n'
+		);
+		expect(await resolve(target, PAIRS)).toEqual({
+			plugin: '',
+			theme: 'style.css',
+		});
+	});
+
+	it('falls back to the default when the directory has no entry file', async () => {
+		expect(await resolve(makeTmpDir(), PAIRS)).toEqual({
+			plugin: '',
+			theme: '',
+		});
+	});
+});
+
+describe('discover_from: exists:<path>', () => {
+	it('resolves a file or directory that exists, as written', async () => {
+		const target = makeTmpDir();
+		fs.mkdirSync(path.join(target, 'inc'));
+		fs.writeFileSync(path.join(target, 'uninstall.php'), '<?php\n');
+		expect(
+			await resolve(target, [
+				['inc', 'exists:inc/'],
+				['uninstall', 'exists:uninstall.php'],
+			])
+		).toEqual({ inc: 'inc/', uninstall: 'uninstall.php' });
+	});
+
+	it('falls back to the default when the path is missing', async () => {
+		expect(await resolve(makeTmpDir(), [['src', 'exists:src/']])).toEqual({
+			src: '',
+		});
+	});
+
+	it('matches only a directory when the path ends in a slash', async () => {
+		const target = makeTmpDir();
+		fs.writeFileSync(path.join(target, 'inc'), '');
+		expect(await resolve(target, [['inc', 'exists:inc/']])).toEqual({
+			inc: '',
+		});
+	});
+
+	it('never resolves a path outside the project', async () => {
+		// Both point at the project itself, which exists: only the way they
+		// are written keeps them from resolving.
+		const target = makeTmpDir();
+		expect(
+			await resolve(target, [
+				['parent', `exists:../${path.basename(target)}`],
+				['absolute', `exists:${target}`],
+			])
+		).toEqual({ parent: '', absolute: '' });
+	});
+});
+
 describe('validate rejects a source the engine cannot resolve', () => {
 	const manifest = (discoverFrom) => ({
 		slug: 'x',
@@ -215,6 +328,8 @@ describe('validate rejects a source the engine cannot resolve', () => {
 		'package.json:name',
 		'plugin-header:text-domain',
 		'config:cssDir',
+		'entry-file:plugin',
+		'exists:inc/',
 		'input:name',
 		'code:bootstrap-class',
 	])('accepts %s', (spec) => {

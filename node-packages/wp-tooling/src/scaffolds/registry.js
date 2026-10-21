@@ -25,6 +25,7 @@
 'use strict';
 
 const fs = require('fs/promises');
+const { existsSync } = require('fs');
 const path = require('path');
 
 const { validate } = require('./validate');
@@ -886,20 +887,21 @@ const HEADER_LINE_RE =
 	/^[ \t/*#]*([A-Za-z][A-Za-z ]*[A-Za-z]):[ \t]*(\S.*?)[ \t]*$/gm;
 
 /**
- * Read the WordPress header block of a project's entry file.
+ * Find a project's WordPress entry file and read its header block.
  *
  * Looks for a plugin first — any root-level `*.php` carrying a `Plugin Name:`
- * header — then falls back to a theme's `style.css` with `Theme Name:`. Keys are
- * the header name lowercased with spaces hyphenated, so `Text Domain:` is read
- * as `text-domain`, which is how a manifest names it.
+ * header — then falls back to a theme's `style.css` with `Theme Name:`. Header
+ * keys are the header name lowercased with spaces hyphenated, so `Text Domain:`
+ * is read as `text-domain`, which is how a manifest names it.
  *
  * Only the header comment is scanned: parsing stops at its closing `*\/`, so a
  * `Foo: bar` in the code below can never be mistaken for a header.
  *
  * @param {string} cwd - Target project directory.
- * @return {Promise<Object|null>} Header map, or null when there is no entry file.
+ * @return {Promise<Object|null>} `{ type: 'plugin'|'theme', file, headers }`,
+ *     or null when there is no entry file.
  */
-async function readEntryHeaders(cwd) {
+async function readEntry(cwd) {
 	const headerBlock = async (file) => {
 		let raw;
 		try {
@@ -945,13 +947,13 @@ async function readEntryHeaders(cwd) {
 	for (const name of entries.filter((f) => f.endsWith('.php')).sort()) {
 		const block = await headerBlock(name);
 		if (block && /^[ \t/*#]*Plugin Name:[ \t]*\S/m.test(block)) {
-			return parse(block);
+			return { type: 'plugin', file: name, headers: parse(block) };
 		}
 	}
 
 	const style = await headerBlock('style.css');
 	if (style && /^[ \t/*#]*Theme Name:[ \t]*\S/m.test(style)) {
-		return parse(style);
+		return { type: 'theme', file: 'style.css', headers: parse(style) };
 	}
 
 	return null;
@@ -959,13 +961,13 @@ async function readEntryHeaders(cwd) {
 
 /**
  * Load the project files `discover_from` can read, tolerantly. A missing or
- * malformed file becomes `null` (composer/package/plugin-header) or `{}`
- * (config) so that discovery silently falls back to each input's `default` —
- * preserving the behaviour of projects that have no composer.json /
- * .wp-tooling.json / recognisable entry file.
+ * malformed file becomes `null` (composer/package/plugin-header/entry-file) or
+ * `{}` (config) so that discovery silently falls back to each input's
+ * `default` — preserving the behaviour of projects that have no composer.json /
+ * .wp-tooling.json / recognisable entry file. `cwd` is kept for `exists:`.
  *
  * @param {string} cwd - Target project directory.
- * @return {Promise<Object>} `{ 'composer.json', 'package.json', 'plugin-header', config }`.
+ * @return {Promise<Object>} `{ 'composer.json', 'package.json', 'plugin-header', 'entry-file', config, cwd }`.
  */
 async function loadDiscovery(cwd) {
 	const readJson = async (file) => {
@@ -982,11 +984,14 @@ async function loadDiscovery(cwd) {
 			return null;
 		}
 	};
+	const entry = await readEntry(cwd);
 	return {
 		'composer.json': await readJson('composer.json'),
 		'package.json': await readJson('package.json'),
-		'plugin-header': await readEntryHeaders(cwd),
+		'plugin-header': entry && entry.headers,
+		'entry-file': entry && { type: entry.type, file: entry.file },
 		config: readConfig(cwd),
+		cwd,
 	};
 }
 
@@ -1007,6 +1012,11 @@ async function loadDiscovery(cwd) {
  *     entry-file header, named lowercased and hyphenated: `plugin-header:text-domain`
  *     reads `Text Domain:`.
  *   - `config:<dot.path>` — string value from `.wp-tooling.json`.
+ *   - `entry-file:<type>` — the entry file's name when the project is that
+ *     type: `entry-file:plugin` is the main plugin file, `entry-file:theme` is
+ *     `style.css`.
+ *   - `exists:<path>` — the path itself, as written, when it exists inside the
+ *     project. A trailing `/` matches only a directory.
  *
  * Unknown sources (`input:` is handled by the caller) return `undefined`.
  * `validate` rejects any other prefix at authoring time, so an unresolvable
@@ -1070,7 +1080,30 @@ function discoverFromSource(decl, discovery) {
 		const value = getByPath(discovery.config || {}, selector);
 		return typeof value === 'string' ? value : undefined;
 	}
+	if (source === 'entry-file') {
+		const entry = discovery['entry-file'];
+		return entry && entry.type === spec.slice(colon + 1)
+			? entry.file
+			: undefined;
+	}
+	if (source === 'exists') {
+		return existingPath(discovery.cwd, spec.slice(colon + 1));
+	}
 	return undefined;
+}
+
+// `exists:<path>` resolves only inside the project: an absolute path or one
+// that climbs out with `..` never does, so a manifest cannot probe the rest of
+// the filesystem.
+function existingPath(cwd, rel) {
+	if (
+		typeof cwd !== 'string' ||
+		path.isAbsolute(rel) ||
+		path.normalize(rel).split(/[\\/]/).includes('..')
+	) {
+		return undefined;
+	}
+	return existsSync(path.join(cwd, rel)) ? rel : undefined;
 }
 
 // Heuristic: does this input key name a filesystem path/dir rather than a namespace?

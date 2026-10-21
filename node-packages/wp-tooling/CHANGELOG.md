@@ -6,8 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `discover_from` sources `entry-file:<type>` and `exists:<path>`. `entry-file:plugin` resolves to the main plugin file's name and `entry-file:theme` to `style.css`, each only for that type of project. `exists:<path>` resolves to the path as written when it exists inside the project, with a trailing `/` matching only a directory; an absolute path or one that climbs out with `..` never resolves.
+
 ### Fixed
 
+- `lint/phpstan`: the generated `phpstan.neon.dist` lists the project's own PHP as found at scaffold time instead of a hardcoded `src` and `includes`. That is the main plugin file, a theme's `functions.php`, `uninstall.php`, and whichever of `framework/`, `inc/`, `includes/`, `patterns/`, `src/`, `template-parts/` and `templates/` exist. PHPStan stops with `Path … does not exist` on a missing `paths` entry, and `(?)` only works in `excludePaths`, so `composer analyse` failed in every project without both directories, including the rtCamp plugin and theme skeletons, which use `inc/`. The `excludePaths` block is gone: it only filters files inside `paths`, and none of its entries were.
 - `detect-changes` buckets the remaining tool config files that change what a job checks, so a pull request that only touches one no longer skips that job. `php` now claims `phpcs*.xml` and `.phpcs*.xml` (with or without `.dist`, so `phpcs.i18n.xml.dist` and `phpcs-custom.xml` count), `phpunit*.xml(.dist)`, `.wp-env.json` and its `.wp-env.<name>.json` variants, and `.distignore`. `js` also claims `jest.config.json` and `tsconfig*.json` / `jsconfig*.json` (any name, such as `tsconfig-base.json` or `tsconfig.app.build.json`), and `css` also claims `postcss.config.*`. `.nvmrc` counts under `css`, `js` and `php` (test-php runs `wp-env` on that Node version), `.browserslistrc` under `css` and `js`, and `block.json` under `js` and `php`. rtCamp/wp-shared-workflows lints the whole project when a bucket's list holds anything but source files, so a ruleset change is checked against every file.
 - The `wp-tooling` binary waits for stdout and stderr to drain before it exits. Writes to a pipe are asynchronous on POSIX, so a report longer than the pipe buffer piped into a reader that was not ready yet (`wp-tooling list --json | jq`) arrived cut off at 64 KiB, as invalid JSON, and a long error message on stderr was cut the same way. Exit codes are unchanged, and a closed pipe on either stream (`2>&1 | head`) exits straight away with the command's own code instead of 1.
 

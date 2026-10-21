@@ -8,6 +8,8 @@
  *   - wiring targetFile paths are normalised (no `..` segments), and a
  *     target that still escapes the project is dropped with a warning
  *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
+ *   - lint/phpstan analyses only the project PHP that exists, since PHPStan
+ *     stops on a listed path that does not
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
  *     rejects an out-of-enum mode/eagerness
@@ -749,6 +751,75 @@ describe('lint/i18n ruleset', () => {
 			code: 'EMISSINGINPUT',
 			missing: ['text_domain'],
 		});
+	});
+});
+
+describe('lint/phpstan paths', () => {
+	// Lays out `entries` in a fresh project (a trailing `/` makes a directory),
+	// scaffolds lint/phpstan into it, and returns the rendered config.
+	async function scaffoldInto(entries) {
+		const target = makeTmpDir();
+		for (const [name, contents] of Object.entries(entries)) {
+			if (name.endsWith('/')) {
+				fs.mkdirSync(path.join(target, name));
+			} else {
+				fs.writeFileSync(path.join(target, name), contents, 'utf8');
+			}
+		}
+		await registry.execute('lint/phpstan', {}, { cwd: target });
+		return fs.readFileSync(path.join(target, 'phpstan.neon.dist'), 'utf8');
+	}
+
+	function analysedPaths(neon) {
+		const block = neon.match(/^ {4}paths:\n((?: {8}- .*\n)+)/m);
+		return block[1].trim().split(/\n\s*/);
+	}
+
+	it('lists the main plugin file and the directories a plugin has', async () => {
+		const neon = await scaffoldInto({
+			'acme-blog.php': '<?php\n/**\n * Plugin Name: Acme Blog\n */\n',
+			'uninstall.php': '<?php\n',
+			'inc/': null,
+			'src/': null,
+			'templates/': null,
+			'tests/': null,
+			'vendor/': null,
+			'node_modules/': null,
+		});
+		expect(analysedPaths(neon)).toEqual([
+			'- acme-blog.php',
+			'- uninstall.php',
+			'- inc/',
+			'- src/',
+			'- templates/',
+		]);
+		// Exclusions only filter files inside `paths`, which none of these are.
+		expect(neon).not.toContain('excludePaths');
+	});
+
+	it("lists a theme's functions.php and the directories it has", async () => {
+		const neon = await scaffoldInto({
+			'style.css': '/*\nTheme Name: Elementary\n*/\n',
+			'functions.php': '<?php\n',
+			'inc/': null,
+			'patterns/': null,
+			'template-parts/': null,
+		});
+		expect(analysedPaths(neon)).toEqual([
+			'- functions.php',
+			'- inc/',
+			'- patterns/',
+			'- template-parts/',
+		]);
+	});
+
+	it('does not list a directory the project lacks', async () => {
+		// The bug this closes: the config always listed `src` and `includes`,
+		// and PHPStan stops on a path that does not exist.
+		const neon = await scaffoldInto({
+			'acme-blog.php': '<?php\n/**\n * Plugin Name: Acme Blog\n */\n',
+		});
+		expect(analysedPaths(neon)).toEqual(['- acme-blog.php']);
 	});
 });
 
