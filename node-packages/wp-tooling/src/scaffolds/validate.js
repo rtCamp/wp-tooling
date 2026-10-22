@@ -85,8 +85,6 @@ const DISCOVER_SOURCES = [
 	'package.json',
 	'plugin-header',
 	'config',
-	'entry-file',
-	'exists',
 	'input',
 ];
 

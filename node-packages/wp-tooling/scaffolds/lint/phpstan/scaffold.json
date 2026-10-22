@@ -6,64 +6,9 @@
 	"source": "template",
 	"inputs": [
 		{
-			"key": "plugin_file",
-			"description": "Main plugin file, analysed with the rest of the project. Found by its Plugin Name header; left out for a theme.",
-			"discover_from": "entry-file:plugin",
-			"default": ""
-		},
-		{
-			"key": "functions_file",
-			"description": "A theme's `functions.php`, analysed when the project has it.",
-			"discover_from": "exists:functions.php",
-			"default": ""
-		},
-		{
-			"key": "uninstall_file",
-			"description": "`uninstall.php`, analysed when the project has it.",
-			"discover_from": "exists:uninstall.php",
-			"default": ""
-		},
-		{
-			"key": "framework_dir",
-			"description": "`framework/`, analysed when the project has it.",
-			"discover_from": "exists:framework/",
-			"default": ""
-		},
-		{
-			"key": "inc_dir",
-			"description": "`inc/`, analysed when the project has it.",
-			"discover_from": "exists:inc/",
-			"default": ""
-		},
-		{
-			"key": "includes_dir",
-			"description": "`includes/`, analysed when the project has it.",
-			"discover_from": "exists:includes/",
-			"default": ""
-		},
-		{
-			"key": "patterns_dir",
-			"description": "A theme's `patterns/`, analysed when the project has it.",
-			"discover_from": "exists:patterns/",
-			"default": ""
-		},
-		{
-			"key": "src_dir",
-			"description": "`src/`, analysed when the project has it.",
-			"discover_from": "exists:src/",
-			"default": ""
-		},
-		{
-			"key": "template_parts_dir",
-			"description": "A theme's `template-parts/`, analysed when the project has it.",
-			"discover_from": "exists:template-parts/",
-			"default": ""
-		},
-		{
-			"key": "templates_dir",
-			"description": "`templates/`, analysed when the project has it.",
-			"discover_from": "exists:templates/",
-			"default": ""
+			"key": "paths",
+			"description": "Files and directories holding your own PHP, comma-separated, e.g. `inc/, my-plugin.php`. PHPStan stops on one that doesn't exist.",
+			"required": true
 		}
 	],
 	"files": [
