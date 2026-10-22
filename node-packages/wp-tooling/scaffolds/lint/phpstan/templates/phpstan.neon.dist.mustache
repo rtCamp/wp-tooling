@@ -5,16 +5,9 @@ includes:
     - vendor/rtcamp/wp-phpstan/phpstan.neon.dist
 
 parameters:
-    # Your own PHP, as found when this file was scaffolded. A path that
-    # doesn't exist stops PHPStan, so keep the list current.
-    paths:{{#plugin_file}}
-        - {{plugin_file}}{{/plugin_file}}{{#functions_file}}
-        - {{functions_file}}{{/functions_file}}{{#uninstall_file}}
-        - {{uninstall_file}}{{/uninstall_file}}{{#framework_dir}}
-        - {{framework_dir}}{{/framework_dir}}{{#inc_dir}}
-        - {{inc_dir}}{{/inc_dir}}{{#includes_dir}}
-        - {{includes_dir}}{{/includes_dir}}{{#patterns_dir}}
-        - {{patterns_dir}}{{/patterns_dir}}{{#src_dir}}
-        - {{src_dir}}{{/src_dir}}{{#template_parts_dir}}
-        - {{template_parts_dir}}{{/template_parts_dir}}{{#templates_dir}}
-        - {{templates_dir}}{{/templates_dir}}
+    # Your own PHP. A path that doesn't exist stops PHPStan.
+    paths: [{{paths}}]
+    # Only matters if `paths` includes `.`.
+    excludePaths:
+        - vendor (?)
+        - node_modules (?)

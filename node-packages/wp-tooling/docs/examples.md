@@ -52,7 +52,7 @@ Confirm?
 npx wp-tooling add setup/editorconfig --non-interactive --json --cwd .
 npx wp-tooling add setup/psr4         --non-interactive --json --cwd . --namespace='Acme\InventoryManager' --base_path=includes
 npx wp-tooling add lint/phpcs/full    --non-interactive --json --cwd .
-npx wp-tooling add lint/phpstan       --non-interactive --json --cwd .
+npx wp-tooling add lint/phpstan       --non-interactive --json --cwd . --paths=includes
 npx wp-tooling add lint/eslint        --non-interactive --json --cwd .
 npx wp-tooling add setup/phpunit      --non-interactive --json --cwd . --source_dir=includes
 npx wp-tooling add wp/cpt             --non-interactive --json --cwd . --slug=product --singular=Product --plural=Products --namespace='Acme\InventoryManager' --base_path=includes
