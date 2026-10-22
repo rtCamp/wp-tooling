@@ -11,7 +11,7 @@ parameters:
     # Analyse against the whole supported PHP range: the 8.2 floor up to 8.5.
     phpVersion:
         min: 80200
-        max: 80500
+        max: 80599
     # WordPress doc-blocks are unreliable; don't treat their types as certain.
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true

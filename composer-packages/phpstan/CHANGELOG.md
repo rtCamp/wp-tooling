@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `phpVersion` range `80200`–`80500`, so code is analysed against every PHP version from the 8.2 floor up to 8.5.
+- `phpVersion` range `80200`–`80599`, so code is analysed against every PHP version from the 8.2 floor up to 8.5.
 
 ### Changed
 
