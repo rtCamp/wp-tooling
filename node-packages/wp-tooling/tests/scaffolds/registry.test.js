@@ -495,6 +495,27 @@ describe('execute() error paths', () => {
 			discover_from: null,
 		});
 	});
+
+	it.each(['', '   '])(
+		'treats a blank required input (%j) as missing',
+		async (blank) => {
+			await expect(
+				registry.execute('wp/cli', { name: blank }, { dryRun: true })
+			).rejects.toMatchObject({
+				code: 'EMISSINGINPUT',
+				missing: ['name'],
+			});
+		}
+	);
+
+	it('accepts a blank optional input', async () => {
+		const result = await registry.execute(
+			'wp/cli',
+			{ name: 'export', namespace: '' },
+			{ dryRun: true, cwd: makeTmpDir() }
+		);
+		expect(result.engine.inputs.namespace).toBe('');
+	});
 });
 
 describe('execute() passes scripts through to developer block', () => {

@@ -1194,8 +1194,8 @@ function resolveDeclared(declared, supplied, discovery) {
  * discovery.
  *
  * Throws EMISSINGINPUT (with `missingDetails`) when required inputs are
- * not supplied (after `default` is applied), then EINVALIDINPUT (with
- * `invalid`) when a resolved value falls outside its declared `enum`.
+ * not supplied or blank (after `default` is applied), then EINVALIDINPUT
+ * (with `invalid`) when a resolved value falls outside its declared `enum`.
  *
  * @param {Object}                scaffold  - The scaffold record being executed.
  * @param {Object<string,string>} supplied  - Caller-supplied input values.
@@ -1211,7 +1211,13 @@ function resolveInputs(scaffold, supplied, discovery = {}) {
 	if (declared) {
 		resolved = resolveDeclared(declared, supplied, discovery);
 		for (const decl of declared) {
-			if (!(decl.key in resolved) && decl.required) {
+			// A blank value counts as missing: it would render an empty slug,
+			// namespace or path list, which no generated code means.
+			const value = resolved[decl.key];
+			if (
+				decl.required &&
+				(value === undefined || String(value).trim() === '')
+			) {
 				missing.push(decl.key);
 				missingDetails.push({
 					key: decl.key,
