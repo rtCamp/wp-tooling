@@ -81,6 +81,25 @@ describe('promptMissingInputs', () => {
 		});
 		expect(ui.__calls.text[0].defaultValue).toBeUndefined();
 	});
+
+	it('asks again on a blank answer only for a required input', async () => {
+		const scaffold = {
+			inputs: [
+				{ key: 'name', description: 'Command slug', required: true },
+				{ key: 'label', description: 'Menu label' },
+			],
+		};
+		await promptMissingInputs({
+			scaffold,
+			missing: ['name', 'label'],
+			missingDetails: [],
+			supplied: {},
+		});
+		const [required, optional] = ui.__calls.text;
+		expect(required.validate('')).toBe('A value is required.');
+		expect(required.validate('export')).toBeUndefined();
+		expect(optional.validate).toBeUndefined();
+	});
 });
 
 describe('confirmRun', () => {

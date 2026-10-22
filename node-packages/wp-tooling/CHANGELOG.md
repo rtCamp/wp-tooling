@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A required scaffold input given an empty or whitespace-only value (`--paths=`, or Enter at the prompt) counts as missing. Non-interactive runs fail with `EMISSINGINPUT` and the prompt asks again, instead of rendering an empty slug, namespace or path list.
+- `lint/phpstan` asks for the PHP to analyse through a required `paths` input (comma-separated, e.g. `--paths='inc/, my-plugin.php'`) instead of hardcoding `src` and `includes`. PHPStan stops with `Path … does not exist` on a missing `paths` entry, and `(?)` only works in `excludePaths`, so `composer analyse` failed in every project without both directories, including the rtCamp plugin and theme skeletons, which use `inc/`. The excludes shrink to optional `vendor` and `node_modules`, which only matter when `paths` includes `.`.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added
