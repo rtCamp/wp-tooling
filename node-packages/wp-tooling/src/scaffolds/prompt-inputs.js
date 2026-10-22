@@ -43,6 +43,10 @@ async function promptMissingInputs({
 		const answer = await text({
 			message: `${message}${defaultValue !== undefined ? ` (default: ${defaultValue})` : ''}`,
 			defaultValue,
+			// The engine rejects a blank required value, so ask again here.
+			validate: declared.required
+				? (value) => (value ? undefined : 'A value is required.')
+				: undefined,
 		});
 		next[key] = answer;
 	}
