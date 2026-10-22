@@ -61,6 +61,22 @@ final class ConfigTest extends TestCase
         self::assertStringContainsString('should return int but returns string', $output);
     }
 
+    public function test_baseline_runs_at_level_8(): void
+    {
+        [$exitCode, $output] = $this->analyse(__DIR__ . '/fixtures/nullable.php');
+
+        self::assertNotSame(0, $exitCode, "Expected the nullable fixture to fail analysis. PHPStan output:\n" . $output);
+        self::assertStringContainsString('Cannot access property $post_title on WP_Post|null', $output);
+    }
+
+    public function test_baseline_analyses_for_the_php_8_2_floor(): void
+    {
+        [$exitCode, $output] = $this->analyse(__DIR__ . '/fixtures/typed-constant.php');
+
+        self::assertNotSame(0, $exitCode, "Expected the typed-constant fixture to fail analysis. PHPStan output:\n" . $output);
+        self::assertStringContainsString('Class constants with native types are supported only on PHP 8.3 and later', $output);
+    }
+
     private function makeConsumerProject(): string
     {
         $project = tempnam(sys_get_temp_dir(), 'wp-phpstan-consumer-');
@@ -77,6 +93,20 @@ final class ConfigTest extends TestCase
         self::assertTrue(
             copy($this->baseline(), $project . '/vendor/rtcamp/wp-phpstan/phpstan.neon.dist'),
             'Could not copy phpstan.neon.dist into the temp consumer project.'
+        );
+
+        // Without a phpVersion, PHPStan infers one from require.php in the
+        // composer.json of its working directory, but only when a
+        // vendor/autoload.php sits beside it; otherwise it reads the package's
+        // own composer.json (>=8.2). Both files below are needed so the baseline
+        // is the only source of the PHP range.
+        self::assertNotFalse(
+            file_put_contents($project . '/composer.json', "{}\n"),
+            'Could not write composer.json into the temp consumer project.'
+        );
+        self::assertNotFalse(
+            file_put_contents($project . '/vendor/autoload.php', "<?php\n"),
+            'Could not write vendor/autoload.php into the temp consumer project.'
         );
 
         foreach (self::LINKED_DEPS as $dep) {
@@ -128,10 +158,12 @@ final class ConfigTest extends TestCase
             )
         );
 
-        // WordPress stubs are large; raise the limit above PHP's 128M default so
-        // analysis completes instead of crashing the worker.
+        // Run from the project root, as a consumer does. WordPress stubs are
+        // large; raise the limit above PHP's 128M default so analysis completes
+        // instead of crashing the worker.
         $command = sprintf(
-            '%s %s analyse --no-progress --no-ansi --error-format=raw --memory-limit=1G --configuration=%s 2>&1',
+            'cd %s && %s %s analyse --no-progress --no-ansi --error-format=raw --memory-limit=1G --configuration=%s 2>&1',
+            escapeshellarg($this->project),
             escapeshellarg(PHP_BINARY),
             escapeshellarg($this->phpstanBinary()),
             escapeshellarg($neon)
