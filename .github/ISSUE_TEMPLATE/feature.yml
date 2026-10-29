@@ -1,6 +1,8 @@
 name: Feature request
 description: Suggest a new command, flag, scaffold, config or coding-standard rule.
 type: Feature
+labels:
+  - "Type: Feature"
 body:
   - type: markdown
     attributes:
