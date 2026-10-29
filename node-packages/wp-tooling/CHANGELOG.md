@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `detect-changes` buckets the remaining tool config files that change what a job checks, so a pull request that only touches one no longer skips that job. `php` now claims `phpcs.xml`, `.phpcs.xml` and `phpcs.<name>.xml` (each with or without `.dist`), `phpunit.xml(.dist)`, `.wp-env.json` and its `.wp-env.<name>.json` variants, and `.distignore`. `js` also claims `jest.config.json`, `tsconfig*.json` and `jsconfig*.json`, and `css` also claims `postcss.config.*`. `.nvmrc` and `.browserslistrc` count under both `css` and `js`, like `package.json`. rtCamp/wp-shared-workflows lints the whole project when a bucket's list holds anything but source files, so a ruleset change is checked against every file.
+
 ### Changed
 
 - `detect-changes` counts `.cjs`, `.mjs`, `.jsx`, `.ts`, `.cts`, `.mts` and `.tsx` files in the `js` bucket, not just `.js` and Jest snapshots, so ES-module and TypeScript changes trigger the jobs gated on `js-count`.

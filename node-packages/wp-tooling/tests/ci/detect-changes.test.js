@@ -86,7 +86,8 @@ describe('detectChanges', () => {
 			'eslint.config.mjs',
 			'src/__snapshots__/a.test.js.snap',
 		];
-		const notJs = ['tsconfig.json', 'src/data.json', 'src/a.jsonc'];
+		// tsconfig.json is js too, as tool config; see the JS tool config cases.
+		const notJs = ['src/data.json', 'src/a.jsonc'];
 		const r = detectChanges({
 			files: [...js, ...notJs],
 			includeFiles: true,
@@ -118,12 +119,9 @@ describe('detectChanges', () => {
 			'.stylelintignore',
 			'plugins/acme/.stylelintrc.json',
 		];
-		const neither = [
-			'tsconfig.json',
-			'.editorconfig',
-			'.browserslistrc',
-			'.lintstagedrc.json',
-		];
+		// tsconfig*.json and .browserslistrc are bucketed too: see the
+		// tool config cases below.
+		const neither = ['.editorconfig', '.lintstagedrc.json'];
 		const r = detectChanges({
 			files: [
 				...jsConfigs,
@@ -150,6 +148,82 @@ describe('detectChanges', () => {
 	test('composer.json and composer.lock count as php', () => {
 		const r = detectChanges({ files: ['composer.json', 'composer.lock'] });
 		expect(r['php-count']).toBe(2);
+	});
+
+	test.each([
+		'phpcs.xml',
+		'phpcs.xml.dist',
+		'.phpcs.xml.dist',
+		'phpcs.i18n.xml.dist',
+		'phpunit.xml',
+		'phpunit.xml.dist',
+		'.wp-env.json',
+		'.wp-env.override.json',
+		'.wp-env.tests.json',
+		'.distignore',
+		'plugins/acme/phpcs.xml.dist',
+	])('PHP tool config %s counts as php only', (file) => {
+		const r = detectChanges({ files: [file] });
+		expect(r['php-count']).toBe(1);
+		expect(r['js-count']).toBe(0);
+		expect(r['css-count']).toBe(0);
+	});
+
+	test.each([
+		'.eslintrc',
+		'.eslintrc.json',
+		'.eslintrc.yml',
+		'.eslintignore',
+		'.prettierrc',
+		'.prettierrc.json',
+		'.babelrc',
+		'babel.config.json',
+		'tsconfig.json',
+		'tsconfig.build.json',
+		'jsconfig.json',
+		'jest.config.json',
+	])('JS tool config %s counts as js only', (file) => {
+		const r = detectChanges({ files: [file] });
+		expect(r['js-count']).toBe(1);
+		expect(r['css-count']).toBe(0);
+		expect(r['php-count']).toBe(0);
+	});
+
+	test.each([
+		'.stylelintrc',
+		'.stylelintrc.json',
+		'.stylelintignore',
+		'stylelint.config.js',
+		'stylelint.config.mjs',
+		'postcss.config.js',
+	])('CSS tool config %s counts as css', (file) => {
+		const r = detectChanges({ files: [file] });
+		expect(r['css-count']).toBe(1);
+		expect(r['php-count']).toBe(0);
+	});
+
+	test.each(['.nvmrc', '.browserslistrc', 'themes/acme/.nvmrc'])(
+		'%s counts under both css and js',
+		(file) => {
+			const r = detectChanges({ files: [file] });
+			expect(r['css-count']).toBe(1);
+			expect(r['js-count']).toBe(1);
+			expect(r['php-count']).toBe(0);
+		}
+	);
+
+	test.each([
+		'README.md',
+		'data.json',
+		'phpcs.txt',
+		'my-phpunit.xml',
+		'notes/tsconfig.md',
+		'readme.txt',
+	])('unrelated file %s lands in no bucket', (file) => {
+		const r = detectChanges({ files: [file] });
+		expect(r['css-count']).toBe(0);
+		expect(r['js-count']).toBe(0);
+		expect(r['php-count']).toBe(0);
 	});
 
 	test('string --ignore overrides the default', () => {
