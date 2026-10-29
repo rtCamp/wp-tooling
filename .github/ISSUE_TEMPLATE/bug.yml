@@ -1,0 +1,123 @@
+name: Bug report
+description: A wp-tooling command, config package or coding standard misbehaves.
+type: Bug
+labels:
+  - "Type: Bug"
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for reporting a bug. Please search
+        [existing issues](https://github.com/rtCamp/wp-tooling/issues?q=is%3Aissue)
+        first. This repository is also the source of `rtcamp/wp-phpcs` and
+        `rtcamp/wp-phpstan`; their own repositories are read-only mirrors.
+  - type: markdown
+    attributes:
+      value: >-
+        **Found a security issue?** Do not open a public issue. Report it
+        privately through
+        [GitHub's vulnerability reporting](https://github.com/rtCamp/wp-tooling/security/advisories/new),
+        as [SECURITY.md](https://github.com/rtCamp/wp-tooling/blob/main/SECURITY.md)
+        describes.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@rtcamp/wp-tooling (CLI: init, add, release and the rest)"
+        - "@rtcamp/eslint-config"
+        - "@rtcamp/stylelint-config"
+        - "@rtcamp/tailwind-config"
+        - "rtcamp/wp-phpcs"
+        - "rtcamp/wp-phpstan"
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: Package version
+      description: >-
+        The installed version, from `npm ls <package>` or
+        `composer show <package>`. For a git-branch install, the commit.
+      placeholder: 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran, with its flags.
+      placeholder: npx wp-tooling add wp/rest
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: The output of `node --version`.
+      placeholder: v22.22.2
+    validations:
+      required: true
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      description: Only for `rtcamp/wp-phpcs` and `rtcamp/wp-phpstan`. The output of `php -v`.
+      placeholder: "8.3"
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows (WSL)
+        - Windows
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: The error or behaviour you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Start from a clean project if you can: the plugin or theme starter, the
+        config file that loads the package, and the commands in order.
+      placeholder: |
+        1. composer create-project rtcamp/plugin-elementary demo
+        2. cd demo && npm install
+        3. npx wp-tooling ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: The full terminal output. Rendered as code, so no backticks are needed.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I removed secrets, tokens and private URLs from everything above.
+          required: true
