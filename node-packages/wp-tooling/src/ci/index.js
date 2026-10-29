@@ -19,6 +19,12 @@ const {
 	DEFAULT_UNMEASURED_POLICY,
 	UNMEASURED_POLICIES,
 } = require('./coverage-gate');
+const {
+	checkIapi,
+	scanText: scanIapiText,
+	IapiCheckError,
+	RULES: IAPI_RULES,
+} = require('./iapi-check');
 
 module.exports = {
 	detectChanges,
@@ -32,4 +38,8 @@ module.exports = {
 	GateError,
 	DEFAULT_UNMEASURED_POLICY,
 	UNMEASURED_POLICIES,
+	checkIapi,
+	scanIapiText,
+	IapiCheckError,
+	IAPI_RULES,
 };

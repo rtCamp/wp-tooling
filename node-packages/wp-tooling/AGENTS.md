@@ -19,12 +19,16 @@ two-ecosystem layout, and release mechanics; this file does not repeat any of it
 
 ```
 src/
-  ci/               detect-changes.js, index.js, coverage-gate/ (cli, diff, errors, gate,
-                    index, render, reports) — CI helper commands (change detection and
-                    changed-line coverage gating for CI pipelines)
-  cli/              index.js (dispatcher) + commands/ (14 files: a11y, add, cache,
-                    coverage-gate, detect-changes, features, install-hooks, list, perf,
-                    release-bump, release-changelog, release-zip, validate, version-monitor)
+  ci/               cli-support.js, detect-changes.js, index.js, coverage-gate/ (cli, diff,
+                    errors, gate, index, render, reports), iapi-check/ (cli, errors, index,
+                    render, rules, scan): CI helper commands (change detection, changed-line
+                    coverage gating and the WordPress 7.2 Interactivity API check).
+                    cli-support.js holds the flag parsing and GitHub output plumbing the
+                    commands share
+  cli/              index.js (dispatcher) + commands/ (15 files: a11y, add, cache,
+                    coverage-gate, detect-changes, features, iapi-check, install-hooks, list,
+                    perf, release-bump, release-changelog, release-zip, validate,
+                    version-monitor)
   hooks/            index.js, install.js, templates/ — git hook installer + shell templates
                     (commit-msg, pre-commit)
   init/             cleanup.js, examples.js, features.js, git.js, identity.js, index.js,
