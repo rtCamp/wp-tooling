@@ -94,6 +94,52 @@ describe('detectChanges', () => {
 		expect(r['js-files']).toEqual(js);
 	});
 
+	test('linter configs count in the bucket they configure', () => {
+		const jsConfigs = [
+			'eslint.config.mjs',
+			'.eslintrc',
+			'.eslintrc.js',
+			'.eslintrc.json',
+			'.eslintrc.yml',
+			'.eslintignore',
+			'.prettierrc',
+			'.prettierrc.json',
+			'prettier.config.js',
+			'.prettierignore',
+			'.babelrc',
+			'.babelrc.json',
+			'babel.config.js',
+			'babel.config.json',
+		];
+		const cssConfigs = [
+			'.stylelintrc',
+			'.stylelintrc.json',
+			'.stylelintrc.yaml',
+			'.stylelintignore',
+			'plugins/acme/.stylelintrc.json',
+		];
+		const neither = [
+			'tsconfig.json',
+			'.editorconfig',
+			'.browserslistrc',
+			'.lintstagedrc.json',
+		];
+		const r = detectChanges({
+			files: [
+				...jsConfigs,
+				...cssConfigs,
+				'stylelint.config.mjs',
+				...neither,
+			],
+			includeFiles: true,
+		});
+		expect(r['js-files']).toEqual([...jsConfigs, 'stylelint.config.mjs']);
+		expect(r['css-files']).toEqual([...cssConfigs, 'stylelint.config.mjs']);
+		expect(r['total-count']).toBe(
+			jsConfigs.length + cssConfigs.length + 1 + neither.length
+		);
+	});
+
 	test('phpstan.neon and phpstan.neon.dist count as php', () => {
 		const r = detectChanges({
 			files: ['phpstan.neon', 'phpstan.neon.dist'],

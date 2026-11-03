@@ -19,16 +19,14 @@ const fs = require('fs');
 /**
  * Default bucket regexes. A file is counted in a bucket if its path matches.
  *
- * `js` covers .js/.cjs/.mjs, .ts/.cts/.mts, .jsx/.tsx and Jest snapshots.
- *
  * `gha` avoids `.+\.yml$`, which was quadratic twice over: `.` also matches
  * `/`, and an unbounded tail let every `/.github/actions/` in the path walk the
  * remainder before `\.yml$` failed. `[^/]` and the count bound fix one each.
  * Four segments is generous — workflows sit at depth 1, composite actions at 2.
  */
 const DEFAULT_PATTERNS = {
-	css: /\.s?css$|(?:^|\/)package(?:-lock)?\.json$/,
-	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
+	css: /\.s?css$|(?:^|\/)(?:package(?:-lock)?\.json|\.stylelintrc(?:\.[^/]+)?|stylelint\.config\.[^/]+|\.stylelintignore)$/,
+	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)(?:package(?:-lock)?\.json|\.eslintrc(?:\.[^/]+)?|\.eslintignore|\.prettierrc(?:\.[^/]+)?|\.prettierignore|\.babelrc(?:\.[^/]+)?|babel\.config\.json)$/,
 	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
 	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+){0,3}\.yml$/,
 };
@@ -174,10 +172,14 @@ function normaliseFiles(input) {
 function gitDiffFiles(explicitBase, strict = false) {
 	const base = explicitBase || resolveBaseRef();
 	try {
-		const out = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], {
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		});
+		const out = execFileSync(
+			'git',
+			['diff', '--name-only', '--no-renames', base, 'HEAD'],
+			{
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+			}
+		);
 		return out.split(/\r?\n/).filter(Boolean);
 	} catch (err) {
 		const detail = (err.stderr || err.message || '').toString().trim();

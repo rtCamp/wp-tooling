@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - `detect-changes` counts `.cjs`, `.mjs`, `.jsx`, `.ts`, `.cts`, `.mts` and `.tsx` files in the `js` bucket, not just `.js` and Jest snapshots, so ES-module and TypeScript changes trigger the jobs gated on `js-count`.
+- `detect-changes` counts linter configs in the bucket they configure. The `css` bucket gains `.stylelintrc*`, `stylelint.config.*` and `.stylelintignore`. The `js` bucket gains `.eslintrc*`, `.eslintignore`, `.prettierrc*`, `.prettierignore`, `.babelrc*` and `babel.config.json`; `eslint.config.*`, `prettier.config.*` and `babel.config.js` already matched by extension. A config-only change used to skip the linter whose rules it changed.
+- `detect-changes` diffs with `--no-renames`, so a rename lists the old path as well as the new one and a caller can treat the old path as removed. `total-count` counts a rename as two files.
 
 ## [2.0.0] - 2026-10-01
 
