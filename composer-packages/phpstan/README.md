@@ -3,7 +3,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg" alt="License: GPL-2.0-or-later"></a>
   <img src="https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg" alt="PHP 8.2+">
-  <img src="https://img.shields.io/badge/PHPStan-2.x-blue.svg" alt="PHPStan 2.x">
+  <img src="https://img.shields.io/badge/PHPStan-2.3%2B-blue.svg" alt="PHPStan 2.3+">
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
 > The [`rtCamp/wp-phpstan`](https://github.com/rtCamp/wp-phpstan) repository is a read-only mirror, split from
 > there on each release. Please open issues and pull requests in wp-tooling.
 
-This package ships a single `phpstan.neon.dist` of rtCamp defaults (level 5, WordPress-aware
+This package ships a single `phpstan.neon.dist` of rtCamp defaults (level 8, PHP 8.2–8.5, WordPress-aware
 rules) and pulls in [`szepeviktor/phpstan-wordpress`](https://github.com/szepeviktor/phpstan-wordpress),
 which loads the WordPress function stubs and dynamic return-type extensions PHPStan
 needs to understand core.
@@ -40,14 +40,11 @@ includes:
     - vendor/rtcamp/wp-phpstan/phpstan.neon.dist
 
 parameters:
+    # Every file and directory holding your own PHP. Dependencies resolve
+    # through Composer's autoloader, so vendor/ needs no entry.
     paths:
-        - src
-        - includes
-    excludePaths:
-        - vendor
-        - node_modules
-        - build
-        - tests
+        - my-plugin.php
+        - inc/
     # Project-specific overrides and suppressions go here.
 ```
 
@@ -72,8 +69,8 @@ vendor/bin/phpstan analyse
 
 ## Overriding
 
-Anything you set under `parameters` *after* the includes wins, so a project can
-raise the level, add `paths`, or add `ignoreErrors` without forking this baseline.
+Anything you set under `parameters` in your own neon overrides this baseline, so a
+project can change the level, add `paths`, or add `ignoreErrors` without forking it.
 Per-project suppressions belong in your own neon — keep this shared file clean.
 
 ## License
