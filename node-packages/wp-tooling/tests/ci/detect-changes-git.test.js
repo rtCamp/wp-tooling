@@ -198,6 +198,21 @@ describe('detectChanges against a git repository', () => {
 		expect(result['total-files']).toEqual(['inc/Feature.php']);
 	});
 
+	test('a rename lists the old path as well as the new one', () => {
+		const repo = makePullRequestRepo();
+		process.chdir(repo);
+		const base = git(repo, 'rev-parse', 'HEAD');
+		git(repo, 'mv', 'src/feature.js', 'src/renamed.js');
+		git(repo, 'commit', '-q', '-m', 'rename');
+
+		const result = detectChanges({ base, includeFiles: true });
+
+		expect(result['js-files']).toEqual([
+			'src/feature.js',
+			'src/renamed.js',
+		]);
+	});
+
 	test('a failed diff is soft by default: no changes plus a stderr note', () => {
 		const repo = makePullRequestRepo();
 		process.chdir(repo);

@@ -25,8 +25,8 @@ const fs = require('fs');
  * Four segments is generous — workflows sit at depth 1, composite actions at 2.
  */
 const DEFAULT_PATTERNS = {
-	css: /\.s?css$|(?:^|\/)package(?:-lock)?\.json$/,
-	js: /\.(?:js|snap)$|(?:^|\/)package(?:-lock)?\.json$/,
+	css: /\.s?css$|(?:^|\/)(?:package(?:-lock)?\.json|\.stylelintrc(?:\.[^/]+)?|stylelint\.config\.[^/]+|\.stylelintignore)$/,
+	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)(?:package(?:-lock)?\.json|\.eslintrc(?:\.[^/]+)?|\.eslintignore|\.prettierrc(?:\.[^/]+)?|\.prettierignore|\.babelrc(?:\.[^/]+)?|babel\.config\.json)$/,
 	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
 	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+){0,3}\.yml$/,
 };
@@ -172,10 +172,14 @@ function normaliseFiles(input) {
 function gitDiffFiles(explicitBase, strict = false) {
 	const base = explicitBase || resolveBaseRef();
 	try {
-		const out = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], {
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe'],
-		});
+		const out = execFileSync(
+			'git',
+			['diff', '--name-only', '--no-renames', base, 'HEAD'],
+			{
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+			}
+		);
 		return out.split(/\r?\n/).filter(Boolean);
 	} catch (err) {
 		const detail = (err.stderr || err.message || '').toString().trim();
