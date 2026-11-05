@@ -12,8 +12,8 @@
 		},
 		{
 			"key": "node_version",
-			"description": "Node.js version for the build.",
-			"default": "22"
+			"description": "Node.js version. Leave empty to use the project's .nvmrc, which the shared workflow reads.",
+			"default": ""
 		},
 		{
 			"key": "php_version",

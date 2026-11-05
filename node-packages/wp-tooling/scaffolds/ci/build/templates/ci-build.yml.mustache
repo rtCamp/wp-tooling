@@ -20,7 +20,7 @@ jobs:
     uses: rtCamp/wp-shared-workflows/.github/workflows/ci-build.yml@{{wsw_ref}}
     with:
       install-node-deps: true
-      install-composer-deps: {{install_composer_deps}}
-      node-version: "{{node_version}}"
+      install-composer-deps: {{install_composer_deps}}{{#node_version}}
+      node-version: "{{node_version}}"{{/node_version}}
       php-version: "{{php_version}}"
       upload-artifact: {{upload_artifact}}

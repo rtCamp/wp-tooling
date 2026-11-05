@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The CI scaffolds call rtCamp/wp-shared-workflows at `@v1`. `ci/lint-css`, `ci/lint-js` and `ci/lint-php` defaulted to the `v1.0.0/task/ci-lint-workflows` branch, which no longer exists, so a workflow scaffolded with the defaults failed before any job ran. `ci/test-measure` defaulted to the stale `release/v1.0.0` branch, and `ci/cd-wporg` hard-coded `@v1.0.0`. The lint templates also drop their outdated "EXPERIMENTAL" header.
+- `node_version` in the `ci/build`, `ci/lint-css`, `ci/lint-js`, `ci/test-a11y`, `ci/test-js` and `ci/test-php` scaffolds defaults to empty, which leaves `node-version` out of the generated workflow, so the shared workflow uses the project's `.nvmrc`. The old default of `22` overrode `.nvmrc`. Passing `--node_version` still pins a version.
+- `ci/test-measure`'s default WordPress versions include 7.1.
+
 ### Changed
 
 - `detect-changes` counts `.cjs`, `.mjs`, `.jsx`, `.ts`, `.cts`, `.mts` and `.tsx` files in the `js` bucket, not just `.js` and Jest snapshots, so ES-module and TypeScript changes trigger the jobs gated on `js-count`.

@@ -7,8 +7,8 @@
 	"inputs": [
 		{
 			"key": "wsw_ref",
-			"description": "Git ref of rtCamp/wp-shared-workflows to pin (tag, branch, or SHA).",
-			"default": "release/v1.0.0"
+			"description": "Tag or ref of rtCamp/wp-shared-workflows to call. Pin a major tag such as `v1`, never a branch: branches move or get deleted.",
+			"default": "v1"
 		},
 		{
 			"key": "project_type",
@@ -28,7 +28,7 @@
 		{
 			"key": "wp_versions",
 			"description": "JSON array of WordPress core versions for the test-php matrix, crossed with php_versions.",
-			"default": "[\"6.7\", \"6.8\", \"6.9\", \"7.0\"]"
+			"default": "[\"6.7\", \"6.8\", \"6.9\", \"7.0\", \"7.1\"]"
 		},
 		{
 			"key": "test_php_exclude",
