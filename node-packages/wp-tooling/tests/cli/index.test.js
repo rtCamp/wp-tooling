@@ -89,6 +89,18 @@ describe('cli main()', () => {
 		expect(stderrChunks.join('')).toMatch(/unknown command "frobnicate"/);
 	});
 
+	test('routes iapi-check --help to its runCli', async () => {
+		const code = await cli.main(['iapi-check', '--help']);
+		expect(code).toBe(0);
+		expect(stdoutChunks.join('')).toMatch(/Usage: iapi-check/);
+	});
+
+	test('iapi-check propagates a usage-error exit code', async () => {
+		const code = await cli.main(['iapi-check', '--output', 'xml']);
+		expect(code).toBe(2);
+		expect(stderrChunks.join('')).toMatch(/invalid --output "xml"/);
+	});
+
 	test('routes detect-changes --help to its runCli', async () => {
 		const code = await cli.main(['detect-changes', '--help']);
 		expect(code).toBe(0);
@@ -195,6 +207,12 @@ describe('cli COMMANDS registry', () => {
 		expect(cli.COMMANDS['coverage-gate']).toBeDefined();
 		expect(typeof cli.COMMANDS['coverage-gate'].summary).toBe('string');
 		expect(typeof cli.COMMANDS['coverage-gate'].run).toBe('function');
+	});
+
+	test('iapi-check is registered with a summary and run handler', () => {
+		expect(cli.COMMANDS['iapi-check']).toBeDefined();
+		expect(cli.COMMANDS['iapi-check'].summary).toMatch(/WordPress 7\.2/);
+		expect(typeof cli.COMMANDS['iapi-check'].run).toBe('function');
 	});
 
 	test('install-hooks is registered with a summary and run handler', () => {
