@@ -55,10 +55,10 @@ body:
     id: node-version
     attributes:
       label: Node version
-      description: The output of `node --version`.
-      placeholder: v22.22.2
+      description: Only for the npm packages. The output of `node --version`.
+      placeholder: v24.22.1
     validations:
-      required: true
+      required: false
   - type: input
     id: php-version
     attributes:

@@ -97,7 +97,7 @@
   description: "Git hook scripts (delivered via scaffold engine)"
 - name: "Scope: Lint Configs"
   color: "0052CC"
-  description: "@rtcamp/wp-tooling/eslint-config + stylelint-config sub-exports"
+  description: "@rtcamp/eslint-config and @rtcamp/stylelint-config"
 - name: "Scope: Release"
   color: "0052CC"
   description: "Version bump, changelog, package zip"
