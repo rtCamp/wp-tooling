@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `wp-tooling` binary waits for stdout to drain before it exits. Writes to a pipe are asynchronous on macOS, so a report longer than the pipe buffer piped into a reader that was not ready yet (`wp-tooling list --json | jq`) arrived cut off at 64 KiB, as invalid JSON. Exit codes are unchanged, and a closed pipe still exits straight away.
+
 ### Changed
 
 - `detect-changes` counts `.cjs`, `.mjs`, `.jsx`, `.ts`, `.cts`, `.mts` and `.tsx` files in the `js` bucket, not just `.js` and Jest snapshots, so ES-module and TypeScript changes trigger the jobs gated on `js-count`.
