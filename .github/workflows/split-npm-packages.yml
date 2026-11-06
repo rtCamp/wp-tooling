@@ -16,8 +16,8 @@ name: Split npm Packages
 # No tags are pushed. npm records the resolved commit SHA in package-lock.json, so
 # installs are reproducible from a branch ref; the branch is only re-read when a
 # consumer regenerates its lock. Tags would additionally pin the *spec*, but they
-# must not start with "v" — release-php.yml triggers on `v*`, and tags share one
-# repo-wide namespace with it.
+# must not take the rtcamp/<package>@<version> form — release-php.yml triggers on
+# it, and tags share one repo-wide namespace with it.
 #
 # The branches are generated. Never commit to them by hand: the next run pushes a
 # fast-forward from the monorepo and a diverged branch fails the run instead of
