@@ -73,15 +73,15 @@ const PRESET_MAP = [
  *
  * @param {Object}   obj  Source object.
  * @param {string[]} keys Key path.
- * @return {*} Value at the key path, or undefined.
+ * @return {unknown} Value at the key path, or undefined.
  */
 const get = (obj, keys) => keys.reduce((acc, key) => acc?.[key], obj);
 
 /**
- * Generate the @theme {} block content from a parsed theme.json object.
+ * Generate the `@theme {}` block content from a parsed theme.json object.
  *
  * @param {Object} themeJson Parsed theme.json content.
- * @return {string} Full @theme {} block as a CSS string.
+ * @return {string} Full `@theme {}` block as a CSS string.
  */
 const generateThemeBlock = (themeJson) => {
 	const lines = [];
@@ -138,7 +138,7 @@ const generateThemeBlock = (themeJson) => {
  * Webpack plugin that generates a Tailwind CSS entry point from theme.json.
  *
  * Reads theme.json and writes a tailwind.css file containing the Tailwind layer
- * imports and an @theme {} block that maps WordPress preset CSS custom properties
+ * imports and an `@theme {}` block that maps WordPress preset CSS custom properties
  * to Tailwind v4 utility namespaces (--color-*, --text-*, --font-*, --spacing-*, --shadow-*).
  *
  * Usage in webpack.config.js:

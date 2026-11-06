@@ -120,8 +120,8 @@ function isScanError(issue) {
 /**
  * Coerce a possibly-missing/non-string raw field to a string.
  *
- * @param {*}      value      Raw field value.
- * @param {string} [fallback] Value to use when `value` isn't a string.
+ * @param {unknown} value      Raw field value.
+ * @param {string}  [fallback] Value to use when `value` isn't a string.
  * @return {string} `value` when it's a string, else `fallback`.
  */
 function stringField(value, fallback = '') {

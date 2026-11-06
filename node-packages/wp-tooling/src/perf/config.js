@@ -62,9 +62,9 @@ const CWV_MODES = ['poor', 'needs-improvement', 'never'];
  * Describe why a section field's value is invalid, judged against the type of
  * its built-in default. Unknown keys are not checked — they are never read.
  *
- * @param {string} key   Field name.
- * @param {*}      value Configured value.
- * @param {*}      def   Built-in default for the field.
+ * @param {string}  key   Field name.
+ * @param {unknown} value Configured value.
+ * @param {unknown} def   Built-in default for the field.
  * @return {string|null} What was expected, or `null` when the value is valid.
  */
 function fieldProblem(key, value, def) {
@@ -93,8 +93,8 @@ function fieldProblem(key, value, def) {
  * like `"enabled": "false"` cannot silently invert a layer or surface later
  * as a degraded layer instead of a config error.
  *
- * @param {*}      raw        Parsed config.
- * @param {string} configPath Config path, for the error message.
+ * @param {unknown} raw        Parsed config.
+ * @param {string}  configPath Config path, for the error message.
  * @throws {RunnerError} `EBADCONFIG` naming the first invalid field.
  */
 function validateConfig(raw, configPath) {
@@ -138,8 +138,8 @@ function validateConfig(raw, configPath) {
 /**
  * Shallow-merge a config section over its defaults.
  *
- * @param {Object} defaults Section defaults.
- * @param {*}      override Raw override value from the parsed config.
+ * @param {Object}  defaults Section defaults.
+ * @param {unknown} override Raw override value from the parsed config.
  * @return {Object} Merged section.
  */
 function mergeSection(defaults, override) {
@@ -152,7 +152,7 @@ function mergeSection(defaults, override) {
 /**
  * Merge a raw parsed config over the built-in defaults, section by section.
  *
- * @param {*} raw Parsed config (or `null`/`undefined` when there is none).
+ * @param {unknown} raw Parsed config (or `null`/`undefined` when there is none).
  * @return {Object} Fully merged config.
  */
 function mergeConfig(raw) {

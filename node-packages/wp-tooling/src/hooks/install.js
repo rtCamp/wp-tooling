@@ -107,19 +107,19 @@ function injectVersionHeader(body, version) {
  * a spinner around each filesystem write without leaking UI into the
  * library itself.
  *
- * @param {string}   repoRoot                Working tree directory.
- * @param {Object}   [options]
- * @param {boolean}  [options.force]         Overwrite existing hooks. Default false.
- * @param {boolean}  [options.dryRun]        Plan only -- do not touch the filesystem.
- * @param {Function} [options.onConflict]    Async `({ name, dest, reason }) => boolean`
- *                                           callback consulted when an existing hook is
- *                                           encountered (and `--force` is not set).
- *                                           Skipped in dry-run mode.
- * @param {Function} [options.onBeforeWrite] Sync `({ name, dest }) => void` called
- *                                           immediately before writing a hook.
- * @param {Function} [options.onAfterWrite]  Sync `({ name, dest, error? }) => void`
- *                                           called after a write attempt completes.
- *                                           `error` is set when the write threw.
+ * @param {string}                                 repoRoot                Working tree directory.
+ * @param {Object}                                 [options]
+ * @param {boolean}                                [options.force]         Overwrite existing hooks. Default false.
+ * @param {boolean}                                [options.dryRun]        Plan only -- do not touch the filesystem.
+ * @param {(conflict: Object) => Promise<boolean>} [options.onConflict]    Async `({ name, dest, reason }) => boolean`
+ *                                                                         callback consulted when an existing hook is
+ *                                                                         encountered (and `--force` is not set).
+ *                                                                         Skipped in dry-run mode.
+ * @param {(hook: Object) => void}                 [options.onBeforeWrite] Sync `({ name, dest }) => void` called
+ *                                                                         immediately before writing a hook.
+ * @param {(hook: Object) => void}                 [options.onAfterWrite]  Sync `({ name, dest, error? }) => void`
+ *                                                                         called after a write attempt completes.
+ *                                                                         `error` is set when the write threw.
  * @return {Promise<Array<Object>>} One result per template:
  *   `{ name, status, reason?, dest }`. `status` is one of `installed`,
  *   `would-install`, `skipped`. `reason` (when skipped) is `husky` or `exists`.
@@ -315,7 +315,7 @@ function makeProgressHooks({ dryRun }) {
  * the user is prompted via `confirm` for each conflict; otherwise (CI)
  * conflicts always skip so the run never blocks waiting for input.
  *
- * @return {Function} Async `({ name, reason }) => boolean` callback.
+ * @return {(conflict: Object) => Promise<boolean>} Async `({ name, reason }) => boolean` callback.
  */
 function makeConflictPrompt() {
 	return async ({ name, reason }) => {

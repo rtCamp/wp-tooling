@@ -11,7 +11,7 @@ const FIXTURES = path.join(__dirname, 'fixtures');
  * Run `fn` and return whatever it throws (or null). Keeps assertions out of a
  * catch block, which `jest/no-conditional-expect` forbids.
  *
- * @param {Function} fn Function expected to throw.
+ * @param {() => unknown} fn Function expected to throw.
  * @return {Error|null} The thrown error, or null if it did not throw.
  */
 function grab(fn) {

@@ -27,7 +27,7 @@ const COMMANDS_DIR = path.join(__dirname, 'commands');
  * `readdirSync` order differs.
  *
  * @param {string} [dir=COMMANDS_DIR] Directory to scan; overridable for tests.
- * @return {Object<string, {summary: string, run: Function}>} Registry keyed by name.
+ * @return {Object<string, {summary: string, run: (argv: string[]) => number|Promise<number>}>} Registry keyed by name.
  */
 function loadCommands(dir = COMMANDS_DIR) {
 	const registry = {};

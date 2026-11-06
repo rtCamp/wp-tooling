@@ -145,7 +145,7 @@ function extractUrls(config) {
  * Pull the URL string out of one `urls[]` entry, which may be a bare string
  * or a `{ url, ... }` object.
  *
- * @param {*} entry One `urls[]` entry.
+ * @param {unknown} entry One `urls[]` entry.
  * @return {string|null} The URL, or null when `entry` isn't a usable shape.
  */
 function urlFromEntry(entry) {

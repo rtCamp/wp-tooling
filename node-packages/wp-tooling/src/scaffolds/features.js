@@ -145,9 +145,9 @@ function printHelp() {
  * Install a feature's reported npm dev/prod dependencies. The engine only
  * reports deps; the feature manager is where they actually get installed.
  *
- * @param {Object}   install - The execute() result `developer.install` block.
- * @param {string}   cwd     - Project directory to install into.
- * @param {Function} [log]   - Optional progress logger.
+ * @param {Object}                    install - The execute() result `developer.install` block.
+ * @param {string}                    cwd     - Project directory to install into.
+ * @param {(message: string) => void} [log]   - Optional progress logger.
  * @return {void}
  */
 function installDeps(install, cwd, log) {
@@ -195,9 +195,9 @@ function installDeps(install, cwd, log) {
  * developer is never overwritten), keys stay sorted, and the file's existing
  * indentation is preserved.
  *
- * @param {Object}   install - The execute() result `developer.install` block.
- * @param {string}   cwd     - Project directory whose package.json to update.
- * @param {Function} [log]   - Optional progress logger.
+ * @param {Object}                    install - The execute() result `developer.install` block.
+ * @param {string}                    cwd     - Project directory whose package.json to update.
+ * @param {(message: string) => void} [log]   - Optional progress logger.
  * @return {string[]} `name@version` specs newly added to package.json.
  */
 function recordDeps(install, cwd, log) {

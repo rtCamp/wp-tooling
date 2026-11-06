@@ -20,8 +20,8 @@ class Wizard {
 	/**
 	 * Create a Wizard instance.
 	 *
-	 * @param {Array<{name: string, run: Function, skip?: Function}>} steps   - Ordered steps.
-	 * @param {Object}                                                context - Shared mutable context.
+	 * @param {Array<{name: string, run: (ctx: Object) => unknown, skip?: (ctx: Object) => unknown}>} steps   - Ordered steps.
+	 * @param {Object}                                                                                context - Shared mutable context.
 	 */
 	constructor(steps = [], context = {}) {
 		if (!Array.isArray(steps)) {

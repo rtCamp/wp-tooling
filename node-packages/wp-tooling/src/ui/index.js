@@ -1,7 +1,7 @@
 /**
  * TTY UI kit -- barrel export.
  *
- * Public API for @rtcamp/wp-tooling/ui.
+ * Public API for `@rtcamp/wp-tooling/ui`.
  * Zero runtime dependencies.
  */
 'use strict';

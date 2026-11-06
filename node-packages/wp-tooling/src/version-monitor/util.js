@@ -88,7 +88,7 @@ function readFileSafe(cwd, relPath) {
  *
  * @param {string} cwd     Project root.
  * @param {string} relPath File path relative to `cwd`.
- * @return {*|null} Parsed JSON, or `null`.
+ * @return {unknown} Parsed JSON, or `null`.
  */
 function readJsonSafe(cwd, relPath) {
 	const text = readFileSafe(cwd, relPath);
