@@ -1,0 +1,602 @@
+{
+	"_source": "rtCamp/wp-shared-workflows at v1 (79619c8), on.workflow_call inputs and secrets. Regenerate when v1 moves.",
+	"cd-built-branch.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"targets": {
+				"required": false
+			},
+			"target-branch": {
+				"required": false
+			},
+			"source-ref": {
+				"required": false
+			},
+			"publish-paths": {
+				"required": false
+			},
+			"verify-paths": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"composer-flags": {
+				"required": false
+			},
+			"build-command": {
+				"required": false
+			},
+			"commit-subject": {
+				"required": false
+			},
+			"allow-rewind": {
+				"required": false
+			},
+			"dry-run": {
+				"required": false
+			},
+			"retention-days": {
+				"required": false
+			}
+		},
+		"secrets": {
+			"push-token": {
+				"required": false
+			}
+		}
+	},
+	"cd-github-release.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"tag": {
+				"required": true
+			},
+			"artifact-name": {
+				"required": true
+			},
+			"slug": {
+				"required": false
+			},
+			"changelog-path": {
+				"required": false
+			},
+			"draft": {
+				"required": false
+			},
+			"prerelease": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"cd-s3.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"tag": {
+				"required": true
+			},
+			"artifact-name": {
+				"required": true
+			},
+			"bucket": {
+				"required": true
+			},
+			"prefix": {
+				"required": false
+			},
+			"cloudfront-distribution-id": {
+				"required": false
+			},
+			"region": {
+				"required": false
+			}
+		},
+		"secrets": {
+			"AWS_ACCESS_KEY_ID": {
+				"required": true
+			},
+			"AWS_SECRET_ACCESS_KEY": {
+				"required": true
+			}
+		}
+	},
+	"cd-wp-org.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"slug": {
+				"required": true
+			},
+			"tag": {
+				"required": true
+			},
+			"artifact-name": {
+				"required": true
+			},
+			"assets-path": {
+				"required": false
+			},
+			"dry-run": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {
+			"WP_ORG_USERNAME": {
+				"required": true
+			},
+			"WP_ORG_PASSWORD": {
+				"required": true
+			}
+		}
+	},
+	"ci-build-artifact-gate.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"gated-paths": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-build.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"install-node-deps": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"install-composer-deps": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"composer-flags": {
+				"required": false
+			},
+			"build-command": {
+				"required": false
+			},
+			"upload-artifact": {
+				"required": false
+			},
+			"artifact-name": {
+				"required": false
+			},
+			"artifact-path": {
+				"required": false
+			},
+			"retention-days": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-detect-changes.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"ignore-paths": {
+				"required": false
+			},
+			"base-ref": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			},
+			"wp-tooling-ref": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-lint-css.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"lint-command": {
+				"required": false
+			},
+			"lint-files-command": {
+				"required": false
+			},
+			"changed-files": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-lint-js.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"lint-command": {
+				"required": false
+			},
+			"lint-files-command": {
+				"required": false
+			},
+			"changed-files": {
+				"required": false
+			},
+			"validate-package-json": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-lint-php.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"enable-phpstan": {
+				"required": false
+			},
+			"phpcs-command": {
+				"required": false
+			},
+			"changed-files": {
+				"required": false
+			},
+			"phpstan-command": {
+				"required": false
+			},
+			"phpstan-level": {
+				"required": false
+			},
+			"composer-flags": {
+				"required": false
+			},
+			"validate-composer": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-test-a11y.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"build-command": {
+				"required": false
+			},
+			"test-command": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-test-build-artifact.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"artifact-name": {
+				"required": true
+			},
+			"slug": {
+				"required": true
+			},
+			"node-version": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"wp-version": {
+				"required": false
+			},
+			"install-path": {
+				"required": false
+			},
+			"smoke-script": {
+				"required": false
+			},
+			"doctor-ignore-checks": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-test-js.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"test-command": {
+				"required": false
+			},
+			"enable-cache": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"ci-test-php.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"wp-version": {
+				"required": false
+			},
+			"use-wp-env": {
+				"required": false
+			},
+			"test-command": {
+				"required": false
+			},
+			"composer-flags": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"version-monitor.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"base-branch": {
+				"required": false
+			},
+			"pr-label": {
+				"required": false
+			},
+			"pr-assignees": {
+				"required": false
+			},
+			"wp-tooling-ref": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	},
+	"wp-cd.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"tag": {
+				"required": true
+			},
+			"artifact-name": {
+				"required": true
+			},
+			"deploy-target": {
+				"required": true
+			},
+			"slug": {
+				"required": false
+			},
+			"working-dir": {
+				"required": false
+			},
+			"changelog-path": {
+				"required": false
+			},
+			"draft": {
+				"required": false
+			},
+			"prerelease": {
+				"required": false
+			},
+			"assets-path": {
+				"required": false
+			},
+			"dry-run": {
+				"required": false
+			},
+			"bucket": {
+				"required": false
+			},
+			"prefix": {
+				"required": false
+			},
+			"cloudfront-distribution-id": {
+				"required": false
+			},
+			"region": {
+				"required": false
+			}
+		},
+		"secrets": {
+			"WP_ORG_USERNAME": {
+				"required": false
+			},
+			"WP_ORG_PASSWORD": {
+				"required": false
+			},
+			"AWS_ACCESS_KEY_ID": {
+				"required": false
+			},
+			"AWS_SECRET_ACCESS_KEY": {
+				"required": false
+			}
+		}
+	},
+	"wp-ci.yml": {
+		"inputs": {
+			"runs-on": {
+				"required": false
+			},
+			"project-type": {
+				"required": true
+			},
+			"working-dir": {
+				"required": false
+			},
+			"skip": {
+				"required": false
+			},
+			"enable-phpstan": {
+				"required": false
+			},
+			"run-a11y": {
+				"required": false
+			},
+			"use-wp-env": {
+				"required": false
+			},
+			"php-versions": {
+				"required": false
+			},
+			"wp-versions": {
+				"required": false
+			},
+			"test-php-exclude": {
+				"required": false
+			},
+			"build-artifact-path": {
+				"required": false
+			},
+			"build-artifact-slug": {
+				"required": false
+			},
+			"ignore-paths": {
+				"required": false
+			},
+			"base-ref": {
+				"required": false
+			},
+			"wp-tooling-ref": {
+				"required": false
+			},
+			"gated-paths": {
+				"required": false
+			},
+			"node-version": {
+				"required": false
+			},
+			"php-version": {
+				"required": false
+			},
+			"composer-flags": {
+				"required": false
+			},
+			"build-composer-flags": {
+				"required": false
+			},
+			"install-composer-deps": {
+				"required": false
+			},
+			"build-command": {
+				"required": false
+			},
+			"lint-css-command": {
+				"required": false
+			},
+			"lint-css-files-command": {
+				"required": false
+			},
+			"lint-js-command": {
+				"required": false
+			},
+			"lint-js-files-command": {
+				"required": false
+			},
+			"phpcs-command": {
+				"required": false
+			},
+			"phpstan-command": {
+				"required": false
+			},
+			"test-js-command": {
+				"required": false
+			},
+			"test-js-cache": {
+				"required": false
+			},
+			"test-php-command": {
+				"required": false
+			},
+			"a11y-command": {
+				"required": false
+			}
+		},
+		"secrets": {}
+	}
+}
