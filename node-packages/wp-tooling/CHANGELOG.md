@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- The CI scaffolds call rtCamp/wp-shared-workflows at `@v1`. `ci/lint-css`, `ci/lint-js` and `ci/lint-php` defaulted to the `v1.0.0/task/ci-lint-workflows` branch, which no longer exists, so a workflow scaffolded with the defaults failed before any job ran. `ci/test-measure` defaulted to the stale `release/v1.0.0` branch, and `ci/cd-wporg` hard-coded `@v1.0.0`. The lint templates also drop their outdated "EXPERIMENTAL" header.
+- The CI scaffolds call rtCamp/wp-shared-workflows at `@v1`. `ci/lint-css`, `ci/lint-js` and `ci/lint-php` defaulted to the `v1.0.0/task/ci-lint-workflows` branch, which no longer exists, so a workflow scaffolded with the defaults failed before any job ran. `ci/test-measure` defaulted to the stale `release/v1.0.0` branch. The lint templates and the `wp-tooling list` descriptions drop their outdated "EXPERIMENTAL" wording.
+- `ci/cd-wporg` works. It passed inputs and secrets `cd-wp-org.yml` never had (`plugin-slug`, `svn-username`, `svn-password`) and deployed an artifact nothing built, so it failed before any job ran. It now builds with `ci-build.yml`, packages with `wp-tooling release:zip` (honouring `.distignore`), and deploys with `cd-wp-org.yml`'s `slug`, `tag`, `artifact-name` and `WP_ORG_USERNAME`/`WP_ORG_PASSWORD`. New inputs: `wsw_ref`, `build_command`, `assets_path`.
+- A Jest test renders every `ci/*` scaffold, with and without `node_version`, and checks each call's `with:` and `secrets:` keys against a snapshot of the wp-shared-workflows `v1` contracts (`tests/fixtures/wp-shared-workflows-v1-contracts.json`), so a mismatch fails here instead of in a project's first run.
 - `node_version` in the `ci/build`, `ci/lint-css`, `ci/lint-js`, `ci/test-a11y`, `ci/test-js` and `ci/test-php` scaffolds defaults to empty, which leaves `node-version` out of the generated workflow, so the shared workflow uses the project's `.nvmrc`. The old default of `22` overrode `.nvmrc`. Passing `--node_version` still pins a version.
 - `ci/test-measure`'s default WordPress versions include 7.1.
 

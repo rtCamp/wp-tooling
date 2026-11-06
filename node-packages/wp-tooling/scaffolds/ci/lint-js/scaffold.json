@@ -2,7 +2,7 @@
 	"slug": "lint-js",
 	"category": "ci",
 	"name": "CI: Lint JS (ESLint)",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-js.yml. Runs ESLint over changed files in a PR, or the whole project on push. Optionally validates package.json shape first. EXPERIMENTAL: the upstream workflow is currently in rtCamp/wp-shared-workflows PR #2 and has not yet shipped on `v1`.",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-js.yml. Runs ESLint over changed files in a PR, or the whole project on push. Optionally validates package.json shape first. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{

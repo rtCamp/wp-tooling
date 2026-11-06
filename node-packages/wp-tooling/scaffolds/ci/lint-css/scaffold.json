@@ -2,7 +2,7 @@
 	"slug": "lint-css",
 	"category": "ci",
 	"name": "CI: Lint CSS (Stylelint)",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-css.yml. Runs Stylelint over changed files in a PR, or the whole project on push. EXPERIMENTAL: the upstream workflow is currently in rtCamp/wp-shared-workflows PR #2 and has not yet shipped on `v1`.",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-css.yml. Runs Stylelint over changed files in a PR, or the whole project on push. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{

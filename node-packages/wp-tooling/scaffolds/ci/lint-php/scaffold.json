@@ -2,7 +2,7 @@
 	"slug": "lint-php",
 	"category": "ci",
 	"name": "CI: Lint PHP (PHPCS + optional PHPStan)",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-php.yml. Runs PHPCS (and optionally PHPStan) over changed files in a PR, or the whole project on push. EXPERIMENTAL: the upstream workflow is currently in rtCamp/wp-shared-workflows PR #2 and has not yet shipped on `v1`. Pin `wsw_ref` to the PR branch or a SHA until the PR merges.",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-lint-php.yml. Runs PHPCS (and optionally PHPStan) over changed files in a PR, or the whole project on push. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{

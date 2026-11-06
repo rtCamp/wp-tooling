@@ -2,7 +2,7 @@
 	"slug": "test-a11y",
 	"category": "ci",
 	"name": "CI: Accessibility (pa11y)",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-a11y.yml. Runs pa11y-ci WCAG2AA scans against a wp-env-booted site. Stable (merged into release/v1.0.0).",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-a11y.yml. Runs pa11y-ci WCAG2AA scans against a wp-env-booted site. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{

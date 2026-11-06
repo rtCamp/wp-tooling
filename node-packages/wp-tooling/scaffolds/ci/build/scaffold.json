@@ -2,7 +2,7 @@
 	"slug": "build",
 	"category": "ci",
 	"name": "CI: production build",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build.yml. Produces a production build (npm and/or composer) and optionally uploads the result as an artifact for downstream CD jobs. Stable (merged into release/v1.0.0).",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build.yml. Produces a production build (npm and/or composer) and optionally uploads the result as an artifact for downstream CD jobs. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{

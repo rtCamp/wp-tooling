@@ -1,14 +1,38 @@
 name: Deploy to WordPress.org
 
+# Scaffolded by @rtcamp/wp-tooling.
+# Builds and packages the plugin, then deploys it to WordPress.org SVN on each
+# published GitHub release, with the reusable ci-build.yml and cd-wp-org.yml from
+# rtCamp/wp-shared-workflows.
+#
+# The release tag (a leading v is stripped) must match readme.txt's Stable tag.
+# Needs the WPORG_USERNAME and WPORG_PASSWORD repository secrets.
+
 on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
-    uses: rtCamp/wp-shared-workflows/.github/workflows/cd-wp-org.yml@v1
+  build:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-build.yml@{{wsw_ref}}
     with:
-      plugin-slug: {{plugin_slug}}
+      install-composer-deps: true
+      build-command: '{{build_command}}'
+      upload-artifact: true
+      artifact-name: wporg-package
+      artifact-path: dist/plugin
+
+  deploy:
+    needs: build
+    uses: rtCamp/wp-shared-workflows/.github/workflows/cd-wp-org.yml@{{wsw_ref}}
+    with:
+      slug: {{plugin_slug}}
+      tag: ${{ github.event.release.tag_name }}
+      artifact-name: wporg-package
+      assets-path: {{assets_path}}
     secrets:
-      svn-username: ${{ secrets.WPORG_USERNAME }}
-      svn-password: ${{ secrets.WPORG_PASSWORD }}
+      WP_ORG_USERNAME: ${{ secrets.WPORG_USERNAME }}
+      WP_ORG_PASSWORD: ${{ secrets.WPORG_PASSWORD }}
