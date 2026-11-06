@@ -155,6 +155,8 @@ describe('detectChanges', () => {
 		'phpcs.xml.dist',
 		'.phpcs.xml.dist',
 		'phpcs.i18n.xml.dist',
+		'phpcs-custom.xml',
+		'phpunit-multisite.xml.dist',
 		'phpunit.xml',
 		'phpunit.xml.dist',
 		'.wp-env.json',
@@ -180,6 +182,9 @@ describe('detectChanges', () => {
 		'babel.config.json',
 		'tsconfig.json',
 		'tsconfig.build.json',
+		'tsconfig-base.json',
+		'tsconfig.app.build.json',
+		'jsconfig.test.build.json',
 		'jsconfig.json',
 		'jest.config.json',
 	])('JS tool config %s counts as js only', (file) => {
@@ -202,7 +207,7 @@ describe('detectChanges', () => {
 		expect(r['php-count']).toBe(0);
 	});
 
-	test.each(['.nvmrc', '.browserslistrc', 'themes/acme/.nvmrc'])(
+	test.each(['.browserslistrc', 'themes/acme/.browserslistrc'])(
 		'%s counts under both css and js',
 		(file) => {
 			const r = detectChanges({ files: [file] });
@@ -212,11 +217,34 @@ describe('detectChanges', () => {
 		}
 	);
 
+	// test-php runs wp-env on the .nvmrc Node version.
+	test.each(['.nvmrc', 'themes/acme/.nvmrc'])(
+		'%s counts under css, js and php',
+		(file) => {
+			const r = detectChanges({ files: [file] });
+			expect(r['css-count']).toBe(1);
+			expect(r['js-count']).toBe(1);
+			expect(r['php-count']).toBe(1);
+		}
+	);
+
+	test.each(['block.json', 'src/blocks/hero/block.json'])(
+		'%s counts under js and php',
+		(file) => {
+			const r = detectChanges({ files: [file] });
+			expect(r['js-count']).toBe(1);
+			expect(r['php-count']).toBe(1);
+			expect(r['css-count']).toBe(0);
+		}
+	);
+
 	test.each([
 		'README.md',
 		'data.json',
 		'phpcs.txt',
 		'my-phpunit.xml',
+		'my.tsconfig.json',
+		'myblock.json',
 		'notes/tsconfig.md',
 		'readme.txt',
 	])('unrelated file %s lands in no bucket', (file) => {

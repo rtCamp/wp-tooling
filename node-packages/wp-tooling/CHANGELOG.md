@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `detect-changes` buckets the remaining tool config files that change what a job checks, so a pull request that only touches one no longer skips that job. `php` now claims `phpcs.xml`, `.phpcs.xml` and `phpcs.<name>.xml` (each with or without `.dist`), `phpunit.xml(.dist)`, `.wp-env.json` and its `.wp-env.<name>.json` variants, and `.distignore`. `js` also claims `jest.config.json`, `tsconfig*.json` and `jsconfig*.json`, and `css` also claims `postcss.config.*`. `.nvmrc` and `.browserslistrc` count under both `css` and `js`, like `package.json`. rtCamp/wp-shared-workflows lints the whole project when a bucket's list holds anything but source files, so a ruleset change is checked against every file.
+- `detect-changes` buckets the remaining tool config files that change what a job checks, so a pull request that only touches one no longer skips that job. `php` now claims `phpcs*.xml` and `.phpcs*.xml` (with or without `.dist`, so `phpcs.i18n.xml.dist` and `phpcs-custom.xml` count), `phpunit*.xml(.dist)`, `.wp-env.json` and its `.wp-env.<name>.json` variants, and `.distignore`. `js` also claims `jest.config.json` and `tsconfig*.json` / `jsconfig*.json` (any name, such as `tsconfig-base.json` or `tsconfig.app.build.json`), and `css` also claims `postcss.config.*`. `.nvmrc` counts under `css`, `js` and `php` (test-php runs `wp-env` on that Node version), `.browserslistrc` under `css` and `js`, and `block.json` under `js` and `php`. rtCamp/wp-shared-workflows lints the whole project when a bucket's list holds anything but source files, so a ruleset change is checked against every file.
 
 ### Changed
 
