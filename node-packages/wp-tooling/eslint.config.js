@@ -4,7 +4,7 @@ const globals = require('globals');
 // eslint-plugin-n may or may not nest its export under `.default` depending on version.
 const nPluginModule = require('eslint-plugin-n');
 const nPlugin = nPluginModule.default ?? nPluginModule;
-const wpToolingConfig = require('@rtcamp/eslint-config');
+const wpToolingConfig = require('@rtcamp/eslint-config/jest');
 
 module.exports = [
 	...wpToolingConfig,
