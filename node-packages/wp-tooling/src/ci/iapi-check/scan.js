@@ -129,7 +129,8 @@ function scanText(text, file) {
 		) {
 			continue;
 		}
-		for (const match of body.matchAll(rule.pattern)) {
+		const pattern = rule.patternFor ? rule.patternFor(body) : rule.pattern;
+		for (const match of body.matchAll(pattern)) {
 			starts ??= lineStarts(body);
 			const { line } = locate(starts, match.index);
 			if (isCommented(body.slice(starts[line - 1], match.index))) {
@@ -172,6 +173,20 @@ function assertDirectory(root) {
 }
 
 /**
+ * Test `rel` against `pattern` from the start. A caller's RegExp with the `g`
+ * or `y` flag keeps `lastIndex` between calls, which would make one file's
+ * result depend on the previous file's.
+ *
+ * @param {RegExp} pattern
+ * @param {string} rel
+ * @return {boolean} Whether the path matches.
+ */
+function resetAndTest(pattern, rel) {
+	pattern.lastIndex = 0;
+	return pattern.test(rel);
+}
+
+/**
  * List the files to scan under `root`, relative to it with `/` separators and
  * sorted. Symbolic links are not followed.
  *
@@ -206,7 +221,7 @@ function listFiles(root, ignore) {
 				entry.isFile() &&
 				SCANNED_EXTENSIONS.has(extensionOf(entry.name)) &&
 				!MINIFIED_RE.test(entry.name) &&
-				!(ignore && ignore.test(rel))
+				!(ignore && resetAndTest(ignore, rel))
 			) {
 				files.push(rel);
 			}

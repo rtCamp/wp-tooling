@@ -53,13 +53,15 @@ const IGNORE_RE = /(?<![\w-])data-wp-ignore(?![\w-])/gi;
 /**
  * `data-wp-init|watch|run` + exactly two hyphens + a unique ID. The ID either
  * starts with a name character (so `---id` never matches), or is built at
- * run time: the name is followed by a closing quote (`'data-wp-watch--' .
- * $id`), `$` (`"...--$id"`, `` `...--${id}` ``), `{` (`"...--{$id}"`) or `%`
- * (`sprintf( '...--%s', $id )`). Placeholders such as `--[id]` in prose don't
- * match.
+ * run time: the name is followed by `$` (`"...--$id"`, `` `...--${id}` ``),
+ * `{` (`"...--{$id}"`), `%` (`sprintf( '...--%s', $id )`), `<` (an inline PHP
+ * tag, `...--<?php echo $id; ?>`), or a closing quote and concatenation
+ * (`'data-wp-watch--' . $id`, `'...--' + id`). A closing quote on its own
+ * (`set_attribute( 'data-wp-watch--', ... )`) is a directive with no ID, which
+ * still works. Placeholders such as `--[id]` in prose don't match.
  */
 const LIFECYCLE_RE =
-	/(?<![\w-])data-wp-(init|watch|run)--(?:(\w[\w-]*)|(?=[{$%'"`]))/gi;
+	/(?<![\w-])data-wp-(init|watch|run)--(?:(\w[\w-]*)|(?=[{$%<]|['"`]\s*[.+]))/gi;
 
 /**
  * `data-wp-on|on-window|on-document--<event>--<id>`. The event is segments
@@ -68,20 +70,81 @@ const LIFECYCLE_RE =
  * `on` must be followed by `--`, `-window--` or `-document--`.
  */
 const EVENT_RE =
-	/(?<![\w-])data-wp-(on|on-window|on-document)--(\w+(?:-\w+)*)--(?:(\w[\w-]*)|(?=[{$%'"`]))/gi;
+	/(?<![\w-])data-wp-(on|on-window|on-document)--(\w+(?:-\w+)*)--(?:(\w[\w-]*)|(?=[{$%<]|['"`]\s*[.+]))/gi;
 
 /**
  * A `data-wp-*` name, its separator (`=` in HTML and JSX, `=>` in a PHP
  * array, `:` in a JS object, `,` in `set_attribute()`, after an optional
- * closing quote and `]`), an optional JSX `{`, an opening quote, then a value
- * that negates `actions.*` or `callbacks.*`. The runtime reads the namespace
- * first (`ns::!actions.x`); `!ns::actions.x` is matched too.
+ * closing quote and `]`, with spaces allowed before the `]`), an optional JSX
+ * `{`, an opening quote (escaped, as in a PHP `echo "...=\"...\""`, or not),
+ * then a value that negates `actions.*` or `callbacks.*`. The runtime reads
+ * the namespace first, so only `!actions.x` and `ns::!actions.x` are matched:
+ * `!ns::actions.x` never resolved its namespace, so 7.2 changes nothing there.
  */
 const NEGATED_RE =
-	/(?<![\w-])(data-wp-[\w-]+)['"]?\]?\s*(?:=>|=|:|,)\s*\{?\s*['"`]((?:[\w/-]+::)?!(?:[\w/-]+::)?(?:actions|callbacks)\.[\w$.]*)/gi;
+	/(?<![\w-])(data-wp-[\w-]+)['"]?\s*\]?\s*(?:=>|=|:|,)\s*\{?\s*\\?['"`]((?:[\w/-]+::)?!(?:actions|callbacks)\.[\w$.]*)/gi;
 
-/** `state.navigation` or `state?.navigation`, as a whole property access. */
-const ROUTER_RE = /(?<![\w$])state\??\.navigation(?![\w$])/g;
+/** Destructuring from `store( 'core/router' )` or the router package's import(). */
+const ROUTER_DESTRUCTURE_RE =
+	/\{([^{}]*)\}\s*=\s*(?:await\s+)?(?:store\s*\(\s*['"]core\/router['"]|import\s*\(\s*['"]@wordpress\/interactivity-router['"]\s*\))/g;
+
+/** `import { state } from '@wordpress/interactivity-router'`. */
+const ROUTER_IMPORT_RE =
+	/import\s*\{([^{}]*)\}\s*from\s*['"]@wordpress\/interactivity-router['"]/g;
+
+/** `const router = store( 'core/router' )`, read as `router.state`. */
+const ROUTER_STORE_BINDING_RE =
+	/(?:const|let|var)\s+([\w$]+)\s*=\s*(?:await\s+)?store\s*\(\s*['"]core\/router['"]/g;
+
+/**
+ * The expressions that hold core/router's state in `text`: each name its
+ * `state` is bound to (`const { state: router } = store( 'core/router' )`
+ * gives `router`), `<name>.state` for a whole-store binding, and a direct
+ * `store( 'core/router' ).state`. With no binding found (the store is read
+ * some other way), `state` is assumed.
+ *
+ * @param {string} text Source text.
+ * @return {string[]} Regular-expression sources, one per expression.
+ */
+function routerStateHeads(text) {
+	const escape = (name) => name.replace(/\$/g, '\\$');
+	const heads = new Set();
+	for (const re of [ROUTER_DESTRUCTURE_RE, ROUTER_IMPORT_RE]) {
+		for (const match of text.matchAll(re)) {
+			for (const part of match[1].split(',')) {
+				const binding = part
+					.trim()
+					.match(/^state(?:\s*(?::|\bas\b)\s*([\w$]+))?$/);
+				if (binding) {
+					heads.add(escape(binding[1] || 'state'));
+				}
+			}
+		}
+	}
+	for (const match of text.matchAll(ROUTER_STORE_BINDING_RE)) {
+		heads.add(`${escape(match[1])}\\??\\.state`);
+	}
+	if (!heads.size) {
+		heads.add('state');
+	}
+	heads.add(`store\\(\\s*['"]core\\/router['"]\\s*\\)\\.state`);
+	return [...heads];
+}
+
+/**
+ * `<router state>.navigation` or `?.navigation`, as a whole property access,
+ * where `<router state>` is one of routerStateHeads(). A `state` that belongs
+ * to another store in the same file is not matched.
+ *
+ * @param {string} text Source text.
+ * @return {RegExp} Global pattern for this file.
+ */
+function routerPattern(text) {
+	return new RegExp(
+		`(?<![\\w$])(?:${routerStateHeads(text).join('|')})\\??\\.navigation(?![\\w$])`,
+		'g'
+	);
+}
 
 /** A file that reads the router store names it or imports its package. */
 const ROUTER_STORE_RE = /core\/router|interactivity-router/;
@@ -185,17 +248,19 @@ function describeNegated(match) {
  * @return {Object} `{ index, text, replacement, message }`.
  */
 function describeRouter(match) {
+	const navigating = match[0].replace(/\??\.navigation$/, '.navigating');
 	return {
 		index: match.index,
 		text: match[0],
 		replacement: null,
-		message: `${match[0]} from the core/router store is deprecated since WordPress 7.0, and a later release removes direct access. Read state.navigating instead (core/router, @wordpress/interactivity-router 2.57.0 and later).`,
+		message: `${match[0]} from the core/router store is deprecated since WordPress 7.0, and a later release removes direct access. Read ${navigating} instead once the plugin requires WordPress 7.2 (@wordpress/interactivity-router 2.57.0); until then this warning is safe to leave.`,
 	};
 }
 
 /**
  * The rules, in report order. `appliesTo`, when present, must accept the file
- * text before the pattern runs.
+ * text before the pattern runs. A rule has a fixed `pattern`, or a
+ * `patternFor( text )` that builds one for the file.
  */
 const RULES = Object.freeze([
 	{
@@ -230,7 +295,7 @@ const RULES = Object.freeze([
 		id: 'router-state-navigation',
 		severity: 'warning',
 		extensions: SCRIPT_EXTENSIONS,
-		pattern: ROUTER_RE,
+		patternFor: routerPattern,
 		appliesTo: (text) => ROUTER_STORE_RE.test(text),
 		describe: describeRouter,
 	},

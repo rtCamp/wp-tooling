@@ -177,6 +177,12 @@ describe('scanText: lifecycle-double-hyphen-id', () => {
 		['echo "data-wp-run--$id";', 7],
 		["sprintf( 'data-wp-init--%s', $id );", 11],
 		['const a = `data-wp-watch--${ id }`;', 12],
+		["const a = 'data-wp-run--' + id;", 12],
+		[
+			'<div data-wp-watch--<?php echo esc_attr( $id ); ?>="callbacks.x">',
+			6,
+		],
+		['<div data-wp-init--<?= $id ?>="callbacks.x">', 6],
 	])('flags a unique ID built at run time: %s', (source, column) => {
 		const [finding] = scanText(source, 'a.php');
 		expect(finding).toMatchObject({
@@ -192,6 +198,9 @@ describe('scanText: lifecycle-double-hyphen-id', () => {
 		'// data-wp-watch--[unique-id] in documentation',
 		'<div data-wp-router-region="acme" data-wp-initial--x data-wp-watchful--y>',
 		'<div data-wp-watch--="callbacks.x">',
+		'<div data-wp-watch---<?php echo $id; ?>="callbacks.x">',
+		// A directive with no ID: the runtime reads a null suffix and runs it.
+		"$p->set_attribute( 'data-wp-watch--', 'callbacks.log' );",
 	])('does not flag %s', (source) => {
 		expect(hits(source)).toEqual([]);
 	});
@@ -240,6 +249,18 @@ describe('scanText: event-double-hyphen-id', () => {
 		);
 	});
 
+	test('flags a unique ID printed with an inline PHP tag', () => {
+		const [finding] = scanText(
+			'<div data-wp-on--click--<?= $id ?>="actions.x">',
+			'render.php'
+		);
+		expect(finding).toMatchObject({
+			rule: 'event-double-hyphen-id',
+			column: 6,
+			replacement: 'data-wp-on--click---',
+		});
+	});
+
 	test.each([
 		'data-wp-on--click---plugin-a',
 		'data-wp-on-window--resize---x',
@@ -267,10 +288,16 @@ describe('scanText: negated-function', () => {
 			'ns::!callbacks.isOn',
 		],
 		[
-			'<b data-wp-bind--hidden="!acme/menu::actions.isOpen">',
+			'<b data-wp-bind--hidden="acme/menu::!actions.isOpen">',
 			26,
-			'!acme/menu::actions.isOpen',
+			'acme/menu::!actions.isOpen',
 		],
+		[
+			'echo "<b data-wp-bind--hidden=\\"!actions.isOpen\\">";',
+			33,
+			'!actions.isOpen',
+		],
+		["$a[ 'data-wp-bind--hidden' ] = '!actions.x';", 33, '!actions.x'],
 		["'data-wp-bind--hidden' => '!actions.x',", 28, '!actions.x'],
 		["$a['data-wp-bind--hidden'] = '!actions.x';", 31, '!actions.x'],
 		["{ 'data-wp-bind--hidden': '!actions.x' }", 28, '!actions.x'],
@@ -309,6 +336,8 @@ describe('scanText: negated-function', () => {
 		'<b data-wp-bind--hidden=" !actions.x">',
 		'<b data-wp-bind--hidden="!actionsList.x">',
 		'<b class="!actions.x">',
+		// The namespace must come first; this form never resolved, before 7.2 too.
+		'<b data-wp-bind--hidden="!acme/menu::actions.isOpen">',
 	])('does not flag %s', (source) => {
 		expect(hits(source)).toEqual([]);
 	});
@@ -357,6 +386,44 @@ describe('scanText: router-state-navigation', () => {
 				'view.js'
 			)
 		).toEqual([]);
+	});
+
+	test('follows the name core/router state is bound to, not another store', () => {
+		const text = [
+			"const { state: router } = store( 'core/router' );",
+			"const { state } = store( 'acme/menu' );",
+			'state.navigation.isOpen; router.navigation.hasStarted;',
+		].join('\n');
+		const findings = scanText(text, 'view.js');
+		expect(findings.map((f) => [f.match, f.line, f.column])).toEqual([
+			['router.navigation', 3, 26],
+		]);
+		expect(findings[0].message).toContain('Read router.navigating instead');
+	});
+
+	test.each([
+		[
+			"import { state as rs } from '@wordpress/interactivity-router';\nrs.navigation.x;",
+			'rs.navigation',
+		],
+		[
+			"const router = store( 'core/router' );\nrouter.state.navigation.x;",
+			'router.state.navigation',
+		],
+		[
+			"store( 'core/router' ).state.navigation.x;",
+			"store( 'core/router' ).state.navigation",
+		],
+	])('reads router state bound as in %s', (text, match) => {
+		expect(scanText(text, 'view.js').map((f) => f.match)).toEqual([match]);
+	});
+
+	test('says when to switch: state.navigating needs WordPress 7.2', () => {
+		const [finding] = scanText(ROUTER, 'view.js');
+		expect(finding.message).toContain(
+			'once the plugin requires WordPress 7.2'
+		);
+		expect(finding.message).toContain('safe to leave');
 	});
 });
 
@@ -509,6 +576,15 @@ describe('checkIapi on the fixture project', () => {
 		expect(scanned.filesScanned).toBe(6);
 	});
 
+	test('an ignore pattern with the g flag skips every match, not every other one', () => {
+		// blocks/legacy/render.php and blocks/legacy/view.js are listed one after
+		// the other: a kept lastIndex made the second test start past the anchor.
+		const scanned = checkIapi({ root: PROJECT, ignore: /^blocks\//g });
+		expect(
+			positions(scanned).filter(([file]) => file.startsWith('blocks/'))
+		).toEqual([]);
+	});
+
 	test('a missing or non-directory root throws IapiCheckError', () => {
 		expect(() => checkIapi({ root: path.join(PROJECT, 'nope') })).toThrow(
 			IapiCheckError
@@ -643,7 +719,7 @@ describe('runCli', () => {
 			'::error file=plugin/blocks/legacy/render.php,line=9,col=2,title=iapi-check%3A ignore-directive::data-wp-ignore is removed in WordPress 7.2: the element and its descendants now hydrate like any other element. Remove the attribute.'
 		);
 		expect(commands).toContain(
-			'::warning file=plugin/blocks/legacy/view.js,line=11,col=11,title=iapi-check%3A router-state-navigation::state.navigation from the core/router store is deprecated since WordPress 7.0, and a later release removes direct access. Read state.navigating instead (core/router, @wordpress/interactivity-router 2.57.0 and later).'
+			'::warning file=plugin/blocks/legacy/view.js,line=11,col=11,title=iapi-check%3A router-state-navigation::state.navigation from the core/router store is deprecated since WordPress 7.0, and a later release removes direct access. Read state.navigating instead once the plugin requires WordPress 7.2 (@wordpress/interactivity-router 2.57.0); until then this warning is safe to leave.'
 		);
 		expect(commands.filter((c) => c.startsWith('::error '))).toHaveLength(
 			15
