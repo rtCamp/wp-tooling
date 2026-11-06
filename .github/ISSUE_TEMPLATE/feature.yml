@@ -1,0 +1,74 @@
+name: Feature request
+description: Suggest a new command, flag, scaffold, config or coding-standard rule.
+type: Feature
+labels:
+  - "Type: Feature"
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for the suggestion. Please search
+        [existing issues](https://github.com/rtCamp/wp-tooling/issues?q=is%3Aissue)
+        first.
+  - type: markdown
+    attributes:
+      value: >-
+        These packages run in every rtCamp plugin and theme, so CLI flags,
+        config exports and PHPCS and PHPStan rule sets are a stable contract.
+        Official WordPress tooling comes first: a new rule or command should
+        cover something `@wordpress/*`, WPCS or PHPStan cannot.
+        [CONTRIBUTING.md](https://github.com/rtCamp/wp-tooling/blob/main/CONTRIBUTING.md)
+        explains how to build it yourself.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@rtcamp/wp-tooling (CLI: init, add, release and the rest)"
+        - "@rtcamp/eslint-config"
+        - "@rtcamp/stylelint-config"
+        - "@rtcamp/tailwind-config"
+        - "rtcamp/wp-phpcs"
+        - "rtcamp/wp-phpstan"
+        - A new package, or not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What you are doing in a plugin or theme, and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The command, flag, config option or rule you have in mind, and an example of using it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use now, or other designs you ruled out.
+    validations:
+      required: false
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Compatibility
+      description: How the change affects projects on the current major.
+      options:
+        - "Additive: a new command, flag, export or opt-in rule"
+        - "Breaking: changes an existing flag, export or default rule set"
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
