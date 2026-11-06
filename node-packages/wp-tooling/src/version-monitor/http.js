@@ -49,7 +49,7 @@ function isClientError(err) {
  * @param {string} [options.token]   Bearer token (e.g. `GITHUB_TOKEN`) for authenticated calls.
  * @param {Object} [options.headers] Extra request headers.
  * @param {number} [options.timeout] Per-request timeout in ms (default 10000).
- * @return {Promise<*>} Parsed JSON body.
+ * @return {Promise<unknown>} Parsed JSON body.
  * @throws {Error} On transport failure, timeout, non-2xx status, or invalid JSON. Rate-limit errors carry `rateLimited = true`; the HTTP status (when known) is on `statusCode`.
  */
 function getJson(url, options = {}) {

@@ -122,8 +122,8 @@ const phaseRow = (name) => {
  * phase and the run totals. Never throws (real output must never break).
  *
  * @param {'stdout'|'stderr'} stream - Which stream.
- * @param {*}                 chunk  - The chunk passed to write().
- * @param {*}                 enc    - The encoding argument (may be a callback).
+ * @param {unknown}           chunk  - The chunk passed to write().
+ * @param {unknown}           enc    - The encoding argument (may be a callback).
  * @return {void}
  */
 const recordOutput = (stream, chunk, enc) => {
@@ -265,9 +265,10 @@ const recordError = (err, phase) => {
  * `name`. When disabled it simply awaits `fn`. Errors are recorded then
  * rethrown so control flow is unchanged.
  *
- * @param {string}   name - Phase name.
- * @param {Function} fn   - Async (or sync) function to run.
- * @return {Promise<*>} Whatever `fn` returns.
+ * @template T
+ * @param {string}             name - Phase name.
+ * @param {() => T|Promise<T>} fn   - Async (or sync) function to run.
+ * @return {Promise<T>} Whatever `fn` returns.
  */
 const phase = async (name, fn) => {
 	if (!state.active) {

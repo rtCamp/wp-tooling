@@ -130,7 +130,7 @@ function splitFlow(inner) {
  * or a scalar.
  *
  * @param {string} raw Value text.
- * @return {*} Parsed value.
+ * @return {unknown} Parsed value.
  * @throws {Error} On a malformed inline mapping entry.
  */
 function parseFlow(raw) {

@@ -1,13 +1,21 @@
 /**
- * ESLint flat config: extends rtCamp's shared @rtcamp/eslint-config.
+ * ESLint flat config: extends rtCamp's shared `@rtcamp/eslint-config`.
  *
- * Scaffolded by @rtcamp/wp-tooling. The shared rules live in
+ * Scaffolded by `@rtcamp/wp-tooling`. The shared rules live in
  * node_modules/@rtcamp/eslint-config. To override a rule for this
  * project, add it after the spread below.
+ *
+ * Test files get Jest rules, matching the setup/jest scaffold and
+ * `wp-scripts test-unit-jest`. Projects that test with Vitest
+ * (`wp-scripts test-unit-js`) swap the require below for the
+ * commented one; eslint-plugin-jest is then no longer needed.
  */
 'use strict';
 
-const rtcampConfig = require('@rtcamp/eslint-config');
+// Jest projects:
+const rtcampConfig = require('@rtcamp/eslint-config/jest');
+// Vitest projects:
+// const rtcampConfig = require('@rtcamp/eslint-config');
 
 module.exports = [
 	...rtcampConfig,

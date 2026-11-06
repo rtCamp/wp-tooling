@@ -119,8 +119,8 @@ function extractLighthouse(lhr, options = {}) {
 /**
  * Normalise one server-profile.js result into the report's `server` section.
  *
- * @param {{data: *, diagnostic: (string|null), error: (string|null)}|null} result
- *                                                                                 Raw result from `server-profile.js`'s `runServerProfile`, or `null` when the layer is disabled.
+ * @param {{data: unknown, diagnostic: (string|null), error: (string|null)}|null} result
+ *                                                                                       Raw result from `server-profile.js`'s `runServerProfile`, or `null` when the layer is disabled.
  * @return {Object|null} Normalised `server` section, or `null` when the layer is disabled.
  */
 function normalizeServer(result) {

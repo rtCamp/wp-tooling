@@ -20,7 +20,7 @@
  *     fill testVersion, minimum_wp_version, text domain and prefixes from the
  *     project, and wire the Composer repository rtcamp/wp-phpcs installs from;
  *     lint/phpcs/vip wires only the Composer plugin permission
- *   - setup/phpunit names the bootstrap's @package after the test namespace
+ *   - setup/phpunit names the bootstrap's `@package` after the test namespace
  */
 
 'use strict';

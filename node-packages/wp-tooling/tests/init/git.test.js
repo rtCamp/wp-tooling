@@ -27,8 +27,8 @@ const noopUi = {
  * Create a git-initialised tmp repo with the given package.json, returning its
  * path. Registered for cleanup.
  *
- * @param {Function} register Cleanup registrar.
- * @param {Object}   pkg      package.json contents to write.
+ * @param {(dir: string) => void} register Cleanup registrar.
+ * @param {Object}                pkg      package.json contents to write.
  * @return {string} Repo path.
  */
 function tmpRepo(register, pkg) {
