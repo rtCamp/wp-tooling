@@ -4,8 +4,4 @@
  */
 module.exports = {
 	testEnvironment: 'node',
-	moduleNameMapper: {
-		'^@wordpress/theme(/.*)?$':
-			'<rootDir>/tests/__mocks__/wordpress-theme.js',
-	},
 };
