@@ -1,9 +1,10 @@
 name: Publish npm Packages
 
 # Publishes each node-packages/* workspace whose package.json version is not on
-# npm yet. A release is a PR that bumps "version"; once it merges, the publish
-# job waits for approval in the `npm` environment, then publishes with npm
-# trusted publishing (OIDC, no stored token).
+# npm yet. A release is release-please's release PR for that package, which
+# bumps "version" (see release.yml); once it merges, the publish job waits for
+# approval in the `npm` environment, then publishes with npm trusted publishing
+# (OIDC, no stored token).
 #
 # One-time setup:
 #   - The `npm` environment needs required reviewers, limited to `main`.

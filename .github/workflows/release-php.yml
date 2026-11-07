@@ -2,14 +2,19 @@ name: Release Composer Packages
 
 # Splits a composer-packages/* package out to its standalone mirror repo so
 # Packagist can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own
-# repositories. Each package is versioned on its own: pushing the tag
+# repositories. Each package is versioned on its own: the tag
 # rtcamp/wp-phpstan@2.0.0 splits composer-packages/phpstan alone and tags its
 # mirror v2.0.0, leaving the other mirror untouched.
 #
+# release.yml calls this workflow with each tag release-please creates (a tag
+# created with GITHUB_TOKEN starts no workflow, so the tag trigger below never
+# fires for those). A tag pushed by hand still runs it through that trigger.
+#
 # splitsh.json is the single source of truth for mirror repo -> subdirectory.
 # To add a package, add it there and list its deploy-key secret in the split
-# step's env below (secrets are referenced by name so the job only receives
-# the deploy keys, never the whole secrets context).
+# step's env and under workflow_call's secrets below, and pass it from
+# release.yml (secrets are referenced by name so the job only receives the
+# deploy keys, never the whole secrets context).
 #
 # Each mirror is pushed with its own SSH deploy key (repo secret
 # SPLIT_KEY_<NAME>, "Allow write access" required) rather than a PAT bound to
@@ -23,6 +28,18 @@ on:
       # <composer package name>@<version>. npm release tags start with "@"
       # (@rtcamp/eslint-config@1.1.0), so they never match.
       - "rtcamp/*@*"
+  # From release.yml, with the tag release-please just created.
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to split, e.g. rtcamp/wp-phpstan@2.1.0"
+        type: string
+        required: true
+    secrets:
+      SPLIT_KEY_PHPCS:
+        required: false
+      SPLIT_KEY_PHPSTAN:
+        required: false
   # Smoke-test the split without cutting a real release tag.
   workflow_dispatch:
     inputs:
@@ -65,15 +82,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          # A call from release.yml runs on main's latest commit; read the tagged one.
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
           persist-credentials: false
 
       - name: Parse config into a matrix
         id: parse
         shell: bash
         env:
-          # workflow_dispatch runs from a branch, so the input has to win or the
-          # tag would be "main"; on a tag push ref_name *is* the tag.
-          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.test_tag || github.ref_name }}
+          # A call from release.yml and workflow_dispatch both run from a branch,
+          # so their input has to win or the tag would be "main"; on a tag push
+          # ref_name *is* the tag.
+          TAG: ${{ inputs.tag || (github.event_name == 'workflow_dispatch' && inputs.test_tag) || github.ref_name }}
         run: |
           set -euo pipefail
 
@@ -182,6 +202,8 @@ jobs:
       - name: Checkout monorepo (full history)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          # A call from release.yml runs on main's latest commit; split the tagged one.
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
           fetch-depth: 0 # the split walks every commit that touched the subtree
           persist-credentials: false # this job pushes with a deploy key, nothing else
 
