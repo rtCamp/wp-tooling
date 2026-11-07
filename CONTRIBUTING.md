@@ -52,8 +52,7 @@ npm run check                                                        # lint + te
 - [ ] Tests added for new behaviour
 - [ ] Breaking changes to a public contract (CLI flags, config exports, PHPCS/PHPStan
       rules) are called out in the PR description
-- [ ] `CHANGELOG.md` entry added under `## Unreleased` in the changed package(s)
-- [ ] Conventional Commits
+- [ ] PR title is a [Conventional Commit](https://www.conventionalcommits.org/) (`fix:`, `feat:`, or `feat!:` for a breaking change) worded as the changelog entry. release-please writes `CHANGELOG.md` from it, so don't edit that file by hand
 
 ## License
 

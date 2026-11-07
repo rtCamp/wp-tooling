@@ -1,0 +1,85 @@
+name: Release
+
+# release-please reads the Conventional Commit subjects squash-merged to main and keeps a release
+# pull request open for each package in release-please-config.json that has changes to release.
+# Merging one bumps that package's version, writes its CHANGELOG.md, tags <name>@<version> on main
+# and publishes the GitHub release with the changelog entry as notes.
+#
+# Publishing then depends on the ecosystem:
+#   - npm: the merged release pull request changes node-packages/<dir>/package.json, which starts
+#     publish-npm-packages.yml. Publishing stays in that workflow because npm's trusted publisher is
+#     tied to its file name.
+#   - Composer: the release-php job below calls release-php.yml with the new rtcamp/<package>@<version>
+#     tag. Tags created with GITHUB_TOKEN start no workflow runs, so that workflow's tag trigger never
+#     fires for them.
+#
+# The release pull requests are opened with GITHUB_TOKEN too, so GitHub holds their CI and PR title
+# runs until someone with write access selects "Approve workflows to run" in the pull request's
+# merge box. Approve them before merging a release pull request. A GitHub App token would start
+# them without approval.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialise runs so two merges in quick succession can't race on the release pull requests.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      composer_tags: ${{ steps.composer.outputs.tags }}
+    steps:
+      - name: Open or update the release pull requests, or publish the releases
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # The action names each release's outputs "<path>--<key>" and lists the released paths in
+      # paths_released. Always writes a JSON array, empty when no Composer package was released.
+      - name: List the Composer releases to split
+        id: composer
+        env:
+          OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+        run: |
+          set -euo pipefail
+          tags=$(jq -c '. as $o
+            | ($o.paths_released // "[]" | fromjson)
+            | map(select(startswith("composer-packages/")) | $o[. + "--tag_name"] | select(. != null))' <<<"$OUTPUTS")
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "Composer releases: $tags"
+
+  release-php:
+    name: Split ${{ matrix.tag }}
+    needs: release-please
+    if: needs.release-please.outputs.composer_tags != '[]'
+    strategy:
+      fail-fast: false # one mirror's failure must not hold back the other
+      matrix:
+        tag: ${{ fromJSON(needs.release-please.outputs.composer_tags) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-php.yml
+    with:
+      tag: ${{ matrix.tag }}
+    # Listed by name rather than `secrets: inherit`, so the split only sees the deploy keys. A new
+    # Composer package's SPLIT_KEY_<NAME> goes here too.
+    secrets:
+      SPLIT_KEY_PHPCS: ${{ secrets.SPLIT_KEY_PHPCS }}
+      SPLIT_KEY_PHPSTAN: ${{ secrets.SPLIT_KEY_PHPSTAN }}

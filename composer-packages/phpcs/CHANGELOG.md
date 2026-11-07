@@ -4,7 +4,7 @@ All notable changes to `rtcamp/wp-phpcs` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+Entries for releases after 1.0.1 are written by [release-please](https://github.com/googleapis/release-please) from the titles of the pull requests merged to `main`. Don't edit this file by hand.
 
 ## [1.0.1] - 2026-10-01
 

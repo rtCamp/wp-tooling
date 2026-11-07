@@ -33,7 +33,7 @@ $ ...
 - [ ] Tests pass
 
 ### Housekeeping
-- [ ] `CHANGELOG.md` entry under `## Unreleased`
+- [ ] PR title is a Conventional Commit; release-please writes `CHANGELOG.md` from it
 
 ## Reviewer notes
 
