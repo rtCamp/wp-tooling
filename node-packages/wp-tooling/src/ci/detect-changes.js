@@ -19,15 +19,26 @@ const fs = require('fs');
 /**
  * Default bucket regexes. A file is counted in a bucket if its path matches.
  *
+ * Each bucket also claims the dependency and tool config files that change how
+ * its jobs behave (rulesets, tsconfig, .wp-env*.json, .nvmrc), so a pull
+ * request that only touches one still runs the jobs it affects. CI lints the
+ * whole project when a bucket's list holds anything other than source files.
+ *
+ * `.nvmrc` also counts as php: test-php runs `wp-env` on that Node version, so a
+ * Node bump has to reach the PHP tests too (at the cost of a whole-project PHPCS
+ * run on a rare change). `package.json` stays out of php: it changes far more
+ * often. `block.json` counts as js (build entry points) and php (block
+ * registration and `render`).
+ *
  * `gha` avoids `.+\.yml$`, which was quadratic twice over: `.` also matches
  * `/`, and an unbounded tail let every `/.github/actions/` in the path walk the
  * remainder before `\.yml$` failed. `[^/]` and the count bound fix one each.
  * Four segments is generous — workflows sit at depth 1, composite actions at 2.
  */
 const DEFAULT_PATTERNS = {
-	css: /\.s?css$|(?:^|\/)(?:package(?:-lock)?\.json|\.stylelintrc(?:\.[^/]+)?|stylelint\.config\.[^/]+|\.stylelintignore)$/,
-	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)(?:package(?:-lock)?\.json|\.eslintrc(?:\.[^/]+)?|\.eslintignore|\.prettierrc(?:\.[^/]+)?|\.prettierignore|\.babelrc(?:\.[^/]+)?|babel\.config\.json)$/,
-	php: /\.php$|(?:^|\/)composer\.(?:json|lock)$|(?:^|\/)phpstan(?:-baseline)?\.neon(?:\.dist)?$/,
+	css: /\.s?css$|(?:^|\/)(?:package(?:-lock)?\.json|\.nvmrc|\.browserslistrc|\.stylelintrc(?:\.[^/]+)?|\.stylelintignore|(?:stylelint|postcss)\.config\.[^/]+)$/,
+	js: /\.(?:[cm]?[jt]s|[jt]sx|snap)$|(?:^|\/)(?:package(?:-lock)?\.json|\.nvmrc|\.browserslistrc|\.eslintrc(?:\.[^/]+)?|\.eslintignore|\.prettierrc(?:\.[^/]+)?|\.prettierignore|\.babelrc(?:\.[^/]+)?|(?:babel|jest)\.config\.json|(?:ts|js)config[^/]*\.json|block\.json)$/,
+	php: /\.php$|(?:^|\/)(?:composer\.(?:json|lock)|phpstan(?:-baseline)?\.neon(?:\.dist)?|\.?phpcs[^/]*\.xml(?:\.dist)?|phpunit[^/]*\.xml(?:\.dist)?|\.wp-env(?:\.[\w-]+)?\.json|\.distignore|\.nvmrc|block\.json)$/,
 	gha: /(?:^|\/)\.github\/(?:workflows|actions)\/[^/]+(?:\/[^/]+){0,3}\.yml$/,
 };
 
