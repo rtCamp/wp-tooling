@@ -18,7 +18,7 @@
 		{
 			"key": "build_command",
 			"description": "Builds the plugin and leaves exactly the files to deploy in dist/plugin (readme.txt at its root). The default builds, packages with `wp-tooling release:zip` (which honours .distignore) and unpacks the zip; python3 is used because self-hosted runners have no unzip.",
-			"default": "npm run build:prod && npx wp-tooling release:zip && python3 -m zipfile -e dist/*.zip dist/package && mv dist/package/*/ dist/plugin"
+			"default": "npm run build:prod && npx @rtcamp/wp-tooling release:zip && python3 -m zipfile -e dist/*.zip dist/package && mv dist/package/*/ dist/plugin"
 		},
 		{
 			"key": "assets_path",
