@@ -107,7 +107,9 @@ const ROUTER_STORE_BINDING_RE =
  * @return {string[]} Regular-expression sources, one per expression.
  */
 function routerStateHeads(text) {
-	const escape = (name) => name.replace(/\$/g, '\\$');
+	// Every regular-expression metacharacter, though the names that reach here
+	// are identifiers ([\w$]), so only `$` can actually occur.
+	const escape = (name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	const heads = new Set();
 	for (const re of [ROUTER_DESTRUCTURE_RE, ROUTER_IMPORT_RE]) {
 		for (const match of text.matchAll(re)) {
