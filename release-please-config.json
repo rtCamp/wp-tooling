@@ -1,0 +1,144 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "f551e953658133fe59d3a9ad4e025c94944db165",
+  "separate-pull-requests": true,
+  "include-component-in-tag": true,
+  "include-v-in-tag": false,
+  "tag-separator": "@",
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Added"
+    },
+    {
+      "type": "fix",
+      "section": "Fixed"
+    },
+    {
+      "type": "perf",
+      "section": "Changed"
+    },
+    {
+      "type": "revert",
+      "section": "Changed"
+    },
+    {
+      "type": "build",
+      "section": "Changed"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "section": "Styles",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous",
+      "hidden": true
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "Continuous Integration",
+      "hidden": true
+    }
+  ],
+  "packages": {
+    "node-packages/eslint-config": {
+      "release-type": "node",
+      "component": "@rtcamp/eslint-config",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/eslint-config'].version"
+        },
+        {
+          "type": "json",
+          "path": "/node-packages/stylelint-config/package.json",
+          "jsonpath": "$.devDependencies['@rtcamp/eslint-config']"
+        },
+        {
+          "type": "json",
+          "path": "/node-packages/tailwind-config/package.json",
+          "jsonpath": "$.devDependencies['@rtcamp/eslint-config']"
+        },
+        {
+          "type": "json",
+          "path": "/node-packages/wp-tooling/package.json",
+          "jsonpath": "$.devDependencies['@rtcamp/eslint-config']"
+        },
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/stylelint-config'].devDependencies['@rtcamp/eslint-config']"
+        },
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/tailwind-config'].devDependencies['@rtcamp/eslint-config']"
+        },
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/wp-tooling'].devDependencies['@rtcamp/eslint-config']"
+        }
+      ]
+    },
+    "node-packages/stylelint-config": {
+      "release-type": "node",
+      "component": "@rtcamp/stylelint-config",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/stylelint-config'].version"
+        }
+      ]
+    },
+    "node-packages/tailwind-config": {
+      "release-type": "node",
+      "component": "@rtcamp/tailwind-config",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/tailwind-config'].version"
+        }
+      ]
+    },
+    "node-packages/wp-tooling": {
+      "release-type": "node",
+      "component": "@rtcamp/wp-tooling",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/package-lock.json",
+          "jsonpath": "$.packages['node-packages/wp-tooling'].version"
+        }
+      ]
+    },
+    "composer-packages/phpcs": {
+      "release-type": "php",
+      "component": "rtcamp/wp-phpcs"
+    },
+    "composer-packages/phpstan": {
+      "release-type": "php",
+      "component": "rtcamp/wp-phpstan"
+    }
+  }
+}

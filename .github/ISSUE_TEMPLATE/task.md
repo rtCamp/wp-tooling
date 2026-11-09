@@ -103,7 +103,7 @@ $ ...
 - [ ]
 
 ### Housekeeping
-- [ ] `CHANGELOG.md` entry under `## Unreleased`
+- [ ] PR title is a Conventional Commit; release-please writes `CHANGELOG.md` from it
 
 ---
 
@@ -117,15 +117,15 @@ $ ...
 
 | | |
 |---|---|
-| **Base your branch on** | `release/<milestone>` |
+| **Base your branch on** | `main` |
 | **Branch name** | `<milestone>/task/<slug>` |
-| **PR target** | `release/<milestone>` |
-| **PR title** | `[<milestone>] <commit-subject>` |
+| **PR target** | `main` |
+| **PR title** | `<commit-subject>`, e.g. `fix(cli): flush stdout before exiting`; it becomes the changelog entry |
 | **Commit style** | [Conventional Commits](https://www.conventionalcommits.org/) |
 
 ```bash
 git fetch origin
-git checkout release/<milestone>
+git checkout main
 git pull
 git checkout -b <milestone>/task/<slug>
 # work, commit

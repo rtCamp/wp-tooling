@@ -119,7 +119,4 @@ internal state.
 - `npm test` / `npm run test:coverage`.
 - `npm run test:watch` — watch mode; this package only (the three config packages don't
   define it).
-- Cutting this package's own release (manual — `release:bump`/`release:changelog` don't
-  apply here, see Directory layout above): bump `package.json`'s `"version"` and rename
-  `CHANGELOG.md`'s `## Unreleased` heading to `## <version> - <YYYY-MM-DD>` (Keep a
-  Changelog), in the same commit.
+- This package's own releases come from release-please, not `release:bump`/`release:changelog` (those are for consumer plugins and themes, see Directory layout above). Don't bump `package.json`'s `"version"` or edit `CHANGELOG.md` by hand: merging the open `@rtcamp/wp-tooling` release pull request bumps the version, writes `CHANGELOG.md` from the merged PR titles and starts the npm publish. The full flow is in the root `AGENTS.md`.

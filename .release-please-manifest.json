@@ -1,0 +1,8 @@
+{
+  "node-packages/eslint-config": "2.0.0",
+  "node-packages/stylelint-config": "1.1.0",
+  "node-packages/tailwind-config": "1.1.0",
+  "node-packages/wp-tooling": "2.1.0",
+  "composer-packages/phpcs": "1.0.1",
+  "composer-packages/phpstan": "2.0.0"
+}
