@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "author": "rtCamp",
   "bin": {
-    "wp-tooling": "./bin/wp-tooling.js"
+    "wp-tooling": "bin/wp-tooling.js"
   },
   "bugs": {
     "url": "https://github.com/rtCamp/wp-tooling/issues"
