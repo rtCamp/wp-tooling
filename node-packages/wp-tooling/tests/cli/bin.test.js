@@ -1,10 +1,11 @@
 /**
- * The bin script must not exit before stdout has written everything.
+ * The bin script must not exit before stdout and stderr have written
+ * everything.
  *
- * Writes to a pipe are asynchronous on macOS, so `process.exit()` straight
- * after a long write cut the output at 64 KiB for a reader that was not ready
- * yet (`wp-tooling list --json | jq`). Linux writes to pipes synchronously, so
- * there this test passes either way; it guards the macOS case.
+ * Writes to a pipe are asynchronous on POSIX (Linux and macOS), so
+ * `process.exit()` straight after a long write cut the output at 64 KiB for a
+ * reader that was not ready yet (`wp-tooling list --json | jq`). Pipes are
+ * synchronous on Windows, where this cannot happen, so the suite skips it.
  */
 
 const { execFileSync } = require('child_process');
@@ -13,6 +14,7 @@ const os = require('os');
 const path = require('path');
 
 const BIN = path.join(__dirname, '..', '..', 'bin', 'wp-tooling.js');
+const EXIT = path.join(__dirname, '..', '..', 'src', 'cli', 'exit.js');
 
 const isWindows = 'win32' === process.platform;
 
@@ -46,6 +48,42 @@ const isWindows = 'win32' === process.platform;
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true });
 		}
+	});
+
+	it('writes all of a long stderr message to a late reader and keeps the code', () => {
+		// A failure message longer than a pipe buffer, through the same exit path.
+		const script = [
+			`const { flushAndExit } = require(${JSON.stringify(EXIT)});`,
+			'process.stderr.write("x".repeat(200000));',
+			'flushAndExit(3);',
+		].join(' ');
+		const node = `"${process.execPath}" -e '${script}'`;
+
+		// The reader starts late: every byte arrives, and the code survives.
+		const [received, code] = execFileSync(
+			'bash',
+			['-c', `${node} 2>&1 | (sleep 1; wc -c); echo "\${PIPESTATUS[0]}"`],
+			{ encoding: 'utf8' }
+		)
+			.trim()
+			.split(/\s+/)
+			.map(Number);
+		expect(received).toBe(200000);
+		expect(code).toBe(3);
+		const status = (cmd) => {
+			try {
+				execFileSync('bash', ['-c', cmd], { stdio: 'ignore' });
+				return 0;
+			} catch (err) {
+				return err.status;
+			}
+		};
+		// The reader leaves after one byte: EPIPE must not replace the code.
+		expect(
+			status(
+				`${node} 2>&1 | head -c 1 >/dev/null; exit "\${PIPESTATUS[0]}"`
+			)
+		).toBe(3);
 	});
 
 	it('keeps the exit code of the command', () => {

@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- The `wp-tooling` binary waits for stdout to drain before it exits. Writes to a pipe are asynchronous on macOS, so a report longer than the pipe buffer piped into a reader that was not ready yet (`wp-tooling list --json | jq`) arrived cut off at 64 KiB, as invalid JSON. Exit codes are unchanged, and a closed pipe still exits straight away.
+- The `wp-tooling` binary waits for stdout and stderr to drain before it exits. Writes to a pipe are asynchronous on POSIX, so a report longer than the pipe buffer piped into a reader that was not ready yet (`wp-tooling list --json | jq`) arrived cut off at 64 KiB, as invalid JSON, and a long error message on stderr was cut the same way. Exit codes are unchanged, and a closed pipe on either stream (`2>&1 | head`) exits straight away with the command's own code instead of 1.
 
 ### Changed
 
