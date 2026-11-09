@@ -49,9 +49,10 @@ return static function (MBConfig $mbConfig): void {
         ],
     ]);
 
-    // Lockstep release pipeline. Tags are pushed here; the actual subtree
-    // split to satellite repos is driven by .github/workflows/release-php.yml
-    // (git subtree split, pushed with a per-mirror SSH deploy key).
+    // Lockstep release pipeline: `monorepo-builder release` tags every package
+    // with one `v*` version, which .github/workflows/release-php.yml does not
+    // act on. Releases are one `rtcamp/<package>@<version>` tag per package
+    // (see AGENTS.md).
     $mbConfig->workers([
         // Pin every package to depend on the same version of its siblings.
         SetCurrentMutualDependenciesReleaseWorker::class,
@@ -65,7 +66,7 @@ return static function (MBConfig $mbConfig): void {
         // Create the git tag locally.
         TagVersionReleaseWorker::class,
 
-        // Push the tag — this is what triggers the split workflow.
+        // Push the tag.
         PushTagReleaseWorker::class,
 
         // Bump mutual dependencies to the next dev version (e.g. ^1.1@dev).
