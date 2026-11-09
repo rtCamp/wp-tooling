@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `detect-changes` counts linter configs in the bucket they configure. The `css` bucket gains `.stylelintrc*`, `stylelint.config.*` and `.stylelintignore`. The `js` bucket gains `.eslintrc*`, `.eslintignore`, `.prettierrc*`, `.prettierignore`, `.babelrc*` and `babel.config.json`; `eslint.config.*`, `prettier.config.*` and `babel.config.js` already matched by extension. A config-only change used to skip the linter whose rules it changed.
 - `detect-changes` diffs with `--no-renames`, so a rename lists the old path as well as the new one and a caller can treat the old path as removed. `total-count` counts a rename as two files.
 
+### Fixed
+
+- `detect-changes` buckets the remaining tool config files that change what a job checks, so a pull request that only touches one no longer skips that job. `php` now claims `phpcs*.xml` and `.phpcs*.xml` (with or without `.dist`, so `phpcs.i18n.xml.dist` and `phpcs-custom.xml` count), `phpunit*.xml(.dist)`, `.wp-env.json` and its `.wp-env.<name>.json` variants, and `.distignore`. `js` also claims `jest.config.json` and `tsconfig*.json` / `jsconfig*.json` (any name, such as `tsconfig-base.json` or `tsconfig.app.build.json`), and `css` also claims `postcss.config.*`. `.nvmrc` counts under `css`, `js` and `php` (test-php runs `wp-env` on that Node version), `.browserslistrc` under `css` and `js`, and `block.json` under `js` and `php`. rtCamp/wp-shared-workflows lints the whole project when a bucket's list holds anything but source files, so a ruleset change is checked against every file.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added
