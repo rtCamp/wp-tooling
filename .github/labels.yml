@@ -1,0 +1,123 @@
+# Labels for rtCamp/wp-tooling.
+#
+# Labels are repository settings, not files, so adding an entry here does not
+# create the label. A maintainer applies this list by running
+# `gh label create <name> --color <color> --description <description> --force`
+# for each entry: missing labels are created and existing ones updated. That
+# never deletes a label, so removing an entry here does not remove it on GitHub.
+#
+# The "Shared" sections are the same in all five rtCamp framework repositories
+# (wp-shared-workflows, wp-primitives, wp-tooling, theme-elementary and
+# plugin-elementary), apart from the wording of the BC descriptions; change them
+# in all five together. The sections after them belong to this repository.
+# .github/release.yml groups release notes by these labels.
+
+# --- Shared: type ------------------------------------------------------------
+- name: "Type: Bug"
+  color: "D93F0B"
+  description: "Something is broken or behaves unexpectedly"
+- name: "Type: Feature"
+  color: "A2EEEF"
+  description: "New capability or an improvement to an existing one"
+- name: "Type: Task"
+  color: "0E8A16"
+  description: "Self-contained unit of work for a milestone"
+- name: "Type: Chore"
+  color: "C5DEF5"
+  description: "Maintenance, tooling, docs, housekeeping"
+- name: "Type: Epic"
+  color: "5319E7"
+  description: "Large initiative spanning multiple issues"
+- name: "Type: Story"
+  color: "1D76DB"
+  description: "Group of related tasks within an epic"
+- name: "Type: Docs"
+  color: "BFD4F2"
+  description: "Documentation-only change"
+
+# --- Shared: priority --------------------------------------------------------
+- name: "Priority: P0"
+  color: "B60205"
+  description: "Critical: blocks milestone"
+- name: "Priority: P1"
+  color: "D93F0B"
+  description: "High: sprint commitment"
+- name: "Priority: P2"
+  color: "FBCA04"
+  description: "Medium: nice to have this sprint"
+- name: "Priority: P3"
+  color: "C2E0C6"
+  description: "Low: can slip"
+
+# --- Shared: status ----------------------------------------------------------
+- name: "Status: Blocked"
+  color: "E99695"
+  description: "Waiting on another issue or external dependency"
+- name: "Status: Needs Review"
+  color: "FEF2C0"
+  description: "Human review requested"
+- name: "Status: Rotating"
+  color: "D4C5F9"
+  description: "Engineer rotated out: awaiting pickup (see Handoff log)"
+- name: "Status: Needs BC Check"
+  color: "F9D0C4"
+  description: "Run /check-bc before merge"
+
+# --- Shared: backward compatibility ------------------------------------------
+- name: "BC: Breaking"
+  color: "B60205"
+  description: "Breaking change: targets release/vNext"
+- name: "BC: Additive"
+  color: "0E8A16"
+  description: "Additive only: safe for current major"
+- name: "BC: Deprecation"
+  color: "FBCA04"
+  description: "Adds or removes a @deprecated symbol"
+
+# --- Shared: dependencies and outside contributors ---------------------------
+- name: "dependencies"
+  color: "0366d6"
+  description: "Pull requests that update a dependency file"
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+- name: "help wanted"
+  color: "008672"
+  description: "Extra attention is needed"
+
+# --- This repository: scope --------------------------------------------------
+- name: "Scope: CI Scripts"
+  color: "0052CC"
+  description: "detect-changes and other CI helpers"
+- name: "Scope: Docs"
+  color: "FEF2C0"
+  description: "Documentation"
+- name: "Scope: Hooks"
+  color: "0052CC"
+  description: "Git hook scripts (delivered via scaffold engine)"
+- name: "Scope: Lint Configs"
+  color: "0052CC"
+  description: "@rtcamp/eslint-config and @rtcamp/stylelint-config"
+- name: "Scope: Release"
+  color: "0052CC"
+  description: "Version bump, changelog, package zip"
+- name: "Scope: Scaffolds"
+  color: "0052CC"
+  description: "ScaffoldRegistry + scaffold.json schema"
+- name: "Scope: TTY UI"
+  color: "0052CC"
+  description: "Wizard, prompts, selects, spinner"
+- name: "Scope: Tests"
+  color: "BFDADC"
+  description: "Jest test suite"
+- name: "Scope: Version Monitor"
+  color: "0052CC"
+  description: "Non-Composer version-monitor scripts"
+
+# --- This repository: Dependabot ecosystem labels ----------------------------
+- name: "javascript"
+  color: "168700"
+  description: "Pull requests that update javascript code"
+- name: "php"
+  color: "45229e"
+  description: "Pull requests that update php code"
