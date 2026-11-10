@@ -97,6 +97,7 @@ The same functionality is available from code:
 - [AI orchestration](https://github.com/rtCamp/wp-tooling/blob/main/node-packages/wp-tooling/docs/ai-orchestration.md)
 - [The wp-primitives contract](https://github.com/rtCamp/wp-tooling/blob/main/node-packages/wp-tooling/docs/wp-primitives-contract.md)
 - [Editor setup](https://github.com/rtCamp/wp-tooling/blob/main/node-packages/wp-tooling/docs/editor-setup.md)
+- [Init cleanup and recovery](https://github.com/rtCamp/wp-tooling/blob/main/node-packages/wp-tooling/docs/init-cleanup.md): starter file moves, JSON key removal, and the current recovery limits (no automatic rollback or resume yet)
 - [CHANGELOG](https://github.com/rtCamp/wp-tooling/blob/main/node-packages/wp-tooling/CHANGELOG.md)
 
 ## Related packages

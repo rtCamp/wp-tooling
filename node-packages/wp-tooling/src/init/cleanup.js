@@ -165,19 +165,15 @@ const resolveMove = (root, targets, entry, index) => {
 	}
 	const fromFull = resolveEntryPath(root, entry.from, `${label}.from`);
 	const toFull = resolveEntryPath(root, entry.to, `${label}.to`);
-	if (fromFull === toFull) {
-		throw new Error(
-			`Expected ${label}.to to differ from ${label}.from, received ${JSON.stringify(entry.to)}`
-		);
-	}
 	assertOutsideTargets(targets, toFull, `${label}.to`, entry.to);
 	return { from: entry.from, to: entry.to, fromFull, toFull };
 };
 
 /**
  * Require every source and destination once, no source that another pair
- * writes, and no destination under another one (that file would block its
- * folder), so the moves never depend on their order or fail halfway.
+ * writes, and no destination under a source or another destination (that
+ * file would block its folder). This rejects configured order dependencies;
+ * filesystem errors can still interrupt application.
  *
  * @param {Object[]} moves Resolved moves.
  * @return {void}
@@ -197,7 +193,7 @@ const assertIndependentMoves = (moves) => {
 	}
 	const destinations = moves.map((move) => move.toFull);
 	const chained = moves.findIndex((move) =>
-		destinations.includes(move.fromFull)
+		moves.some((other) => other !== move && other.toFull === move.fromFull)
 	);
 	if (-1 !== chained) {
 		throw new Error(
@@ -210,6 +206,15 @@ const assertIndependentMoves = (moves) => {
 	if (-1 !== nested) {
 		throw new Error(
 			`Expected cleanup.replace[${nested}].to not to sit under another pair's destination, received ${JSON.stringify(moves[nested].to)}`
+		);
+	}
+	const sources = moves.map((move) => move.fromFull);
+	const underSource = moves.findIndex((move) =>
+		sources.some((source) => move.toFull.startsWith(source + path.sep))
+	);
+	if (-1 !== underSource) {
+		throw new Error(
+			`Expected cleanup.replace[${underSource}].to not to sit under a cleanup.replace source, received ${JSON.stringify(moves[underSource].to)}`
 		);
 	}
 };
@@ -243,7 +248,13 @@ const resolveEdit = (root, targets, moves, entry, index) => {
 		);
 	}
 	assertOutsideTargets(targets, full, `${label}.file`, entry.file);
-	if (moves.some((move) => [move.fromFull, move.toFull].includes(full))) {
+	if (
+		moves.some(
+			(move) =>
+				move.fromFull !== move.toFull &&
+				[move.fromFull, move.toFull].includes(full)
+		)
+	) {
 		throw new Error(
 			`Expected ${label}.file not to be a cleanup.replace source or destination, received ${JSON.stringify(entry.file)}`
 		);
@@ -300,13 +311,17 @@ const resolveSetupCleanup = (root, cleanup) => {
 };
 
 /**
- * Pre-flight one move: skip a missing source, refuse directories.
+ * Pre-flight one move: skip an identical path or missing source, refuse directories.
  *
  * @param {Object} move Resolved move.
  * @param {Object} ui   Status output.
  * @return {boolean} Whether the move should run.
  */
 const checkMove = (move, ui) => {
+	if (move.fromFull === move.toFull) {
+		ui.info(`skipped ${move.to}: source and destination are the same path`);
+		return false;
+	}
 	if (!fs.existsSync(move.fromFull)) {
 		ui.warn(`skipped ${move.to}: ${move.from} not found`);
 		return false;
@@ -367,8 +382,9 @@ const applyMove = (move, ui) => {
 };
 
 /**
- * Remove the listed keys that are present, keeping the file's indentation and
- * trailing newline. A file with none of the keys is left untouched.
+ * Remove the listed keys that are present, keeping indentation, line endings,
+ * single-line layout and the trailing newline. A file with none of the keys
+ * is left untouched.
  *
  * @param {Object} edit Parsed edit.
  * @param {Object} ui   Status output.
@@ -382,8 +398,12 @@ const applyEdit = (edit, ui) => {
 	const kept = Object.fromEntries(
 		Object.entries(edit.data).filter(([key]) => !present.includes(key))
 	);
-	const eol = edit.raw.endsWith('\n') ? '\n' : '';
-	const body = JSON.stringify(kept, null, detectIndent(edit.raw));
+	const lineEnding = edit.raw.includes('\r\n') ? '\r\n' : '\n';
+	const eol = edit.raw.endsWith('\n') ? lineEnding : '';
+	const indent = edit.raw.trim().includes('\n')
+		? detectIndent(edit.raw)
+		: null;
+	const body = JSON.stringify(kept, null, indent).replace(/\n/g, lineEnding);
 	fs.writeFileSync(edit.full, `${body}${eol}`);
 	ui.info(`removed ${present.join(', ')} from ${edit.file}`);
 	return present.length;
@@ -392,8 +412,10 @@ const applyEdit = (edit, ui) => {
 /**
  * Apply the first-setup `cleanup.replace` moves and `cleanup.unset` key
  * removals. Every source is checked and every JSON file parsed before the
- * first write, so a bad file fails setup before anything moves. Missing
- * sources and files are warned about and skipped.
+ * first cleanup write, so pre-flight errors stop cleanup before anything moves.
+ * Earlier setup steps may already have changed files. Missing sources and files
+ * are warned about and skipped. Application has no rollback or resume support;
+ * filesystem errors can leave partial cleanup changes.
  *
  * @param {string} root      Project root.
  * @param {Object} [cleanup] The scaffold config's `cleanup` block.

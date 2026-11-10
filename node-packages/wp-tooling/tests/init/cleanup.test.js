@@ -57,6 +57,42 @@ describe('runSetupCleanup', () => {
 	});
 	afterEach(() => {
 		fs.rmSync(root, { recursive: true, force: true });
+		jest.restoreAllMocks();
+	});
+
+	test.each(['README.md', './README.md'])(
+		'skips an identical source and destination (%s) with a notice',
+		(to) => {
+			touch(root, 'README.md', 'project readme');
+			const before = snapshot(root);
+			expect(
+				runSetupCleanup(
+					root,
+					{ replace: [{ from: 'README.md', to }] },
+					ui
+				)
+			).toEqual({ replaced: 0, unset: 0 });
+			expect(snapshot(root)).toEqual(before);
+			expect(ui.info).toHaveBeenCalledWith(
+				`skipped ${to}: source and destination are the same path`
+			);
+			expect(ui.warn).not.toHaveBeenCalled();
+		}
+	);
+
+	test('a skipped identical path does not block JSON key removal on that file', () => {
+		touch(root, 'package.json', '{"name":"starter","homepage":"starter"}');
+		expect(
+			runSetupCleanup(
+				root,
+				{
+					replace: [{ from: 'package.json', to: 'package.json' }],
+					unset: [{ file: 'package.json', keys: ['homepage'] }],
+				},
+				ui
+			)
+		).toEqual({ replaced: 0, unset: 1 });
+		expect(read('package.json')).toBe('{"name":"starter"}');
 	});
 
 	test('moves each source over its destination, creating parent directories', () => {
@@ -101,12 +137,17 @@ describe('runSetupCleanup', () => {
 	});
 
 	test.each([
-		['tabs', '\t', '\n'],
-		['two spaces', '  ', '\n'],
-		['no trailing newline', '\t', ''],
+		['tabs', '\t', '\n', '\n'],
+		['two spaces', '  ', '\n', '\n'],
+		['no trailing newline', '\t', '', '\n'],
+		['CRLF', '  ', '\r\n', '\r\n'],
+		['CRLF without trailing newline', '\t', '', '\r\n'],
+		['single-line JSON', null, '', '\n'],
+		['single-line JSON with LF', null, '\n', '\n'],
+		['single-line JSON with CRLF', null, '\r\n', '\r\n'],
 	])(
 		'removes listed top-level keys and keeps the file style (%s)',
-		(label, indent, eol) => {
+		(label, indent, eol, lineEnding) => {
 			const pkg = {
 				name: 'starter',
 				homepage: 'https://example.com/starter',
@@ -117,7 +158,8 @@ describe('runSetupCleanup', () => {
 			touch(
 				root,
 				'package.json',
-				JSON.stringify(pkg, null, indent) + eol
+				JSON.stringify(pkg, null, indent).replace(/\n/g, lineEnding) +
+					eol
 			);
 			const result = runSetupCleanup(
 				root,
@@ -137,10 +179,80 @@ describe('runSetupCleanup', () => {
 					{ name: 'starter', license: 'GPL-2.0-or-later' },
 					null,
 					indent
-				) + eol
+				).replace(/\n/g, lineEnding) + eol
 			);
 		}
 	);
+
+	test.each([
+		[false, false],
+		[true, false],
+		[false, true],
+		[true, true],
+	])(
+		'rejects a destination under another source before any move (reverse: %s, source exists: %s)',
+		(reverse, sourceExists) => {
+			touch(root, 'first.md', 'first');
+			touch(root, 'a.md', 'a');
+			if (sourceExists) {
+				touch(root, 'notes', 'notes');
+			}
+			const moves = [
+				{ from: 'a.md', to: 'notes/a.md' },
+				{ from: 'notes', to: 'docs/notes.md' },
+			];
+			const before = snapshot(root);
+			expect(() =>
+				runSetupCleanup(
+					root,
+					{
+						replace: [
+							{ from: 'first.md', to: 'docs/first.md' },
+							...(reverse ? moves.reverse() : moves),
+						],
+					},
+					ui
+				)
+			).toThrow(
+				sourceExists
+					? /ENOTDIR/
+					: /not to sit under a cleanup.replace source/
+			);
+			expect(snapshot(root)).toEqual(before);
+		}
+	);
+
+	test('a filesystem failure leaves earlier cleanup moves applied without rollback', () => {
+		touch(root, 'a.md', 'a');
+		touch(root, 'b.md', 'b');
+		touch(root, 'first.md', 'original destination');
+		touch(root, 'package.json', '{"homepage":"starter"}');
+		const rename = fs.renameSync;
+		jest.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+			if (from === path.join(root, 'b.md')) {
+				throw new Error('rename failed');
+			}
+			return rename(from, to);
+		});
+		expect(() =>
+			runSetupCleanup(
+				root,
+				{
+					replace: [
+						{ from: 'a.md', to: 'first.md' },
+						{ from: 'b.md', to: 'second.md' },
+					],
+					unset: [{ file: 'package.json', keys: ['homepage'] }],
+				},
+				ui
+			)
+		).toThrow('rename failed');
+		expect(read('first.md')).toBe('a');
+		expect(exists('a.md')).toBe(false);
+		expect(read('b.md')).toBe('b');
+		expect(exists('second.md')).toBe(false);
+		expect(read('package.json')).toBe('{"homepage":"starter"}');
+	});
 
 	test('leaves a JSON file untouched when none of its keys are present', () => {
 		const raw = '{\n    "name": "starter"\n}';
@@ -250,7 +362,6 @@ describe('resolveSetupCleanup', () => {
 		[{ replace: [pair('../x.md', 'README.md')] }, /replace\[0\]\.from/],
 		[{ replace: [pair('a.md', '/abs.md')] }, /replace\[0\]\.to/],
 		[{ replace: [pair('a.md', '.')] }, /below the project root/],
-		[{ replace: [pair('a.md', 'a.md')] }, /to differ from/],
 		[
 			{ replace: [pair('a.md', 'README.md'), pair('b.md', 'README.md')] },
 			/destination once/,

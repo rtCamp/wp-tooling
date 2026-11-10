@@ -669,6 +669,18 @@ describe('first-setup cleanup moves and key removals', () => {
 		);
 		expect(read('README.md')).toBe('# Acme Blog starter kit\n');
 		expect(exists('README.theme.md')).toBe(true);
+		expect(exists('.wp-scaffold.json')).toBe(true);
+
+		// Fixing the JSON and reinitializing does not resume first-setup cleanup.
+		touch(
+			root,
+			'package.json',
+			'{"name":"acme-blog","homepage":"starter"}'
+		);
+		await setUp(['--reinit', '--yes', '--name=Acme Blog']);
+		expect(exists('README.theme.md')).toBe(true);
+		expect(read('README.md')).toBe('# Acme Blog starter kit\n');
+		expect(JSON.parse(read('package.json')).homepage).toBe('starter');
 	});
 
 	test('an invalid move is rejected before setup changes anything', async () => {
