@@ -12,7 +12,7 @@ const ui = require('../../src/ui');
 const fs = require('fs');
 const path = require('path');
 const { run } = require('../../src/init');
-const { makeRoot, touch, capture, snapshot } = require('./_helpers');
+const { makeRoot, touch, capture, snapshot, tree } = require('./_helpers');
 
 const config = {
 	kind: 'theme',
@@ -256,9 +256,18 @@ describe('setup step failures and optional steps', () => {
 		process.exitCode = undefined;
 	});
 
-	test('Composer failure stops cleanup and Git and reports partial setup', async () => {
+	test('Composer failure undoes setup, including the vendor/ it created', async () => {
 		touch(root, 'composer.json', '{}');
+		const before = snapshot(root);
+		const paths = tree(root);
+		let seen;
 		execFileSync.mockImplementationOnce(() => {
+			// Cleanup has run and the marker is not written yet.
+			seen = {
+				target: fs.existsSync(path.join(root, 'keep.txt')),
+				marker: fs.existsSync(path.join(root, '.wp-scaffold.json')),
+			};
+			touch(root, 'vendor/autoload.php', '<?php');
 			throw new Error('Composer failed');
 		});
 		const output = await capture(async () => {
@@ -266,13 +275,40 @@ describe('setup step failures and optional steps', () => {
 				run(stepConfig, { root, argv: ['--name=Acme Blog'] })
 			).rejects.toThrow('Composer failed');
 		});
-		expect(fs.existsSync(path.join(root, 'keep.txt'))).toBe(true);
+		expect(seen).toEqual({ target: false, marker: false });
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 		expect(git.initRepo).not.toHaveBeenCalled();
 		expect(output.stdout + output.stderr).toContain(
-			'Some changes may remain'
+			'init undid the changes it made'
 		);
+		expect(output.stdout + output.stderr).not.toContain('vendor/');
 		expect(output.stdout).not.toContain('Your new theme is ready');
 		expect(process.exitCode).toBe(1);
+	});
+
+	test('Composer failure keeps a vendor/ that already existed and says so', async () => {
+		touch(root, 'composer.json', '{}');
+		touch(root, 'vendor/autoload.php', 'old');
+		execFileSync.mockImplementationOnce(() => {
+			touch(root, 'vendor/autoload.php', 'new');
+			throw new Error('Composer failed');
+		});
+		const output = await capture(async () => {
+			await expect(
+				run(stepConfig, { root, argv: ['--name=Acme Blog'] })
+			).rejects.toThrow('Composer failed');
+		});
+		expect(
+			fs.readFileSync(path.join(root, 'vendor/autoload.php'), 'utf8')
+		).toBe('new');
+		expect(fs.readFileSync(path.join(root, 'keep.txt'), 'utf8')).toBe(
+			'Starter Theme'
+		);
+		expect(fs.existsSync(path.join(root, '.wp-scaffold.json'))).toBe(false);
+		expect(output.stdout + output.stderr).toContain(
+			'Composer may have rewritten vendor/'
+		);
 	});
 
 	test.each(['initRepo', 'installGitHooks', 'commitAll'])(
@@ -333,7 +369,9 @@ describe('setup step failures and optional steps', () => {
 		expect(process.exitCode).toBeUndefined();
 	});
 
-	test('feature failure prevents identity persistence and cleanup', async () => {
+	test('feature failure undoes setup', async () => {
+		const before = snapshot(root);
+		const paths = tree(root);
 		const feature = {
 			key: 'demo',
 			label: 'Demo',
@@ -354,12 +392,107 @@ describe('setup step failures and optional steps', () => {
 				)
 			).rejects.toThrow('Feature setup failed');
 		});
-		expect(fs.existsSync(path.join(root, 'keep.txt'))).toBe(true);
-		expect(fs.existsSync(path.join(root, '.wp-scaffold.json'))).toBe(false);
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 		expect(git.initRepo).not.toHaveBeenCalled();
 	});
 
-	test('identity persistence failure prevents cleanup and Git', async () => {
+	test('a failing feature also undoes the features enabled before it', async () => {
+		touch(root, 'package.json', '{}');
+		const before = snapshot(root);
+		const paths = tree(root);
+		const features = [
+			{
+				key: 'good',
+				label: 'Good',
+				detect: (api) => api.exists('assets/good.css'),
+				onEnable(api) {
+					api.write('assets/good.css', 'body {}');
+					api.editPackageJson((pkg) => {
+						pkg.good = true;
+					});
+				},
+				onDisable() {},
+			},
+			{
+				key: 'bad',
+				label: 'Bad',
+				detect: () => false,
+				onEnable() {
+					throw new Error('hook failed');
+				},
+				onDisable() {},
+			},
+		];
+		await capture(async () => {
+			await expect(
+				run(
+					{ ...stepConfig, features },
+					{
+						root,
+						argv: [
+							'--yes',
+							'--name=Acme Blog',
+							'--features=good,bad',
+						],
+					}
+				)
+			).rejects.toThrow('Feature setup failed: bad');
+		});
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
+	});
+
+	test('a feature whose own undo fails is reported, not announced as undone', async () => {
+		const feature = {
+			key: 'demo',
+			label: 'Demo',
+			detect: () => false,
+			onEnable(api) {
+				api.write('demo.txt', 'on');
+				throw new Error('hook failed');
+			},
+			onDisable() {},
+		};
+		const remove = fs.rmSync;
+		jest.spyOn(fs, 'rmSync').mockImplementation((target, ...options) => {
+			if (target === path.join(root, 'demo.txt')) {
+				throw new Error('demo undo failed');
+			}
+			return remove(target, ...options);
+		});
+		let failure;
+		const output = await capture(async () => {
+			failure = await run(
+				{ ...stepConfig, features: [feature] },
+				{
+					root,
+					argv: ['--yes', '--name=Acme Blog', '--features=demo'],
+				}
+			).catch((error) => error);
+		});
+		expect(failure).toBeInstanceOf(AggregateError);
+		expect(failure.message).toBe(
+			'Feature setup failed: demo; rollback failed: demo undo failed'
+		);
+		expect(output.stdout + output.stderr).toContain(
+			'some changes could not be undone (demo undo failed)'
+		);
+		expect(output.stdout + output.stderr).not.toContain('init undid');
+		// Everything else was still restored.
+		expect(fs.readFileSync(path.join(root, 'keep.txt'), 'utf8')).toBe(
+			'Starter Theme'
+		);
+		expect(fs.existsSync(path.join(root, '.wp-scaffold.json'))).toBe(false);
+	});
+
+	test('identity persistence failure after Composer undoes setup, including vendor/', async () => {
+		touch(root, 'composer.json', '{}');
+		const before = snapshot(root);
+		const paths = tree(root);
+		execFileSync.mockImplementationOnce(() => {
+			touch(root, 'vendor/autoload.php', '<?php');
+		});
 		const originalWrite = fs.writeFileSync;
 		jest.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
 			if (path.basename(file) === '.wp-scaffold.json') {
@@ -372,7 +505,9 @@ describe('setup step failures and optional steps', () => {
 				run(stepConfig, { root, argv: ['--yes', '--name=Acme Blog'] })
 			).rejects.toThrow('identity write failed');
 		});
-		expect(fs.existsSync(path.join(root, 'keep.txt'))).toBe(true);
+		expect(execFileSync).toHaveBeenCalledTimes(1);
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 		expect(git.initRepo).not.toHaveBeenCalled();
 	});
 
@@ -422,15 +557,18 @@ describe('entry-point error reporting', () => {
 		expect(detect).not.toHaveBeenCalled();
 	});
 	test.each(['keep.txt', null, false, ''])(
-		'standalone cleanup rejects malformed targets %j before deleting files',
+		'setup rejects malformed cleanup targets %j before changing files',
 		async (targets) => {
 			touch(root, 'keep.txt', 'keep');
-			jest.spyOn(ui, 'confirm').mockResolvedValue(true);
 			await capture(async () => {
 				await expect(
 					run(
-						{ ...config, cleanup: { targets } },
-						{ root, argv: ['--clean'] }
+						{
+							...config,
+							cleanup: { targets },
+							steps: { cleanup: true },
+						},
+						{ root, argv: ['--yes', '--name=Acme Blog'] }
 					)
 				).rejects.toThrow(/Expected cleanup.targets to be an array/);
 			});
@@ -618,20 +756,37 @@ describe('first-setup cleanup moves and key removals', () => {
 		touch(root, 'README.md', 'Our own README\n');
 		touch(root, 'README.theme.md', '# Template\n');
 		touch(root, 'package.json', ownPackage);
+		// The project's own file at a cleanup target path.
+		touch(root, 'CONTRIBUTING.md', 'Contribute to our site.');
 		await setUp(['--reinit', '--yes', '--name=Cedar Blog']);
 		expect(process.exitCode).toBeUndefined();
 		expect(read('README.md')).toBe('Our own README\n');
 		expect(read('README.theme.md')).toBe('# Template\n');
 		expect(read('package.json')).toBe(ownPackage);
+		expect(read('CONTRIBUTING.md')).toBe('Contribute to our site.');
 	});
 
-	test('--clean removes the targets only, even on a fresh starter', async () => {
-		await setUp(['--clean']);
-		expect(exists('CONTRIBUTING.md')).toBe(false);
-		expect(read('README.md')).toBe(starterReadme);
-		expect(exists('README.theme.md')).toBe(true);
-		expect(read('package.json')).toBe(starterPackage);
-	});
+	test.each([
+		['--clean', false],
+		['-c', false],
+		['--clean', true],
+		['-c', true],
+	])(
+		'%s is an unknown argument (already set up: %s)',
+		async (flag, setUpFirst) => {
+			if (setUpFirst) {
+				await setUp(['--yes', '--name=Acme Blog']);
+				touch(root, 'CONTRIBUTING.md', 'Contribute to our site.');
+			}
+			const before = snapshot(root);
+			const output = await setUp([flag]);
+			expect(output.stdout + output.stderr).toContain(
+				`Unknown argument(s): ${flag}`
+			);
+			expect(process.exitCode).toBe(1);
+			expect(snapshot(root)).toEqual(before);
+		}
+	);
 
 	test('a disabled cleanup step skips the moves and key removals', async () => {
 		await setUp(['--yes', '--name=Acme Blog'], {
@@ -653,8 +808,10 @@ describe('first-setup cleanup moves and key removals', () => {
 		expect(process.exitCode).toBe(130);
 	});
 
-	test('a JSON file that fails to parse stops setup before any move and reports the partial setup', async () => {
+	test('a JSON file that fails to parse undoes setup, and a plain rerun is a clean first setup', async () => {
 		touch(root, 'package.json', '{ broken');
+		const before = snapshot(root);
+		const paths = tree(root);
 		const output = await capture(async () => {
 			await expect(
 				run(cleanupConfig, {
@@ -665,22 +822,82 @@ describe('first-setup cleanup moves and key removals', () => {
 		});
 		expect(process.exitCode).toBe(1);
 		expect(output.stdout + output.stderr).toContain(
-			'restore your starter backup'
+			'init undid the changes it made'
 		);
-		expect(read('README.md')).toBe('# Acme Blog starter kit\n');
-		expect(exists('README.theme.md')).toBe(true);
-		expect(exists('.wp-scaffold.json')).toBe(true);
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 
-		// Fixing the JSON and reinitializing does not resume first-setup cleanup.
-		touch(
-			root,
-			'package.json',
-			'{"name":"acme-blog","homepage":"starter"}'
-		);
-		await setUp(['--reinit', '--yes', '--name=Acme Blog']);
-		expect(exists('README.theme.md')).toBe(true);
-		expect(read('README.md')).toBe('# Acme Blog starter kit\n');
-		expect(JSON.parse(read('package.json')).homepage).toBe('starter');
+		// Fix the JSON and run setup again: no marker, so it is a first setup.
+		touch(root, 'package.json', starterPackage);
+		process.exitCode = undefined;
+		await setUp(['--yes', '--name=Acme Blog']);
+		expect(process.exitCode).toBeUndefined();
+		expect(read('README.md')).toBe('# Acme Blog\n');
+		expect(exists('README.theme.md')).toBe(false);
+		expect(exists('CONTRIBUTING.md')).toBe(false);
+		expect(read('package.json')).toBe(setupPackage);
+	});
+
+	test('a failure after the key removals and a target deletion undoes all of cleanup', async () => {
+		touch(root, 'NOTES.md', 'Starter notes');
+		const twoTargets = {
+			...cleanupConfig,
+			cleanup: {
+				...cleanupConfig.cleanup,
+				targets: ['CONTRIBUTING.md', 'NOTES.md'],
+			},
+		};
+		const before = snapshot(root);
+		const paths = tree(root);
+		const rename = fs.renameSync;
+		const spy = jest
+			.spyOn(fs, 'renameSync')
+			.mockImplementation((from, to) => {
+				if (from === path.join(root, 'NOTES.md')) {
+					throw new Error('target removal failed');
+				}
+				return rename(from, to);
+			});
+		await capture(async () => {
+			await expect(
+				run(twoTargets, { root, argv: ['--yes', '--name=Acme Blog'] })
+			).rejects.toThrow('target removal failed');
+		});
+		spy.mockRestore();
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
+
+		process.exitCode = undefined;
+		await setUp(['--yes', '--name=Acme Blog'], twoTargets);
+		expect(process.exitCode).toBeUndefined();
+		expect(exists('NOTES.md')).toBe(false);
+		expect(exists('CONTRIBUTING.md')).toBe(false);
+		expect(read('package.json')).toBe(setupPackage);
+	});
+
+	test('a failed --reinit restores the previous identity and files', async () => {
+		await setUp(['--yes', '--name=Acme Blog']);
+		const before = snapshot(root);
+		const paths = tree(root);
+		const write = fs.writeFileSync;
+		let failed = false;
+		jest.spyOn(fs, 'writeFileSync').mockImplementation((file, ...args) => {
+			if (!failed && path.basename(file) === '.wp-scaffold.json') {
+				failed = true;
+				throw new Error('identity write failed');
+			}
+			return write(file, ...args);
+		});
+		await capture(async () => {
+			await expect(
+				run(cleanupConfig, {
+					root,
+					argv: ['--reinit', '--yes', '--name=Cedar Blog'],
+				})
+			).rejects.toThrow('identity write failed');
+		});
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 	});
 
 	test('an invalid move is rejected before setup changes anything', async () => {

@@ -6,7 +6,8 @@ const {
 } = require('../../src/init/cleanup');
 const fs = require('fs');
 const path = require('path');
-const { makeRoot, touch, snapshot } = require('./_helpers');
+const { createJournal } = require('../../src/init/journal');
+const { makeRoot, touch, snapshot, tree } = require('./_helpers');
 
 describe('runCleanup', () => {
 	let root;
@@ -222,36 +223,40 @@ describe('runSetupCleanup', () => {
 		}
 	);
 
-	test('a filesystem failure leaves earlier cleanup moves applied without rollback', () => {
-		touch(root, 'a.md', 'a');
-		touch(root, 'b.md', 'b');
-		touch(root, 'first.md', 'original destination');
+	test('a journal undoes the moves, key removals and target deletions after a later failure', () => {
+		touch(root, 'starter/README.md', 'project readme');
+		touch(root, 'README.md', 'starter readme');
 		touch(root, 'package.json', '{"homepage":"starter"}');
+		touch(root, 'CONTRIBUTING.md', 'starter guide');
+		touch(root, 'notes/todo.md', 'starter notes');
+		const cleanup = {
+			targets: ['starter', 'CONTRIBUTING.md', 'notes'],
+			replace: [{ from: 'starter/README.md', to: 'README.md' }],
+			unset: [{ file: 'package.json', keys: ['homepage'] }],
+		};
+		const before = snapshot(root);
+		const paths = tree(root);
 		const rename = fs.renameSync;
 		jest.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
-			if (from === path.join(root, 'b.md')) {
-				throw new Error('rename failed');
+			if (from === path.join(root, 'notes')) {
+				throw new Error('target removal failed');
 			}
 			return rename(from, to);
 		});
-		expect(() =>
-			runSetupCleanup(
-				root,
-				{
-					replace: [
-						{ from: 'a.md', to: 'first.md' },
-						{ from: 'b.md', to: 'second.md' },
-					],
-					unset: [{ file: 'package.json', keys: ['homepage'] }],
-				},
-				ui
-			)
-		).toThrow('rename failed');
-		expect(read('first.md')).toBe('a');
-		expect(exists('a.md')).toBe(false);
-		expect(read('b.md')).toBe('b');
-		expect(exists('second.md')).toBe(false);
-		expect(read('package.json')).toBe('{"homepage":"starter"}');
+		const journal = createJournal(root);
+		runSetupCleanup(root, cleanup, ui, journal);
+		expect(() => runCleanup(root, cleanup.targets, ui, journal)).toThrow(
+			'target removal failed'
+		);
+		// The moves, the key removal and two deletions all happened first.
+		expect(read('README.md')).toBe('project readme');
+		expect(read('package.json')).toBe('{}');
+		expect(exists('starter')).toBe(false);
+		expect(exists('CONTRIBUTING.md')).toBe(false);
+		jest.restoreAllMocks();
+		expect(journal.rollback()).toEqual({ errors: [], trash: null });
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 	});
 
 	test('leaves a JSON file untouched when none of its keys are present', () => {

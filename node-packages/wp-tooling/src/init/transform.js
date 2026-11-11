@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
+const { createJournal } = require('./journal');
 
 /**
  * Require a nonempty relative path without parent traversal.
@@ -279,39 +280,17 @@ const applyReplacements = (text, replacements) => {
  * and completed renames are journaled; this is not a process-crash recovery log.
  * Reverse order restores paths before earlier writes at those paths are undone.
  *
- * @param {Function} apply Callback receiving journaled writeFile and renameFile.
+ * @param {Function} apply Callback receiving the journal (writeFile, renameFile).
  * @return {*} Callback result.
  */
 const withFileRollback = (apply) => {
-	const undo = [];
-	const writeFile = (file, content, options) => {
-		const existed = fs.existsSync(file);
-		const original = existed ? fs.readFileSync(file) : null;
-		// Register before writing: a failed write may have truncated the file.
-		undo.push(() => {
-			if (existed) {
-				fs.writeFileSync(file, original);
-			} else {
-				fs.rmSync(file, { force: true });
-			}
-		});
-		fs.writeFileSync(file, content, options);
-	};
-	const renameFile = (from, to) => {
-		fs.renameSync(from, to);
-		undo.push(() => fs.renameSync(to, from));
-	};
+	const journal = createJournal();
 	try {
-		return apply({ writeFile, renameFile });
+		const result = apply(journal);
+		journal.commit();
+		return result;
 	} catch (error) {
-		const rollbackErrors = [];
-		for (const restore of undo.reverse()) {
-			try {
-				restore();
-			} catch (rollbackError) {
-				rollbackErrors.push(rollbackError);
-			}
-		}
+		const { errors: rollbackErrors } = journal.rollback();
 		if (rollbackErrors.length) {
 			throw new AggregateError(
 				[error, ...rollbackErrors],

@@ -8,7 +8,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { stripRegions, expandGlob } = require('../../src/init/examples');
+const {
+	stripRegions,
+	expandGlob,
+	applyExamples,
+} = require('../../src/init/examples');
+const { createJournal } = require('../../src/init/journal');
+const { makeRoot, touch, snapshot, tree } = require('./_helpers');
 
 const SAMPLE = [
 	'before',
@@ -118,5 +124,52 @@ describe('expandGlob', () => {
 
 	it('returns nothing when no file matches', () => {
 		expect(expandGlob(dir, 'inc/Missing*.php')).toEqual([]);
+	});
+});
+
+describe('applyExamples with a journal', () => {
+	let root;
+	beforeEach(() => {
+		root = makeRoot();
+	});
+	afterEach(() => {
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+
+	it('brings back removed folders and stripped files on rollback', () => {
+		touch(root, 'inc/Main.php', SAMPLE);
+		touch(root, 'inc/Modules/Example.php', '<?php');
+		touch(root, 'inc/Modules/Example/Thing.php', '<?php');
+		const before = snapshot(root);
+		const paths = tree(root);
+		const journal = createJournal(root);
+		applyExamples(
+			{
+				examples: {
+					groups: [
+						{
+							key: 'example',
+							strip: ['inc/Main.php'],
+							remove: [
+								'inc/Modules/Example.php',
+								'inc/Modules/Example',
+							],
+						},
+					],
+				},
+			},
+			root,
+			null,
+			new Set(['example']),
+			journal
+		);
+		expect(fs.readFileSync(path.join(root, 'inc/Main.php'), 'utf8')).toBe(
+			'before\nafter'
+		);
+		expect(fs.existsSync(path.join(root, 'inc/Modules'))).toBe(true);
+		expect(fs.readdirSync(path.join(root, 'inc/Modules'))).toEqual([]);
+		expect(journal.rollback()).toEqual({ errors: [], trash: null });
+		expect(snapshot(root)).toEqual(before);
+		expect(tree(root)).toEqual(paths);
 	});
 });
