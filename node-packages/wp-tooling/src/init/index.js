@@ -8,10 +8,13 @@
  * I/O goes through `@rtcamp/wp-tooling/ui`.
  *
  * Flow: confirm -> name (validated) -> review identity -> select capabilities
- * -> confirm changes -> apply identity/version/capabilities -> persist
- * `.wp-scaffold.json` -> composer dump-autoload -> cleanup (first setup also
- * applies `cleanup.replace` / `cleanup.unset`) -> optional git + hooks ->
- * initial commit.
+ * -> confirm changes -> apply identity/version/capabilities -> cleanup (first
+ * setup only) -> composer dump-autoload -> persist `.wp-scaffold.json` ->
+ * optional git + hooks -> initial commit.
+ *
+ * Every project-file change up to and including `.wp-scaffold.json` goes
+ * through one journal. A failure before the marker is written undoes them, so
+ * the next run starts a clean first setup. The Git steps run after that point.
  */
 
 'use strict';
@@ -37,9 +40,9 @@ const {
 	planRenames,
 	replaceInFiles,
 	executeRenames,
-	withFileRollback,
 	applyVersion,
 } = require('./transform');
+const { createJournal, isTrash } = require('./journal');
 const {
 	writeIdentityFile,
 	readIdentityFile,
@@ -47,17 +50,14 @@ const {
 	IDENTITY_FILE,
 } = require('./persist');
 const { initRepo, commitAll, installGitHooks } = require('./git');
-const {
-	runCleanup,
-	resolveCleanupTargets,
-	runSetupCleanup,
-} = require('./cleanup');
+const { runSetupCleanup } = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
 	safeDetectMap,
 	retiredKeys,
 	toggleFeatures,
+	retainJournal,
 } = require('./features');
 const {
 	usageError,
@@ -92,7 +92,10 @@ const printHelp = (kind) => {
 Usage: npm run init [-- options]
 
 Set up this ${kind}: rename the starter tokens to your project name, apply the
-version, persist identity to .wp-scaffold.json, then optional git / Husky / cleanup.
+version and capabilities, remove the starter-only files, persist identity to
+.wp-scaffold.json, then optional git / hooks. If setup fails before
+.wp-scaffold.json is written, its file changes are undone; fix the problem and
+run it again.
 
 Once set up (.wp-scaffold.json exists), 'npm run init' enters MANAGE mode to
 edit project details (name, namespace, prefixes, ...) and toggle optional
@@ -107,7 +110,8 @@ Scaffold options (first run):
   --features=a,b     Enable exactly these optional features (empty = none).
   --enable=a,b       Enable features (delta over defaults).
   --disable=a,b      Disable features (delta over defaults).
-  --reinit         Reapply identity/features; preserve one-shot example choices.
+  --reinit         Reapply identity/features; example removal and cleanup are
+                   first-setup only and do not run again.
 
   Interactive runs show ONE grouped "Select the capabilities to include"
   prompt (by category); unchecking a capability removes it entirely.
@@ -124,8 +128,6 @@ Query options (any time, before or after set up):
                    ({ mode, capabilities, features, warnings }).
 
 General:
-  -c, --clean      Run cleanup only (remove scaffolding files). First-setup
-                   file moves and key removals do not run.
   -h, --help       Show this help.
 `);
 };
@@ -133,7 +135,7 @@ General:
 /**
  * Parse CLI flags for the setup flow.
  *
- * @param {string[]} argv - Arguments (without --help/--clean).
+ * @param {string[]} argv - Arguments (without --help).
  * @return {{ flags: Object, unknown: string[] }} Parsed flags and any unrecognised args.
  */
 const parseFlags = (argv) => {
@@ -401,26 +403,25 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) => c.cancelled,
 			async run(c) {
 				c.applicationStarted = true;
-				withFileRollback(({ writeFile, renameFile }) => {
-					const changed = replaceInFiles(
-						c.files,
-						c.replacements,
-						writeFile
-					);
-					const renamed = executeRenames(c.renames, renameFile);
-					const target = { ...c.target, kebab: c.target.textDomain };
-					const files = (config.versionFiles || []).map((spec) => ({
-						...spec,
-						path:
-							'function' === typeof spec.path
-								? spec.path(target)
-								: spec.path,
-					}));
-					applyVersion(root, files, c.version, ui, writeFile);
-					ui.success(
-						`Updated ${changed} file(s), renamed ${renamed} file(s)`
-					);
-				});
+				const { writeFile, renameFile } = c.journal;
+				const changed = replaceInFiles(
+					c.files,
+					c.replacements,
+					writeFile
+				);
+				const renamed = executeRenames(c.renames, renameFile);
+				const target = { ...c.target, kebab: c.target.textDomain };
+				const files = (config.versionFiles || []).map((spec) => ({
+					...spec,
+					path:
+						'function' === typeof spec.path
+							? spec.path(target)
+							: spec.path,
+				}));
+				applyVersion(root, files, c.version, ui, writeFile);
+				ui.success(
+					`Updated ${changed} file(s), renamed ${renamed} file(s)`
+				);
 			},
 		},
 		{
@@ -428,12 +429,20 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) => c.cancelled,
 			async run(c) {
 				if (!existing && config.examples?.groups?.length) {
-					applyExamples(config, root, ui, c.removeKeys || new Set());
+					applyExamples(
+						config,
+						root,
+						ui,
+						c.removeKeys || new Set(),
+						c.journal
+					);
 					c.persistPayload.examples = {
 						removed: [...(c.removeKeys || [])].sort(),
 					};
 				}
 				const api = makeFeatureApi(root, c.persistPayload, ui);
+				// Features that succeed stay undoable until setup commits.
+				c.journal.record(retainJournal(api));
 				const result = await toggleFeatures(config, root, {
 					mode: 'scaffold',
 					wantOn: c.wantOn || new Set(),
@@ -442,14 +451,45 @@ const setupSteps = (config, root, flags) => {
 					ui,
 				});
 				if (result.failed.length) {
-					throw new Error(
+					const error = new Error(
 						`Feature setup failed: ${result.failed.join(', ')}`
 					);
+					error.rollbackErrors = result.rollbackErrors;
+					throw error;
 				}
 				c.persistPayload.features = result.finalMap;
 			},
 		},
 		{
+			name: 'Cleanup',
+			// One-shot, like example removal: --reinit keeps any file the project
+			// later creates at a target path.
+			skip: (c) => c.cancelled || !steps.cleanup || Boolean(existing),
+			async run(c) {
+				runSetupCleanup(root, config.cleanup, ui, c.journal);
+			},
+		},
+		{
+			name: 'Regenerate autoloader',
+			skip: (c) => c.cancelled || !steps.composer,
+			async run(c) {
+				if (fs.existsSync(path.join(root, 'composer.json'))) {
+					const vendor = path.join(root, 'vendor');
+					if (fs.existsSync(vendor)) {
+						// Composer owns an existing vendor/; rollback leaves it.
+						c.vendorUntracked = true;
+					} else {
+						c.journal.record(() =>
+							fs.rmSync(vendor, { recursive: true, force: true })
+						);
+					}
+				}
+				composerDump(root);
+			},
+		},
+		{
+			// The marker is the last project write: once it exists, setup is
+			// complete and its changes are kept.
 			name: 'Persist identity',
 			skip: (c) => c.cancelled,
 			async run(c) {
@@ -459,34 +499,23 @@ const setupSteps = (config, root, flags) => {
 						...c.persistPayload,
 						generatedAt: new Date().toISOString(),
 					},
-					ui
+					ui,
+					c.journal.writeFile
 				);
-			},
-		},
-		{
-			name: 'Regenerate autoloader',
-			skip: (c) => c.cancelled || !steps.composer,
-			async run() {
-				composerDump(root);
-			},
-		},
-		{
-			name: 'Cleanup',
-			skip: (c) => c.cancelled || !steps.cleanup,
-			async run() {
-				// Moves and key removals are a one-shot first-setup choice,
-				// like example removal; reinit must not redo them.
-				if (!existing) {
-					runSetupCleanup(root, config.cleanup, ui);
+				const leftover = c.journal.commit();
+				c.projectSetupComplete = true;
+				if (leftover) {
+					c.leftoverTrash = path.relative(root, leftover);
+					ui.warn(
+						`Could not remove ${c.leftoverTrash}, which holds the files setup removed or replaced. Delete it before you commit.`
+					);
 				}
-				runCleanup(root, config.cleanup?.targets, ui);
 			},
 		},
 		{
 			name: 'Git',
 			skip: (c) => c.cancelled || !steps.git,
 			async run(c) {
-				c.projectSetupComplete = true;
 				const go = flags.yes
 					? false
 					: await ui.confirm({
@@ -521,7 +550,13 @@ const setupSteps = (config, root, flags) => {
 		{
 			name: 'Commit',
 			skip: (c) => c.cancelled || !c.gitReady,
-			async run() {
+			async run(c) {
+				if (c.leftoverTrash) {
+					ui.warn(
+						`Skipped the initial commit because ${c.leftoverTrash} is still there. Delete it, then commit.`
+					);
+					return;
+				}
 				commitAll(
 					root,
 					`Initialize project using ${config.repoUrl || GENERATED_BY}`,
@@ -530,6 +565,42 @@ const setupSteps = (config, root, flags) => {
 			},
 		},
 	];
+};
+
+/**
+ * Undo a setup that failed before `.wp-scaffold.json` was written, and say what
+ * happened. A failed undo keeps the trash folder so nothing else is lost.
+ *
+ * @param {Object} ctx   - Wizard context holding the setup journal.
+ * @param {Error}  error - The failure.
+ * @param {string} root  - Project root.
+ * @return {Error} The error to rethrow: an AggregateError when some changes could not be undone.
+ */
+const undoSetup = (ctx, error, root) => {
+	// A failed feature's own undo only rewrites files from memory, so the setup
+	// journal can still roll back safely after `rollbackErrors`.
+	const { errors, trash } = ctx.journal.rollback();
+	const failures = [...(error?.rollbackErrors || []), ...errors];
+	const trashPath = trash && path.relative(root, trash);
+	if (failures.length) {
+		const detail = failures.map((failure) => failure.message).join('; ');
+		ui.warn(
+			`Setup failed and some changes could not be undone (${detail}).${trash ? ` Files setup removed or replaced are kept in ${trashPath}.` : ''} Inspect the diff and restore the project from version control before running setup again.`
+		);
+		return new AggregateError(
+			[error, ...failures],
+			`${error?.message}; rollback failed: ${detail}`
+		);
+	}
+	ui.warn(
+		`Setup failed, so init undid the changes it made to the project. Fix the error and run setup again.${ctx.vendorUntracked ? ' Composer may have rewritten vendor/; the next successful setup regenerates it.' : ''}`
+	);
+	if (trash) {
+		ui.warn(
+			`Could not remove ${trashPath}; delete it before running setup again.`
+		);
+	}
+	return error;
 };
 
 /**
@@ -542,10 +613,17 @@ const setupSteps = (config, root, flags) => {
  */
 const setupFlow = async (config, root, flags) => {
 	validatePaths(config, root);
+	// Never delete it here: it may hold the only copy of what a crashed setup removed.
+	const leftover = fs.readdirSync(root).find(isTrash);
+	if (leftover) {
+		throw new Error(
+			`Found ${leftover} from an earlier setup. It holds files that setup removed or replaced; if that setup did not finish, restore the project from version control first. Delete ${leftover}, then run setup again.`
+		);
+	}
 	const kind = config.kind || 'project';
 	ui.heading(`${cap(kind)} setup`);
 
-	const ctx = { cancelled: false };
+	const ctx = { cancelled: false, journal: createJournal(root) };
 	try {
 		await new ui.Wizard(setupSteps(config, root, flags), ctx).run();
 	} catch (error) {
@@ -556,9 +634,7 @@ const setupFlow = async (config, root, flags) => {
 					: 'Project setup completed, but Git setup failed. Resolve the Git error and finish Git setup manually; do not rerun project setup.'
 			);
 		} else if (ctx.applicationStarted) {
-			ui.warn(
-				'Setup stopped after application began. Some changes may remain; inspect the diff and restore your starter backup before retrying setup.'
-			);
+			throw undoSetup(ctx, error, root);
 		}
 		throw error;
 	}
@@ -574,28 +650,6 @@ const setupFlow = async (config, root, flags) => {
 	if (config.docsUrl) {
 		ui.info(`Docs: ${config.docsUrl}`);
 	}
-};
-
-/**
- * Run the cleanup-only flow (`--clean`).
- *
- * @param {Object} config - Per-project scaffold config.
- * @param {string} root   - Project root.
- * @return {Promise<void>}
- */
-const cleanFlow = async (config, root) => {
-	resolveCleanupTargets(root, config.cleanup?.targets);
-	const kind = config.kind || 'project';
-	const go = await ui.confirm({
-		message: `Run ${kind} cleanup now?`,
-		defaultValue: false,
-	});
-	if (!go) {
-		ui.warn('Cleanup skipped.');
-		return;
-	}
-	const removed = runCleanup(root, config.cleanup?.targets, ui);
-	ui.success(`Cleanup complete (${removed} removed).`);
 };
 
 /**
@@ -824,20 +878,6 @@ const run = async (config, options = {}) => {
 		}
 
 		try {
-			// Cleanup works in either mode.
-			if (argv.includes('--clean') || argv.includes('-c')) {
-				const others = argv.filter(
-					(arg) => '--clean' !== arg && '-c' !== arg
-				);
-				if (others.length) {
-					ui.error('Invalid arguments.');
-					process.exitCode = 1;
-					return;
-				}
-				await cleanFlow(config, root);
-				return;
-			}
-
 			// Validate the feature manifest once, before touching disk, for both modes.
 			try {
 				validateFeatures(config);

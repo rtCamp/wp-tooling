@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveWithin } = require('./transform');
+const { directOps } = require('./journal');
 
 /**
  * Expand a simple glob (only `*`, matched within a single path segment) to
@@ -129,9 +130,10 @@ const stripRegions = (text, marker, dropBody) => {
  * @param {string}      root       - Project root.
  * @param {Object}      ui         - Merged UI.
  * @param {Set<string>} removeKeys - Group keys to remove (others are kept).
+ * @param {Object}      [ops]      - File operations; setup passes its journal.
  * @return {void}
  */
-const applyExamples = (config, root, ui, removeKeys) => {
+const applyExamples = (config, root, ui, removeKeys, ops = directOps) => {
 	const spec = config.examples;
 	if (!spec || !Array.isArray(spec.groups)) {
 		return;
@@ -157,7 +159,7 @@ const applyExamples = (config, root, ui, removeKeys) => {
 			const text = fs.readFileSync(file, 'utf8');
 			const next = stripRegions(text, marker, remove);
 			if (next !== text) {
-				fs.writeFileSync(file, next);
+				ops.writeFile(file, next);
 				cleaned++;
 			}
 		});
@@ -166,9 +168,9 @@ const applyExamples = (config, root, ui, removeKeys) => {
 			(group.remove || []).forEach((glob) => {
 				expandGlob(root, glob).forEach((target) => {
 					// expandGlob only ever returns paths under root, but re-assert
-					// before an irreversible recursive delete.
+					// before a recursive delete.
 					resolveWithin(root, path.relative(root, target));
-					fs.rmSync(target, { recursive: true, force: true });
+					ops.removePath(target);
 					deleted++;
 				});
 			});

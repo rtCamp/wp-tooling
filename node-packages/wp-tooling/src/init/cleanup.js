@@ -1,7 +1,7 @@
 /**
- * Remove scaffolding-only files/directories after a successful setup, and apply
- * the first-setup file moves (`cleanup.replace`) and JSON key removals
- * (`cleanup.unset`) a starter declares.
+ * First-setup cleanup a starter declares: file moves (`cleanup.replace`), JSON
+ * key removals (`cleanup.unset`) and deletion of starter-only paths
+ * (`cleanup.targets`). Setup passes its journal so a failure can be undone.
  */
 
 'use strict';
@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { resolveWithin, validateRelativePath } = require('./transform');
 const { detectIndent } = require('./features');
+const { directOps } = require('./journal');
 
 /**
  * Validate every cleanup target before deletion starts.
@@ -40,16 +41,17 @@ const resolveCleanupTargets = (root, targets = []) => {
  * @param {string}   root    Project root.
  * @param {string[]} targets Relative paths to remove.
  * @param {Object}   ui      Status output.
+ * @param {Object}   [ops]   File operations; setup passes its journal.
  * @return {number} Number of targets removed.
  */
-const runCleanup = (root, targets, ui) => {
+const runCleanup = (root, targets, ui, ops = directOps) => {
 	const resolved = resolveCleanupTargets(root, targets);
 	let removed = 0;
 	for (const { target, full } of resolved) {
 		if (!fs.existsSync(full)) {
 			continue;
 		}
-		fs.rmSync(full, { recursive: true, force: true });
+		ops.removePath(full);
 		ui.info(`removed ${target}`);
 		removed++;
 	}
@@ -373,11 +375,11 @@ const readEdit = (edit, ui) => {
  *
  * @param {Object} move Checked move.
  * @param {Object} ui   Status output.
+ * @param {Object} ops  File operations.
  * @return {void}
  */
-const applyMove = (move, ui) => {
-	fs.mkdirSync(path.dirname(move.toFull), { recursive: true });
-	fs.renameSync(move.fromFull, move.toFull);
+const applyMove = (move, ui, ops) => {
+	ops.moveFile(move.fromFull, move.toFull);
 	ui.info(`replaced ${move.to} with ${move.from}`);
 };
 
@@ -388,9 +390,10 @@ const applyMove = (move, ui) => {
  *
  * @param {Object} edit Parsed edit.
  * @param {Object} ui   Status output.
+ * @param {Object} ops  File operations.
  * @return {number} Number of keys removed.
  */
-const applyEdit = (edit, ui) => {
+const applyEdit = (edit, ui, ops) => {
 	const present = edit.keys.filter((key) => Object.hasOwn(edit.data, key));
 	if (!present.length) {
 		return 0;
@@ -404,37 +407,39 @@ const applyEdit = (edit, ui) => {
 		? detectIndent(edit.raw)
 		: null;
 	const body = JSON.stringify(kept, null, indent).replace(/\n/g, lineEnding);
-	fs.writeFileSync(edit.full, `${body}${eol}`);
+	ops.writeFile(edit.full, `${body}${eol}`);
 	ui.info(`removed ${present.join(', ')} from ${edit.file}`);
 	return present.length;
 };
 
 /**
- * Apply the first-setup `cleanup.replace` moves and `cleanup.unset` key
- * removals. Every source is checked and every JSON file parsed before the
- * first cleanup write, so pre-flight errors stop cleanup before anything moves.
- * Earlier setup steps may already have changed files. Missing sources and files
- * are warned about and skipped. Application has no rollback or resume support;
- * filesystem errors can leave partial cleanup changes.
+ * Run the whole first-setup cleanup: the `cleanup.replace` moves, then the
+ * `cleanup.unset` key removals, then deletion of the `cleanup.targets`. Every
+ * entry is validated, every source checked and every JSON file parsed before
+ * the first cleanup write, so pre-flight errors stop cleanup before anything
+ * moves. Missing sources and files are warned about and skipped. Pass the setup
+ * journal as `ops` so a later failure can undo all of it.
  *
  * @param {string} root      Project root.
  * @param {Object} [cleanup] The scaffold config's `cleanup` block.
  * @param {Object} ui        Status output.
- * @return {{ replaced: number, unset: number }} Files moved and keys removed.
+ * @param {Object} [ops]     File operations; setup passes its journal.
+ * @return {{ replaced: number, unset: number, removed: number }} Files moved, keys removed and targets deleted.
  */
-const runSetupCleanup = (root, cleanup, ui) => {
+const runSetupCleanup = (root, cleanup, ui, ops = directOps) => {
 	const { moves, edits } = resolveSetupCleanup(root, cleanup);
 	const pendingMoves = moves.filter((move) => checkMove(move, ui));
 	const pendingEdits = edits
 		.map((edit) => readEdit(edit, ui))
 		.filter(Boolean);
 
-	pendingMoves.forEach((move) => applyMove(move, ui));
+	pendingMoves.forEach((move) => applyMove(move, ui, ops));
 	const unset = pendingEdits.reduce(
-		(count, edit) => count + applyEdit(edit, ui),
+		(count, edit) => count + applyEdit(edit, ui, ops),
 		0
 	);
-	return { replaced: pendingMoves.length, unset };
+	const removed = runCleanup(root, cleanup?.targets, ui, ops);
+	return { replaced: pendingMoves.length, unset, removed };
 };
 
 module.exports = {

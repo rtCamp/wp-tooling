@@ -77,4 +77,14 @@ const snapshot = (root) =>
 			])
 	);
 
-module.exports = { makeRoot, touch, capture, snapshot };
+/**
+ * List every path under a fixture, folders included, so a rollback test can
+ * prove created folders and the journal's trash are gone (`snapshot` only
+ * sees files).
+ *
+ * @param {string} root Fixture root.
+ * @return {string[]} Sorted relative paths.
+ */
+const tree = (root) => fs.readdirSync(root, { recursive: true }).sort();
+
+module.exports = { makeRoot, touch, capture, snapshot, tree };

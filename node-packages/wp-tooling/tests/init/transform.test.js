@@ -12,6 +12,7 @@ const {
 	withFileRollback,
 	resolveWithin,
 	applyVersion,
+	collectFiles,
 } = require('../../src/init/transform');
 const { makeRoot, touch } = require('./_helpers');
 const { renameFiles, replaceInFiles } = require('../../src/init/transform');
@@ -120,7 +121,7 @@ describe('filesystem transforms', () => {
 		jest.restoreAllMocks();
 	});
 
-	test('rollback continues after an undo failure and reports both errors', () => {
+	test('rollback stops at an undo failure and reports both errors', () => {
 		const restored = path.join(root, 'restored.txt');
 		const failing = path.join(root, 'failing.txt');
 		const created = path.join(root, 'created.txt');
@@ -153,8 +154,15 @@ describe('filesystem transforms', () => {
 		expect(caught.message).toContain(
 			'edit failed; rollback failed: undo failed'
 		);
-		expect(fs.readFileSync(restored, 'utf8')).toBe('original');
+		// Newer than the failure: undone. Older: left changed, not guessed at.
 		expect(fs.existsSync(created)).toBe(false);
+		expect(fs.readFileSync(restored, 'utf8')).toBe('changed');
+	});
+
+	test('collectFiles skips a setup trash folder', () => {
+		touch(root, 'kept.php', 'project');
+		touch(root, '.wp-init-trash-abc123/0/SECURITY.md', 'removed');
+		expect(collectFiles(root)).toEqual([path.join(root, 'kept.php')]);
 	});
 
 	test('rename collision never overwrites an existing destination', () => {

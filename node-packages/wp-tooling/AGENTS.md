@@ -28,7 +28,7 @@ src/
   hooks/            index.js, install.js, templates/ — git hook installer + shell templates
                     (commit-msg, pre-commit)
   init/             cleanup.js, examples.js, features.js, git.js, identity.js, index.js,
-                    manage.js, persist.js, transform.js — shared init engine for consumer
+                    journal.js, manage.js, persist.js, transform.js — shared init engine for consumer
                     WP plugin/theme starters
   release/          bump.js, changelog.js, context.js, index.js, zip.js — version
                     bump/changelog/zip for CONSUMER WordPress plugins/themes only

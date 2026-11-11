@@ -16,6 +16,7 @@ const {
 	disableFeature,
 	detectFeature,
 	toggleFeatures,
+	retainJournal,
 } = require('../../src/init/features');
 const { makeFeatureApi: makeFeatureApiFromIndex } = require('../../src/init');
 const { makeRoot, touch } = require('./_helpers');
@@ -813,6 +814,154 @@ describe('feature transitions', () => {
 			JSON.parse(fs.readFileSync(path.join(root, 'package.json')))
 				.devDependencies.shared
 		).toBe('1');
+	});
+
+	test('returns the undo failures of a feature that failed', async () => {
+		touch(root, 'file.txt', 'before');
+		const write = fs.writeFileSync;
+		jest.spyOn(fs, 'writeFileSync').mockImplementation(
+			(file, body, ...options) => {
+				if (String(body) === 'before') {
+					throw new Error('undo failed');
+				}
+				return write(file, body, ...options);
+			}
+		);
+		const config = {
+			features: [
+				{
+					key: 'bad',
+					label: 'Bad',
+					detect: () => false,
+					onEnable(api) {
+						api.write('file.txt', 'after');
+						throw new Error('hook failed');
+					},
+				},
+			],
+		};
+		const result = await toggleFeatures(config, root, {
+			mode: 'scaffold',
+			api: makeFeatureApi(root, IDENTITY, fakeUi()),
+			ui: fakeUi(),
+			wantOn: new Set(['bad']),
+			flags: { yes: true },
+		});
+		expect(result.failed).toEqual(['bad']);
+		expect(result.rollbackErrors.map((error) => error.message)).toEqual([
+			'undo failed',
+		]);
+	});
+
+	test('a later exception still carries earlier undo failures, merged with its own', async () => {
+		touch(root, 'file.txt', 'before');
+		const write = fs.writeFileSync;
+		jest.spyOn(fs, 'writeFileSync').mockImplementation(
+			(file, body, ...options) => {
+				if (String(body) === 'before') {
+					throw new Error('undo failed');
+				}
+				return write(file, body, ...options);
+			}
+		);
+		const remove = fs.rmSync;
+		jest.spyOn(fs, 'rmSync').mockImplementation((target, ...options) => {
+			if (target === path.join(root, 'good.txt')) {
+				throw new Error('good undo failed');
+			}
+			return remove(target, ...options);
+		});
+		let probes = 0;
+		const config = {
+			features: [
+				{
+					key: 'good',
+					label: 'Good',
+					detect: () => false,
+					onEnable: (api) => api.write('good.txt', 'on'),
+				},
+				{
+					key: 'bad',
+					label: 'Bad',
+					detect: () => false,
+					onEnable(api) {
+						api.write('file.txt', 'after');
+						throw new Error('hook failed');
+					},
+				},
+				{
+					key: 'probe',
+					label: 'Probe',
+					// Reconcile probes once; the final detect pass throws.
+					detect: () => {
+						probes += 1;
+						if (probes > 1) {
+							throw new Error('detect failed');
+						}
+						return false;
+					},
+				},
+			],
+		};
+		const failure = await toggleFeatures(config, root, {
+			mode: 'scaffold',
+			api: makeFeatureApi(root, IDENTITY, fakeUi()),
+			ui: fakeUi(),
+			wantOn: new Set(['good', 'bad']),
+			flags: { yes: true },
+		}).catch((error) => error);
+		expect(failure.message).toMatch(/^detect failed; rollback failed/);
+		expect(failure.rollbackErrors.map((error) => error.message)).toEqual([
+			'undo failed',
+			'good undo failed',
+		]);
+	});
+
+	test('retainJournal keeps a successful feature undoable until its undo runs', async () => {
+		const api = makeFeatureApi(root, IDENTITY, fakeUi());
+		const undo = retainJournal(api);
+		const config = {
+			features: [
+				{
+					key: 'good',
+					label: 'Good',
+					detect: (featureApi) => featureApi.exists('good.txt'),
+					onEnable: (featureApi) =>
+						featureApi.write('good.txt', 'on'),
+				},
+			],
+		};
+		const result = await toggleFeatures(config, root, {
+			mode: 'scaffold',
+			api,
+			ui: fakeUi(),
+			wantOn: new Set(['good']),
+			flags: { yes: true },
+		});
+		expect(result.failed).toEqual([]);
+		expect(api.exists('good.txt')).toBe(true);
+		undo();
+		expect(api.exists('good.txt')).toBe(false);
+		expect(api._journal).toHaveLength(0);
+	});
+
+	test('retainJournal reports every undo that failed', () => {
+		const api = makeFeatureApi(root, IDENTITY, fakeUi());
+		const undo = retainJournal(api);
+		api._journal.push(
+			{
+				undo: () => {
+					throw new Error('first');
+				},
+			},
+			{
+				undo: () => {
+					throw new Error('second');
+				},
+			}
+		);
+		expect(undo).toThrow('feature rollback failed: second; first');
+		expect(api._journal).toHaveLength(0);
 	});
 });
 

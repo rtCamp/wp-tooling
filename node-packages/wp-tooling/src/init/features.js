@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { writeFeatures } = require('./persist');
 const { resolveWithin, validateRelativePath } = require('./transform');
+const { firstMissingAncestor } = require('./journal');
 
 /**
  * Whether a manifest value is a plain object rather than an array or scalar.
@@ -172,25 +173,6 @@ const validateFeatures = (config) => {
 const detectIndent = (raw) => {
 	const match = raw.match(/\n([ \t]+)\S/);
 	return match ? match[1] : '\t';
-};
-
-/**
- * Find the directory `fs.mkdirSync(dir, { recursive: true })` would actually
- * create. Its recursive option can create several levels in one call, so
- * removing just this one directory on rollback undoes exactly that.
- *
- * @param {string} dir - Directory that is about to be mkdir'd.
- * @return {string|null} Topmost missing ancestor, or null if `dir` exists.
- */
-const firstMissingAncestor = (dir) => {
-	if (fs.existsSync(dir)) {
-		return null;
-	}
-	let cur = dir;
-	while (!fs.existsSync(path.dirname(cur))) {
-		cur = path.dirname(cur);
-	}
-	return cur;
 };
 
 /**
@@ -446,9 +428,25 @@ const makeFeatureApi = (root, identity, ui) => {
 };
 
 /**
+ * Attach undo failures to an error, keeping any it already carries, so a later
+ * exception never hides an earlier failed rollback.
+ *
+ * @param {Error}   err    - Error being thrown.
+ * @param {Error[]} errors - Undo failures to carry with it.
+ * @return {Error} The same error, with `rollbackErrors` when there are any.
+ */
+const withRollbackErrors = (err, errors) => {
+	if (errors.length && err && 'object' === typeof err) {
+		err.rollbackErrors = [...(err.rollbackErrors || []), ...errors];
+	}
+	return err;
+};
+
+/**
  * Run `fn` inside the api journal; on throw, replay undo entries in reverse to
  * restore exactly what `fn` mutated, then rethrow. Nested successes retain their
- * undo entries until the outer transaction commits.
+ * undo entries until the outer transaction commits. Undo failures travel on the
+ * thrown error as `rollbackErrors`, together with any the error already had.
  *
  * @param {Object}   api - FeatureApi.
  * @param {Function} fn  - Synchronous or asynchronous mutation function.
@@ -480,15 +478,50 @@ const runJournaled = async (api, fn) => {
 			api._notes.length = notesStart;
 		}
 		if (rollbackErrors.length) {
-			throw new AggregateError(
+			const aggregate = new AggregateError(
 				[err, ...rollbackErrors],
 				`${err.message}; rollback failed: ${rollbackErrors.map((error) => error.message).join('; ')}`
 			);
+			aggregate.rollbackErrors = [
+				...(err.rollbackErrors || []),
+				...rollbackErrors,
+			];
+			throw aggregate;
 		}
 		throw err;
 	} finally {
 		api._transactionDepth = depth;
 	}
+};
+
+/**
+ * Keep a FeatureApi's undo entries after its transactions succeed, so a larger
+ * transaction (first setup) can undo the features it enabled. Every entry the
+ * api records is synchronous.
+ *
+ * @param {Object} api - FeatureApi.
+ * @return {Function} Undo that replays the kept entries newest first, and throws
+ *                    an AggregateError of every entry that failed.
+ */
+const retainJournal = (api) => {
+	api._transactionDepth = (api._transactionDepth || 0) + 1;
+	return () => {
+		const errors = [];
+		for (let i = api._journal.length - 1; i >= 0; i--) {
+			try {
+				api._journal[i].undo();
+			} catch (error) {
+				errors.push(error);
+			}
+		}
+		api._journal.length = 0;
+		if (errors.length) {
+			throw new AggregateError(
+				errors,
+				`feature rollback failed: ${errors.map((error) => error.message).join('; ')}`
+			);
+		}
+	};
 };
 
 /**
@@ -784,7 +817,7 @@ const touchesPackage = (feature) => {
  * @param {Object} config - Per-project scaffold config.
  * @param {string} root   - Project root.
  * @param {Object} opts   - { mode, wantOn?, flags, api, ui, rows?, unknown? }.
- * @return {Promise<{changed: boolean, failed: string[], finalMap: Object}>} Whether anything changed, the keys that failed, and the post-apply detected map.
+ * @return {Promise<{changed: boolean, failed: string[], finalMap: Object, rollbackErrors: Error[]}>} Whether anything changed, the keys that failed, the post-apply detected map, and the undo failures of failed features.
  */
 const toggleFeatures = async (config, root, opts) => {
 	const { mode, api, ui } = opts;
@@ -803,7 +836,7 @@ const toggleFeatures = async (config, root, opts) => {
 
 	// Persist only when at least one transition succeeded. Failed, cancelled,
 	// and no-op requests must not rewrite identity just to reconcile drift.
-	const finalize = (changed, failed) => {
+	const finalize = (changed, failed, rollbackErrors = []) => {
 		const finalMap = detectMap(config, api);
 		if ('manage' === mode && changed) {
 			writeFeatures(root, finalMap, ui, (file, body) =>
@@ -816,7 +849,7 @@ const toggleFeatures = async (config, root, opts) => {
 				`Some features failed: ${failed.join(', ')}. Re-run init to retry.`
 			);
 		}
-		return { changed, failed: failed || [], finalMap };
+		return { changed, failed: failed || [], finalMap, rollbackErrors };
 	};
 
 	// Surface drift + retired features.
@@ -903,6 +936,8 @@ const toggleFeatures = async (config, root, opts) => {
 			rows.filter((row) => row.on).map((row) => row.key)
 		);
 		const failed = [];
+		// A failed feature whose own undo also failed; reported to the caller.
+		const rollbackErrors = [];
 		let depsChanged = false;
 		let changed = false;
 
@@ -926,6 +961,7 @@ const toggleFeatures = async (config, root, opts) => {
 				spin.fail(`Failed to disable ${r.label}`);
 				ui.error(err.message);
 				failed.push(r.key);
+				rollbackErrors.push(...(err.rollbackErrors || []));
 			}
 			if (failed.length) {
 				break;
@@ -946,24 +982,30 @@ const toggleFeatures = async (config, root, opts) => {
 				spin.fail(`Failed to enable ${r.label}`);
 				ui.error(err.message);
 				failed.push(r.key);
+				rollbackErrors.push(...(err.rollbackErrors || []));
 			}
 		}
 
-		const result = finalize(changed, failed);
-		if (depsChanged) {
-			ui.warn('Dependencies changed -- run `npm install` to sync.');
-		}
-		// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
-		const notes = api._notes || [];
-		if (notes.length) {
-			ui.heading('Next steps');
-			notes.splice(0).forEach((message) => ui.info(message));
-		}
-		if (!failed.length) {
-			ui.success('Features updated.');
-		}
+		try {
+			const result = finalize(changed, failed, rollbackErrors);
+			if (depsChanged) {
+				ui.warn('Dependencies changed -- run `npm install` to sync.');
+			}
+			// Drained, so a manage-mode loop that toggles twice doesn't reprint them.
+			const notes = api._notes || [];
+			if (notes.length) {
+				ui.heading('Next steps');
+				notes.splice(0).forEach((message) => ui.info(message));
+			}
+			if (!failed.length) {
+				ui.success('Features updated.');
+			}
 
-		return result;
+			return result;
+		} catch (err) {
+			// Carry the earlier undo failures through to the caller.
+			throw withRollbackErrors(err, rollbackErrors);
+		}
 	});
 };
 
@@ -980,4 +1022,5 @@ module.exports = {
 	detectMap,
 	safeDetectMap,
 	toggleFeatures,
+	retainJournal,
 };
