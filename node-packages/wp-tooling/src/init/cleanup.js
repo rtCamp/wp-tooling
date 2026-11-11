@@ -413,17 +413,18 @@ const applyEdit = (edit, ui, ops) => {
 };
 
 /**
- * Apply the first-setup `cleanup.replace` moves and `cleanup.unset` key
- * removals. Every source is checked and every JSON file parsed before the
- * first cleanup write, so pre-flight errors stop cleanup before anything moves.
- * Missing sources and files are warned about and skipped. Pass the setup
- * journal as `ops` so a later failure can undo the moves and edits.
+ * Run the whole first-setup cleanup: the `cleanup.replace` moves, then the
+ * `cleanup.unset` key removals, then deletion of the `cleanup.targets`. Every
+ * entry is validated, every source checked and every JSON file parsed before
+ * the first cleanup write, so pre-flight errors stop cleanup before anything
+ * moves. Missing sources and files are warned about and skipped. Pass the setup
+ * journal as `ops` so a later failure can undo all of it.
  *
  * @param {string} root      Project root.
  * @param {Object} [cleanup] The scaffold config's `cleanup` block.
  * @param {Object} ui        Status output.
  * @param {Object} [ops]     File operations; setup passes its journal.
- * @return {{ replaced: number, unset: number }} Files moved and keys removed.
+ * @return {{ replaced: number, unset: number, removed: number }} Files moved, keys removed and targets deleted.
  */
 const runSetupCleanup = (root, cleanup, ui, ops = directOps) => {
 	const { moves, edits } = resolveSetupCleanup(root, cleanup);
@@ -437,7 +438,8 @@ const runSetupCleanup = (root, cleanup, ui, ops = directOps) => {
 		(count, edit) => count + applyEdit(edit, ui, ops),
 		0
 	);
-	return { replaced: pendingMoves.length, unset };
+	const removed = runCleanup(root, cleanup?.targets, ui, ops);
+	return { replaced: pendingMoves.length, unset, removed };
 };
 
 module.exports = {

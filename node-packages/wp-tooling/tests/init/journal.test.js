@@ -150,27 +150,49 @@ describe('createJournal', () => {
 		expect(trash).toBeNull();
 	});
 
-	test('rollback keeps going past a failing entry and keeps the trash', () => {
+	test('rollback stops at the first failed undo and keeps the trash', () => {
 		touch(root, 'a.md', 'a');
 		touch(root, 'b.md', 'b');
 		const journal = createJournal(root);
+		const older = jest.fn();
+		journal.record(older);
 		journal.removePath(at('a.md'));
 		journal.record(() => {
-			throw new Error('first undo failed');
+			throw new Error('undo failed');
 		});
 		journal.removePath(at('b.md'));
-		journal.record(() => {
-			throw new Error('second undo failed');
-		});
+		const { errors, trash } = journal.rollback();
+		expect(errors.map((error) => error.message)).toEqual(['undo failed']);
+		// Newer than the failure: undone. Older: left as it is.
+		expect(read('b.md')).toBe('b');
+		expect(fs.existsSync(at('a.md'))).toBe(false);
+		expect(older).not.toHaveBeenCalled();
+		// The removed file stays in the kept trash.
+		const [kept] = fs.readdirSync(trash);
+		expect(fs.readFileSync(path.join(trash, kept), 'utf8')).toBe('a');
+		// Nothing is left to replay.
+		expect(journal.rollback().errors).toEqual([]);
+		expect(older).not.toHaveBeenCalled();
+	});
+
+	test('an older write does not overwrite a moved file that could not go back', () => {
+		touch(root, 'README.md', 'starter readme');
+		touch(root, 'docs/README.plugin.md', 'plugin readme');
+		const journal = createJournal(root);
+		// Identity edits README.md, then cleanup moves the plugin README over it.
+		journal.writeFile(at('README.md'), 'identity readme');
+		journal.moveFile(at('docs/README.plugin.md'), at('README.md'));
+		failRenameFrom(at('README.md'));
 		const { errors, trash } = journal.rollback();
 		expect(errors.map((error) => error.message)).toEqual([
-			'second undo failed',
-			'first undo failed',
+			'rename back failed',
 		]);
-		expect(read('a.md')).toBe('a');
-		expect(read('b.md')).toBe('b');
-		expect(trash).not.toBeNull();
-		expect(fs.existsSync(trash)).toBe(true);
+		// The moved file's only copy survives, and so does the edited original.
+		expect(read('README.md')).toBe('plugin readme');
+		const [backup] = fs.readdirSync(trash);
+		expect(fs.readFileSync(path.join(trash, backup), 'utf8')).toBe(
+			'identity readme'
+		);
 	});
 
 	test('commit keeps the changes and deletes the trash folder itself', () => {

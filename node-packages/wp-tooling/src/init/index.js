@@ -42,7 +42,7 @@ const {
 	executeRenames,
 	applyVersion,
 } = require('./transform');
-const { createJournal } = require('./journal');
+const { createJournal, isTrash } = require('./journal');
 const {
 	writeIdentityFile,
 	readIdentityFile,
@@ -50,7 +50,7 @@ const {
 	IDENTITY_FILE,
 } = require('./persist');
 const { initRepo, commitAll, installGitHooks } = require('./git');
-const { runCleanup, runSetupCleanup } = require('./cleanup');
+const { runSetupCleanup } = require('./cleanup');
 const {
 	validateFeatures,
 	makeFeatureApi,
@@ -467,7 +467,6 @@ const setupSteps = (config, root, flags) => {
 			skip: (c) => c.cancelled || !steps.cleanup || Boolean(existing),
 			async run(c) {
 				runSetupCleanup(root, config.cleanup, ui, c.journal);
-				runCleanup(root, config.cleanup?.targets, ui, c.journal);
 			},
 		},
 		{
@@ -506,8 +505,9 @@ const setupSteps = (config, root, flags) => {
 				const leftover = c.journal.commit();
 				c.projectSetupComplete = true;
 				if (leftover) {
+					c.leftoverTrash = path.relative(root, leftover);
 					ui.warn(
-						`Could not remove ${path.relative(root, leftover)}; delete it before committing.`
+						`Could not remove ${c.leftoverTrash}, which holds the files setup removed or replaced. Delete it before you commit.`
 					);
 				}
 			},
@@ -550,7 +550,13 @@ const setupSteps = (config, root, flags) => {
 		{
 			name: 'Commit',
 			skip: (c) => c.cancelled || !c.gitReady,
-			async run() {
+			async run(c) {
+				if (c.leftoverTrash) {
+					ui.warn(
+						`Skipped the initial commit because ${c.leftoverTrash} is still there. Delete it, then commit.`
+					);
+					return;
+				}
 				commitAll(
 					root,
 					`Initialize project using ${config.repoUrl || GENERATED_BY}`,
@@ -571,13 +577,15 @@ const setupSteps = (config, root, flags) => {
  * @return {Error} The error to rethrow: an AggregateError when some changes could not be undone.
  */
 const undoSetup = (ctx, error, root) => {
+	// A failed feature's own undo only rewrites files from memory, so the setup
+	// journal can still roll back safely after `rollbackErrors`.
 	const { errors, trash } = ctx.journal.rollback();
 	const failures = [...(error?.rollbackErrors || []), ...errors];
 	const trashPath = trash && path.relative(root, trash);
 	if (failures.length) {
 		const detail = failures.map((failure) => failure.message).join('; ');
 		ui.warn(
-			`Setup failed and some changes could not be undone (${detail}).${trash ? ` Paths init removed are kept in ${trashPath}.` : ''} Inspect the diff and restore the project from version control before running setup again.`
+			`Setup failed and some changes could not be undone (${detail}).${trash ? ` Files setup removed or replaced are kept in ${trashPath}.` : ''} Inspect the diff and restore the project from version control before running setup again.`
 		);
 		return new AggregateError(
 			[error, ...failures],
@@ -588,7 +596,9 @@ const undoSetup = (ctx, error, root) => {
 		`Setup failed, so init undid the changes it made to the project. Fix the error and run setup again.${ctx.vendorUntracked ? ' Composer may have rewritten vendor/; the next successful setup regenerates it.' : ''}`
 	);
 	if (trash) {
-		ui.warn(`Could not remove ${trashPath}; delete it.`);
+		ui.warn(
+			`Could not remove ${trashPath}; delete it before running setup again.`
+		);
 	}
 	return error;
 };
@@ -603,6 +613,13 @@ const undoSetup = (ctx, error, root) => {
  */
 const setupFlow = async (config, root, flags) => {
 	validatePaths(config, root);
+	// Never delete it here: it may hold the only copy of what a crashed setup removed.
+	const leftover = fs.readdirSync(root).find(isTrash);
+	if (leftover) {
+		throw new Error(
+			`Found ${leftover} from an earlier setup. It holds files that setup removed or replaced; if that setup did not finish, restore the project from version control first. Delete ${leftover}, then run setup again.`
+		);
+	}
 	const kind = config.kind || 'project';
 	ui.heading(`${cap(kind)} setup`);
 

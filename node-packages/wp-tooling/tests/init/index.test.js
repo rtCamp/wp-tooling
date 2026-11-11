@@ -900,6 +900,51 @@ describe('first-setup cleanup moves and key removals', () => {
 		expect(tree(root)).toEqual(paths);
 	});
 
+	test.each([[[]], [['--reinit']]])(
+		'a leftover trash folder stops setup %j before anything changes',
+		async (extra) => {
+			if (extra.length) {
+				await setUp(['--yes', '--name=Acme Blog']);
+			}
+			touch(root, '.wp-init-trash-abc123/0/SECURITY.md', 'removed');
+			const before = snapshot(root);
+			const paths = tree(root);
+			await capture(async () => {
+				await expect(
+					run(cleanupConfig, {
+						root,
+						argv: [...extra, '--yes', '--name=Cedar Blog'],
+					})
+				).rejects.toThrow(
+					/Found \.wp-init-trash-abc123 from an earlier setup/
+				);
+			});
+			expect(snapshot(root)).toEqual(before);
+			expect(tree(root)).toEqual(paths);
+		}
+	);
+
+	test('a trash folder that cannot be removed skips the initial commit', async () => {
+		const remove = fs.rmSync;
+		jest.spyOn(fs, 'rmSync').mockImplementation((target, ...options) => {
+			if (path.basename(String(target)).startsWith('.wp-init-trash-')) {
+				throw new Error('busy');
+			}
+			return remove(target, ...options);
+		});
+		const output = await setUp(['--name=Acme Blog']);
+		const [trash] = fs
+			.readdirSync(root)
+			.filter((name) => name.startsWith('.wp-init-trash-'));
+		expect(process.exitCode).toBeUndefined();
+		expect(exists('.wp-scaffold.json')).toBe(true);
+		expect(git.initRepo).toHaveBeenCalledTimes(1);
+		expect(git.commitAll).not.toHaveBeenCalled();
+		expect(output.stdout + output.stderr).toContain(
+			`Skipped the initial commit because ${trash} is still there`
+		);
+	});
+
 	test('an invalid move is rejected before setup changes anything', async () => {
 		const invalidConfig = {
 			...cleanupConfig,

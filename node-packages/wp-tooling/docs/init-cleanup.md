@@ -36,7 +36,7 @@ A missing source or JSON file produces a warning and is skipped. Identical sourc
 - cleanup moves, JSON key removals and target deletions
 - a `vendor/` folder that `composer dump-autoload` created
 
-Deleted and overwritten paths are kept in a `.wp-init-trash-*` folder in the project root until setup finishes, then that folder is removed. After a failure, setup reports the error and that its changes were undone; there is no `.wp-scaffold.json`, so fixing the problem and running `npm run init` again is a clean first setup. A failed `--reinit` restores the previous `.wp-scaffold.json` and files the same way.
+Deleted and overwritten paths are kept in a `.wp-init-trash-*` folder in the project root until setup finishes, then that folder is removed. If it cannot be removed, setup warns and skips the initial commit so the folder never lands in Git; delete it, then commit. After a failure, setup reports the error and that its changes were undone; there is no `.wp-scaffold.json`, so fixing the problem and running `npm run init` again is a clean first setup. A failed `--reinit` restores the previous `.wp-scaffold.json` and files the same way.
 
 Not undone:
 
@@ -44,9 +44,9 @@ Not undone:
 - **Feature hooks that write files with `fs` directly** instead of the FeatureApi.
 - **The Git steps.** They run after `.wp-scaffold.json` is written; if one fails, finish Git setup by hand rather than running setup again.
 
-If an undo step itself fails, setup says which changes could not be undone and keeps the `.wp-init-trash-*` folder, which holds the deleted and overwritten files, and names it. Restore the project from version control or a copy before running setup again.
+If an undo step itself fails, rollback stops there: the older changes assume it worked, so undoing them could overwrite a file that did not go back. Setup says which change could not be undone, leaves the earlier ones in place, and keeps and names the `.wp-init-trash-*` folder, which holds the deleted and overwritten files. Restore the project from version control or a copy, then delete that folder before running setup again.
 
-Rollback runs inside the init process. A killed process, Ctrl+C or a power loss while files are changing skips it: restore from version control, and look in any leftover `.wp-init-trash-*` folder for deleted files. A target on a different filesystem from the project root (a separate mount) cannot be moved into the trash, so setup fails and is rolled back.
+Rollback runs inside the init process. A killed process, Ctrl+C or a power loss while files are changing skips it: restore from version control, and look in any leftover `.wp-init-trash-*` folder for deleted files. Setup refuses to start while a `.wp-init-trash-*` folder exists in the project root, so it never rewrites or commits one; take what you need from it and delete it first. Manage mode leaves the folder alone. A target on a different filesystem from the project root (a separate mount) cannot be moved into the trash, so setup fails and is rolled back.
 
 ## Projects set up with an earlier version
 

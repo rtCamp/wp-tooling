@@ -72,7 +72,7 @@ describe('runSetupCleanup', () => {
 					{ replace: [{ from: 'README.md', to }] },
 					ui
 				)
-			).toEqual({ replaced: 0, unset: 0 });
+			).toEqual({ replaced: 0, unset: 0, removed: 0 });
 			expect(snapshot(root)).toEqual(before);
 			expect(ui.info).toHaveBeenCalledWith(
 				`skipped ${to}: source and destination are the same path`
@@ -92,7 +92,7 @@ describe('runSetupCleanup', () => {
 				},
 				ui
 			)
-		).toEqual({ replaced: 0, unset: 1 });
+		).toEqual({ replaced: 0, unset: 1, removed: 0 });
 		expect(read('package.json')).toBe('{"name":"starter"}');
 	});
 
@@ -110,7 +110,7 @@ describe('runSetupCleanup', () => {
 			},
 			ui
 		);
-		expect(result).toEqual({ replaced: 2, unset: 0 });
+		expect(result).toEqual({ replaced: 2, unset: 0, removed: 0 });
 		expect(read('README.md')).toBe('plugin readme');
 		expect(read('guides/index.md')).toBe('plugin index');
 		expect(exists('README.plugin.md')).toBe(false);
@@ -127,7 +127,7 @@ describe('runSetupCleanup', () => {
 			},
 			ui
 		);
-		expect(result).toEqual({ replaced: 0, unset: 0 });
+		expect(result).toEqual({ replaced: 0, unset: 0, removed: 0 });
 		expect(read('README.md')).toBe('starter readme');
 		expect(ui.warn).toHaveBeenCalledWith(
 			'skipped README.md: README.plugin.md not found'
@@ -174,7 +174,7 @@ describe('runSetupCleanup', () => {
 				},
 				ui
 			);
-			expect(result).toEqual({ replaced: 0, unset: 3 });
+			expect(result).toEqual({ replaced: 0, unset: 3, removed: 0 });
 			expect(read('package.json')).toBe(
 				JSON.stringify(
 					{ name: 'starter', license: 'GPL-2.0-or-later' },
@@ -244,8 +244,7 @@ describe('runSetupCleanup', () => {
 			return rename(from, to);
 		});
 		const journal = createJournal(root);
-		runSetupCleanup(root, cleanup, ui, journal);
-		expect(() => runCleanup(root, cleanup.targets, ui, journal)).toThrow(
+		expect(() => runSetupCleanup(root, cleanup, ui, journal)).toThrow(
 			'target removal failed'
 		);
 		// The moves, the key removal and two deletions all happened first.
@@ -259,6 +258,24 @@ describe('runSetupCleanup', () => {
 		expect(tree(root)).toEqual(paths);
 	});
 
+	test('deletes the targets last, so a source can live in one', () => {
+		touch(root, 'starter/README.md', 'project readme');
+		touch(root, 'README.md', 'starter readme');
+		touch(root, 'SECURITY.md', 'starter policy');
+		expect(
+			runSetupCleanup(
+				root,
+				{
+					targets: ['starter', 'SECURITY.md', 'missing'],
+					replace: [{ from: 'starter/README.md', to: 'README.md' }],
+				},
+				ui
+			)
+		).toEqual({ replaced: 1, unset: 0, removed: 2 });
+		expect(tree(root)).toEqual(['README.md']);
+		expect(read('README.md')).toBe('project readme');
+	});
+
 	test('leaves a JSON file untouched when none of its keys are present', () => {
 		const raw = '{\n    "name": "starter"\n}';
 		touch(root, 'package.json', raw);
@@ -268,7 +285,7 @@ describe('runSetupCleanup', () => {
 				{ unset: [{ file: 'package.json', keys: ['homepage'] }] },
 				ui
 			)
-		).toEqual({ replaced: 0, unset: 0 });
+		).toEqual({ replaced: 0, unset: 0, removed: 0 });
 		expect(read('package.json')).toBe(raw);
 	});
 

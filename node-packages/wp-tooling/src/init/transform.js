@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
-const { createJournal } = require('./journal');
+const { createJournal, isTrash } = require('./journal');
 
 /**
  * Require a nonempty relative path without parent traversal.
@@ -208,7 +208,8 @@ const PHP_RESERVED_WORDS = [
 ];
 
 /**
- * Recursively collect every file under `dir`, skipping ignored names.
+ * Recursively collect every file under `dir`, skipping ignored names and any
+ * setup trash folder (it holds files a setup removed, not project content).
  *
  * @param {string}   dir      - Directory to walk.
  * @param {string[]} [ignore] - Directory / file names to skip.
@@ -219,7 +220,7 @@ const collectFiles = (dir, ignore = DEFAULT_IGNORE) => {
 
 	let files = [];
 	entries.forEach((entry) => {
-		if (ignore.includes(entry.name)) {
+		if (ignore.includes(entry.name) || isTrash(entry.name)) {
 			return;
 		}
 		const full = path.join(dir, entry.name);

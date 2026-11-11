@@ -16,6 +16,14 @@ const path = require('path');
 const TRASH_PREFIX = '.wp-init-trash-';
 
 /**
+ * Whether a file name is a setup trash folder.
+ *
+ * @param {string} name Base name.
+ * @return {boolean} Whether it starts with the trash prefix.
+ */
+const isTrash = (name) => name.startsWith(TRASH_PREFIX);
+
+/**
  * Find the directory `fs.mkdirSync(dir, { recursive: true })` would actually
  * create. Its recursive option can create several levels in one call, so
  * removing just this one directory on rollback undoes exactly that.
@@ -89,8 +97,9 @@ const directOps = {
  *
  * Each operation records one undo entry before it changes anything and tracks
  * which of its steps finished, so its undo only reverses what happened. A step
- * that depends on an earlier one is skipped when that one cannot be undone, so
- * a failed undo never destroys the data that survived.
+ * that depends on an earlier one is skipped when that one cannot be undone, and
+ * rollback stops at the first entry that fails, so a failed undo never destroys
+ * the data that survived.
  *
  * @param {string} [root] Project root; required to remove or move paths.
  * @return {Object} The journal.
@@ -213,15 +222,17 @@ const createJournal = (root) => {
 		},
 
 		/**
-		 * Undo every recorded change, newest first, continuing past failures.
-		 * The trash is removed only when everything was restored; otherwise it
-		 * keeps the paths that could not go back.
+		 * Undo the recorded changes, newest first, and stop at the first undo
+		 * that fails. Older changes assume the newer ones were undone, so
+		 * running them could overwrite or delete the only copy of a file that
+		 * did not go back. The trash is removed only when everything was
+		 * restored; otherwise it keeps what setup removed.
 		 *
-		 * @return {{ errors: Error[], trash: string|null }} Undo failures, and the trash folder when it is still on disk.
+		 * @return {{ errors: Error[], trash: string|null }} The undo failure, if any, and the trash folder when it is still on disk.
 		 */
 		rollback() {
 			const errors = [];
-			while (entries.length) {
+			while (entries.length && !errors.length) {
 				const undo = entries.pop();
 				try {
 					undo();
@@ -229,6 +240,7 @@ const createJournal = (root) => {
 					errors.push(error);
 				}
 			}
+			entries.length = 0;
 			const dir = trash;
 			trash = null;
 			if (dir && !errors.length) {
@@ -270,4 +282,5 @@ module.exports = {
 	createJournal,
 	directOps,
 	firstMissingAncestor,
+	isTrash,
 };
