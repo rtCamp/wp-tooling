@@ -5,17 +5,25 @@
  * node_modules/@rtcamp/eslint-config. To override a rule for this
  * project, add it after the spread below.
  *
- * Test files get Jest rules, matching the setup/jest scaffold and
- * `wp-scripts test-unit-jest`. Projects that test with Vitest
- * (`wp-scripts test-unit-js`) swap the require below for the
- * commented one; eslint-plugin-jest is then no longer needed.
+ * Test files get Jest rules when Jest is installed (the setup/jest
+ * scaffold, `wp-scripts test-unit-jest`) and Vitest rules otherwise
+ * (`wp-scripts test-unit-js`). To pin one runner, keep only its
+ * require below.
  */
 'use strict';
 
-// Jest projects:
-const rtcampConfig = require('@rtcamp/eslint-config/jest');
-// Vitest projects:
-// const rtcampConfig = require('@rtcamp/eslint-config');
+// eslint-plugin-jest reads the installed Jest version and fails to load
+// its rules without one, so look Jest up the same way it does.
+let hasJest = true;
+try {
+	require.resolve('jest/package.json');
+} catch {
+	hasJest = false;
+}
+
+const rtcampConfig = hasJest
+	? require('@rtcamp/eslint-config/jest') // Jest projects.
+	: require('@rtcamp/eslint-config'); // Vitest projects.
 
 module.exports = [
 	...rtcampConfig,

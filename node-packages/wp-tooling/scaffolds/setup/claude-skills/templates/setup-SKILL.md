@@ -327,8 +327,8 @@ Scripts to add to composer.json:
 Scripts to add to package.json:
 
   "scripts": {
-    "lint:js": "eslint src assets",
-    "lint:js:fix": "eslint src assets --fix"
+    "lint:js": "eslint --no-error-on-unmatched-pattern src assets",
+    "lint:js:fix": "eslint --no-error-on-unmatched-pattern src assets --fix"
   }
 
 Skipped: none.

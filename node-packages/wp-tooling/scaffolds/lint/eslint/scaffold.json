@@ -2,7 +2,7 @@
 	"slug": "eslint",
 	"category": "lint",
 	"name": "ESLint setup",
-	"description": "Installs ESLint with rtCamp's shared config (extends `@rtcamp/eslint-config/jest`, Jest test rules) and adds lint:js scripts.",
+	"description": "Installs ESLint with rtCamp's shared config (Jest test rules when Jest is installed, Vitest otherwise) and adds lint:js scripts.",
 	"source": "template",
 	"files": [
 		{
@@ -18,8 +18,8 @@
 	},
 	"scripts": {
 		"npm": {
-			"lint:js": "eslint src assets",
-			"lint:js:fix": "eslint src assets --fix"
+			"lint:js": "eslint --no-error-on-unmatched-pattern src assets",
+			"lint:js:fix": "eslint --no-error-on-unmatched-pattern src assets --fix"
 		}
 	}
 }
