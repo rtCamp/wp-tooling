@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-12
+
 ### Changed
 
 - **Breaking:** unit-test files get Vitest rules by default (`@wordpress/eslint-plugin`'s `test-unit` config) instead of `eslint-plugin-jest`'s. `wp-scripts test-unit-js` runs Vitest since `@wordpress/scripts` 36, and the Jest rules stopped ESLint with "Unable to detect Jest version" in projects without Jest installed. Test files are now matched the way `@wordpress/scripts` matches them: `test/` and `__tests__/` directories plus `*.test.*` and `*.spec.*` in every JS and TS extension, not only `*.test.js`. Projects that still run Jest switch to `@rtcamp/eslint-config/jest`. Without the switch, `no-undef` reports every Jest global (`describe`, `it`, `expect`, `jest`) in their test files, because the Vitest rules declare no test globals.
