@@ -17,7 +17,7 @@ const FIXTURES = path.join(__dirname, 'fixtures');
  * Run `fn` and return whatever it throws (or null). Keeps assertions out of a
  * catch block, which `jest/no-conditional-expect` forbids.
  *
- * @param {Function} fn Function expected to throw.
+ * @param {() => unknown} fn Function expected to throw.
  * @return {Error|null} The thrown error, or null if it did not throw.
  */
 function grab(fn) {
@@ -144,7 +144,7 @@ describe('resolveConfig — field validation', () => {
 	/**
 	 * Write `raw` as the config and resolve it with a --url, returning the error.
 	 *
-	 * @param {*} raw Config value to serialise.
+	 * @param {unknown} raw Config value to serialise.
 	 * @return {Error|null} The thrown error, or null.
 	 */
 	function resolveRaw(raw) {

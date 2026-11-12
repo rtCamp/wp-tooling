@@ -31,10 +31,10 @@ class IdentityFileError extends Error {
 /**
  * Write the identity payload to `<root>/.wp-scaffold.json` (tab-indented).
  *
- * @param {string}   root        - Project root.
- * @param {Object}   payload     - Identity payload to persist.
- * @param {Object}   [ui]        - `@rtcamp/wp-tooling/ui` for an optional log line.
- * @param {Function} [writeFile] Synchronous writer (journaled during identity edits).
+ * @param {string}                                                 root        - Project root.
+ * @param {Object}                                                 payload     - Identity payload to persist.
+ * @param {Object}                                                 [ui]        - `@rtcamp/wp-tooling/ui` for an optional log line.
+ * @param {(file: string, data: string, encoding: string) => void} [writeFile] Synchronous writer (journaled during identity edits).
  * @return {string} Absolute path written.
  */
 const writeIdentityFile = (root, payload, ui, writeFile = fs.writeFileSync) => {
@@ -95,10 +95,10 @@ const readFeatures = (root) => {
  * Update only the `features` field of the persisted identity, preserving every
  * other field and the file's tab indentation.
  *
- * @param {string}   root        - Project root.
- * @param {Object}   featuresMap - Features map to persist.
- * @param {Object}   [ui]        - UI for an optional log line.
- * @param {Function} [writeFile] Journaled synchronous writer.
+ * @param {string}                                                 root        - Project root.
+ * @param {Object}                                                 featuresMap - Features map to persist.
+ * @param {Object}                                                 [ui]        - UI for an optional log line.
+ * @param {(file: string, data: string, encoding: string) => void} [writeFile] Journaled synchronous writer.
  * @return {string} Absolute path written.
  */
 const writeFeatures = (root, featuresMap, ui, writeFile = fs.writeFileSync) => {

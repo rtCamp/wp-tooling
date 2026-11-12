@@ -66,7 +66,7 @@ const MOCK_VERSION = '4.1.1\n';
  *
  * @param {Object}  [o]
  * @param {boolean} [o.available=true] Whether the --version probe succeeds.
- * @param {*}       [o.report=REPORT]  Report returned by the run.
+ * @param {unknown} [o.report=REPORT]  Report returned by the run.
  * @param {boolean} [o.runThrows]      Whether the run throws (violations / failure).
  * @param {string}  [o.runStdout]      stdout attached to a thrown run error.
  * @param {string}  [o.runStderr]      stderr attached to a thrown run error.

@@ -19,7 +19,7 @@ const PKG = require('../../package.json');
  * Create a fresh tmp dir, `git init` it, and return the absolute path.
  * The directory is registered for cleanup in `afterEach`.
  *
- * @param {Function} register Push the created dir onto the cleanup list.
+ * @param {(dir: string) => void} register Push the created dir onto the cleanup list.
  * @return {string} Absolute path to the new repository's working tree.
  */
 function tmpRepo(register) {
@@ -32,7 +32,7 @@ function tmpRepo(register) {
 /**
  * Create a fresh tmp dir without `git init`. Registered for cleanup.
  *
- * @param {Function} register Push the created dir onto the cleanup list.
+ * @param {(dir: string) => void} register Push the created dir onto the cleanup list.
  * @return {string} Absolute path to the empty directory.
  */
 function tmpDir(register) {

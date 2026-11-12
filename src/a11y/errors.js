@@ -41,7 +41,7 @@ const USAGE_ERROR_CODES = [
  * Whether `err` is a RunnerError the CLI should treat as a usage error
  * (exit code 2) rather than a run failure (exit code 1).
  *
- * @param {*} err Value caught from a runner call.
+ * @param {unknown} err Value caught from a runner call.
  * @return {boolean} True for EBINMISSING / ENOURLS / ECONFIGJS / ECONFIGJSON.
  */
 function isUsageError(err) {

@@ -50,7 +50,7 @@ function splitUrl(url) {
  * Parse the shim's stdout, tolerating a leading non-JSON preamble line.
  *
  * @param {string} text Raw stdout.
- * @return {*} Parsed value, or `null` when not parseable.
+ * @return {unknown} Parsed value, or `null` when not parseable.
  */
 function tryParse(text) {
 	if (!text) {

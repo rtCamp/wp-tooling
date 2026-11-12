@@ -21,7 +21,7 @@ const { CancelledError } = require('../errors');
 /**
  * Validate grouped checkboxTree input.
  *
- * @param {*} groups - The received groups value.
+ * @param {unknown} groups - The received groups value.
  * @return {void}
  */
 function validateGroups(groups) {

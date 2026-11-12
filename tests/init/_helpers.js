@@ -34,7 +34,7 @@ const touch = (root, rel, content = '') => {
 /**
  * Run `fn` with process.stdout/stderr captured; always restores the streams.
  *
- * @param {Function} fn - Sync or async workload.
+ * @param {() => unknown} fn - Sync or async workload.
  * @return {Promise<{stdout: string, stderr: string}>} Captured output.
  */
 const capture = async (fn) => {

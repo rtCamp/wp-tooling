@@ -20,7 +20,7 @@ const { resolveWithin, validateRelativePath } = require('./transform');
 /**
  * Whether a manifest value is a plain object rather than an array or scalar.
  *
- * @param {*} value Manifest value.
+ * @param {unknown} value Manifest value.
  * @return {boolean} Whether the value is an object record.
  */
 const isRecord = (value) =>
@@ -450,9 +450,10 @@ const makeFeatureApi = (root, identity, ui) => {
  * restore exactly what `fn` mutated, then rethrow. Nested successes retain their
  * undo entries until the outer transaction commits.
  *
- * @param {Object}   api - FeatureApi.
- * @param {Function} fn  - Synchronous or asynchronous mutation function.
- * @return {Promise<*>} Callback result, or rejection after rollback.
+ * @template T
+ * @param {Object}             api - FeatureApi.
+ * @param {() => T|Promise<T>} fn  - Synchronous or asynchronous mutation function.
+ * @return {Promise<T>} Callback result, or rejection after rollback.
  */
 const runJournaled = async (api, fn) => {
 	const start = api._journal.length;

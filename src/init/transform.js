@@ -279,8 +279,9 @@ const applyReplacements = (text, replacements) => {
  * and completed renames are journaled; this is not a process-crash recovery log.
  * Reverse order restores paths before earlier writes at those paths are undone.
  *
- * @param {Function} apply Callback receiving journaled writeFile and renameFile.
- * @return {*} Callback result.
+ * @template T
+ * @param {(fileOps: Object) => T} apply Callback receiving journaled writeFile and renameFile.
+ * @return {T} Callback result.
  */
 const withFileRollback = (apply) => {
 	const undo = [];
@@ -325,9 +326,9 @@ const withFileRollback = (apply) => {
 /**
  * Replace token content across files in place.
  *
- * @param {string[]}                files        - Absolute file paths.
- * @param {Array<[string, string]>} replacements - Ordered [ from, to ] pairs.
- * @param {Function}                [writeFile]  Synchronous writer (journaled during identity edits).
+ * @param {string[]}                                               files        - Absolute file paths.
+ * @param {Array<[string, string]>}                                replacements - Ordered [ from, to ] pairs.
+ * @param {(file: string, data: string, encoding: string) => void} [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {number} Count of files changed.
  */
 const replaceInFiles = (files, replacements, writeFile = fs.writeFileSync) => {
@@ -409,8 +410,8 @@ const planRenames = (files, replacements) => {
 /**
  * Execute a validated plan, staging sources so chains and swaps cannot overwrite.
  *
- * @param {Array}    renames    Validated source/destination pairs.
- * @param {Function} renameFile Journaled synchronous rename.
+ * @param {Array}                              renames    Validated source/destination pairs.
+ * @param {(from: string, to: string) => void} renameFile Journaled synchronous rename.
  * @return {number} Number of logical renames.
  */
 const executeRenames = (renames, renameFile) => {
@@ -455,11 +456,11 @@ const renameFiles = (files, replacements) => {
  *   - `css-header`  : a `Version:` line in a stylesheet header comment.
  *   - `php-header`  : a ` * Version:` line in a plugin header docblock.
  *
- * @param {string}                              root         - Project root.
- * @param {Array<{path: string, kind: string}>} versionFiles - Targets.
- * @param {string}                              version      - Version to apply.
- * @param {Object}                              ui           - `@rtcamp/wp-tooling/ui`.
- * @param {Function}                            [writeFile]  Synchronous writer (journaled during identity edits).
+ * @param {string}                                                 root         - Project root.
+ * @param {Array<{path: string, kind: string}>}                    versionFiles - Targets.
+ * @param {string}                                                 version      - Version to apply.
+ * @param {Object}                                                 ui           - `@rtcamp/wp-tooling/ui`.
+ * @param {(file: string, data: string, encoding: string) => void} [writeFile]  Synchronous writer (journaled during identity edits).
  * @return {void}
  */
 const applyVersion = (
