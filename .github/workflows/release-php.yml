@@ -1,8 +1,10 @@
 name: Release Composer Packages
 
-# Splits composer-packages/* out to their standalone mirror repos so Packagist
-# can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own repositories.
-# Fired by the tag that `vendor/bin/monorepo-builder release` pushes.
+# Splits a composer-packages/* package out to its standalone mirror repo so
+# Packagist can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own
+# repositories. Each package is versioned on its own: pushing the tag
+# rtcamp/wp-phpstan@2.0.0 splits composer-packages/phpstan alone and tags its
+# mirror v2.0.0, leaving the other mirror untouched.
 #
 # splitsh.json is the single source of truth for mirror repo -> subdirectory.
 # To add a package, add it there and list its deploy-key secret in the split
@@ -18,16 +20,18 @@ name: Release Composer Packages
 on:
   push:
     tags:
-      - "v*"
+      # <composer package name>@<version>. npm release tags start with "@"
+      # (@rtcamp/eslint-config@1.1.0), so they never match.
+      - "rtcamp/*@*"
   # Smoke-test the split without cutting a real release tag.
   workflow_dispatch:
     inputs:
       test_tag:
-        description: "Throwaway tag to push to the mirrors (e.g. v0.0.0-test)"
+        description: "Release-style tag naming the package to split (e.g. rtcamp/wp-phpstan@0.0.0-test pushes v0.0.0-test to the wp-phpstan mirror)"
         required: true
-        default: "v0.0.0-test"
+        default: "rtcamp/wp-phpstan@0.0.0-test"
       force_push:
-        description: "Force-push the mirrors (bootstrap an empty mirror, or re-push the same test tag)"
+        description: "Force-push the mirror (bootstrap an empty mirror, or re-push the same test tag)"
         type: boolean
         required: false
         default: false
@@ -56,6 +60,7 @@ jobs:
       organization: ${{ steps.parse.outputs.organization }}
       branch: ${{ steps.parse.outputs.branch }}
       tag: ${{ steps.parse.outputs.tag }}
+      release_tag: ${{ steps.parse.outputs.release_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -67,10 +72,22 @@ jobs:
         shell: bash
         env:
           # workflow_dispatch runs from a branch, so the input has to win or the
-          # mirrors get tagged "main"; on a tag push ref_name *is* the tag.
+          # tag would be "main"; on a tag push ref_name *is* the tag.
           TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.test_tag || github.ref_name }}
         run: |
           set -euo pipefail
+
+          # The tag names one package: rtcamp/wp-phpstan@2.0.0 releases the
+          # wp-phpstan subtree and tags its mirror v2.0.0. This also turns away
+          # a dispatch whose test_tag was emptied or set to a branch name.
+          release_re='^([a-z0-9._-]+)/([a-z0-9._-]+)@([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
+          if [[ ! "$TAG" =~ $release_re ]]; then
+            echo "::error::Refusing tag '$TAG': a release tag must look like <vendor>/<package>@<version>, for example rtcamp/wp-phpstan@2.0.0."
+            exit 1
+          fi
+          package_name="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+          mirror="${BASH_REMATCH[2]}"
+          mirror_tag="v${BASH_REMATCH[3]}"
 
           if [[ ! -f "$CONFIG_FILE" ]]; then
             echo "::error::Config file '$CONFIG_FILE' not found (path is relative to the repo root)."
@@ -86,10 +103,11 @@ jobs:
           # the object form ({ "prefixes": [{ "from": "..." }] }), and derives
           # the deploy-key secret: wp-phpcs -> SPLIT_KEY_PHPCS. A "secret" key
           # on the object form replaces the derived suffix; the gsub keeps a
-          # future wp-foo-bar from producing an invalid secret name.
-          if ! matrix=$(jq -c '{
+          # future wp-foo-bar from producing an invalid secret name. Only the
+          # subtree the tag names makes it into the matrix.
+          if ! matrix=$(jq -c --arg mirror "$mirror" '{
             include: [
-              (.subtrees // {}) | to_entries[] | {
+              (.subtrees // {}) | to_entries[] | select(.key == $mirror) | {
                 mirror_repo: .key,
                 package_directory: (
                   if (.value | type) == "string" then .value
@@ -115,14 +133,17 @@ jobs:
 
           count=$(jq -r '.include | length' <<<"$matrix")
           if [[ "$count" -eq 0 ]]; then
-            echo "::error::No subtrees defined in '$CONFIG_FILE'. Nothing to split."
+            echo "::error::'$CONFIG_FILE' has no subtree named '$mirror' (from tag '$TAG'). Nothing to split."
             exit 1
           fi
 
-          # Guards a dispatch with an emptied-out test_tag, which would otherwise
-          # fall through to a branch name and tag the mirrors with it.
-          if [[ "$TAG" != v* ]]; then
-            echo "::error::Refusing to push '$TAG' to the mirrors — the tag must start with 'v'."
+          # The subtree is looked up by the package half alone, so compare the
+          # full name with the package's composer.json: a mistyped vendor fails
+          # here instead of releasing anyway.
+          package_directory=$(jq -r '.include[0].package_directory' <<<"$matrix")
+          actual_name=$(jq -r '.name // empty' "$package_directory/composer.json" 2>/dev/null || true)
+          if [[ "$actual_name" != "$package_name" ]]; then
+            echo "::error::Tag '$TAG' names $package_name, but $package_directory/composer.json is named '${actual_name:-<none>}'."
             exit 1
           fi
 
@@ -141,7 +162,8 @@ jobs:
             echo "matrix=$matrix"
             echo "organization=$organization"
             echo "branch=$branch"
-            echo "tag=$TAG"
+            echo "tag=$mirror_tag"
+            echo "release_tag=$TAG"
           } >> "$GITHUB_OUTPUT"
 
       - name: Echo resolved matrix
@@ -176,6 +198,7 @@ jobs:
           REPO: ${{ matrix.mirror_repo }}
           BRANCH: ${{ needs.build-matrix.outputs.branch }}
           TAG: ${{ needs.build-matrix.outputs.tag }}
+          RELEASE_TAG: ${{ needs.build-matrix.outputs.release_tag }}
           FORCE_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.force_push }}
           RESYNC_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.resync_branch }}
         run: |
@@ -245,7 +268,7 @@ jobs:
           fi
 
           if ! "${push[@]}" "$remote" "$split_sha:refs/heads/$BRANCH"; then
-            echo "::error::$ORG/$REPO $BRANCH did not fast-forward: something other than this workflow committed to the mirror. Inspect what it holds, then run this workflow by dispatch on the $TAG tag with resync_branch enabled, and re-run this release run."
+            echo "::error::$ORG/$REPO $BRANCH did not fast-forward: something other than this workflow committed to the mirror. Inspect what it holds, then dispatch this workflow on the $RELEASE_TAG tag with test_tag=$RELEASE_TAG and resync_branch enabled, and re-run this release run."
             exit 1
           fi
           # Packagist versions a package from its tags, so this push is not optional.
