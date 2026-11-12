@@ -149,12 +149,12 @@ function rewrite(update, contents) {
 /**
  * Apply a batch of updates to disk.
  *
- * @param {Object[]} updates              Update records (as produced by `detect`).
- * @param {Object}   [options]
- * @param {string}   [options.cwd]        Project root.
- * @param {boolean}  [options.allowMajor] Apply major bumps too (default: skip them).
- * @param {boolean}  [options.dryRun]     Match but do not write.
- * @param {Function} [options.log]        Logger for each action (default: stdout).
+ * @param {Object[]}                  updates              Update records (as produced by `detect`).
+ * @param {Object}                    [options]
+ * @param {string}                    [options.cwd]        Project root.
+ * @param {boolean}                   [options.allowMajor] Apply major bumps too (default: skip them).
+ * @param {boolean}                   [options.dryRun]     Match but do not write.
+ * @param {(message: string) => void} [options.log]        Logger for each action (default: stdout).
  * @return {{written: Object[], skipped: Object[], unmatched: Object[], dryRun: boolean}} Outcome summary.
  */
 function applyUpdates(updates, options = {}) {

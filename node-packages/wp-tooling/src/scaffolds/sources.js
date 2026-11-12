@@ -64,7 +64,7 @@ function parseId(id) {
  * Read `<dir>/sources.json`.
  *
  * @param {string} dir - Directory that may contain the sources file.
- * @return {Promise<{file: string, parsed: *}|null>} Parsed sources + its path,
+ * @return {Promise<{file: string, parsed: unknown}|null>} Parsed sources + its path,
  *         or `null` when the file is absent (the dormant default).
  * @throws {ScaffoldError} EBADSCAFFOLD when the file exists but is invalid JSON.
  */

@@ -120,12 +120,12 @@ const reqReadFeatures = (root) => readFeatures(root);
 /**
  * Manage-mode entry. Routes flags or an interactive menu into `toggleFeatures`.
  *
- * @param {Object}   config   - Per-project scaffold config.
- * @param {string}   root     - Project root.
- * @param {string[]} argv     - CLI args.
- * @param {Object}   identity - Parsed .wp-scaffold.json.
- * @param {Object}   ui       - Merged UI.
- * @param {Function} reinit   - Callback to re-run the full scaffold flow.
+ * @param {Object}              config   - Per-project scaffold config.
+ * @param {string}              root     - Project root.
+ * @param {string[]}            argv     - CLI args.
+ * @param {Object}              identity - Parsed .wp-scaffold.json.
+ * @param {Object}              ui       - Merged UI.
+ * @param {() => Promise<void>} reinit   - Callback to re-run the full scaffold flow.
  * @return {Promise<void>}
  */
 const manageFlow = async (config, root, argv, identity, ui, reinit) => {

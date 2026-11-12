@@ -34,10 +34,10 @@ function normaliseOptions(options) {
  *
  * Accepts either a string shortcut (`text('Name?')`) or a full options object.
  *
- * @param {string|Object} options                - String message, or options object.
- * @param {string}        options.message        - The label / question to display.
- * @param {string}        [options.defaultValue] - Default value if the user presses Enter without typing.
- * @param {Function}      [options.validate]     - Validation function. Return a string message on failure, or undefined on success.
+ * @param {string|Object}                       options                - String message, or options object.
+ * @param {string}                              options.message        - The label / question to display.
+ * @param {string}                              [options.defaultValue] - Default value if the user presses Enter without typing.
+ * @param {(value: string) => string|undefined} [options.validate]     - Validation function. Return a string message on failure, or undefined on success.
  * @return {Promise<string>} The user's input.
  */
 async function text(options) {

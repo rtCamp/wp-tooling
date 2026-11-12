@@ -40,7 +40,7 @@ const GOOD_LHR = {
  *
  * @param {Object}  [o]
  * @param {boolean} [o.lighthouseAvailable=true] Whether the --version probe succeeds.
- * @param {*}       [o.lhr=GOOD_LHR]             Value returned by a real lighthouse run.
+ * @param {unknown} [o.lhr=GOOD_LHR]             Value returned by a real lighthouse run.
  * @param {boolean} [o.lighthouseRunThrows]      Whether the real lighthouse run throws.
  * @param {string}  [o.lighthouseRunReturn]      Raw stdout for a non-throwing lighthouse run.
  * @param {Object}  [o.serverResult]             `spawnSync` return value for the server layer.

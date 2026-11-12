@@ -14,7 +14,7 @@ const INTERVAL = 80;
  * Create a spinner instance.
  *
  * @param {string} text - Initial spinner label.
- * @return {{ start: Function, succeed: Function, fail: Function, update: Function }} Spinner controls.
+ * @return {{ start: () => void, succeed: (msg?: string) => void, fail: (msg?: string) => void, update: (newText: string) => void }} Spinner controls.
  */
 function spinner(text) {
 	let frameIndex = 0;

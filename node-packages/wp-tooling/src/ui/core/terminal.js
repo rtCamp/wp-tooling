@@ -102,7 +102,7 @@ let _lineQueueClosed = false;
 /**
  * Ensure the shared non-TTY line queue is initialised.
  *
- * @return {{ shift: Function, readonly closed: boolean }} The line queue.
+ * @return {{ shift: () => Promise<string>, readonly closed: boolean }} The line queue.
  */
 function _getLineQueue() {
 	if (_lineQueue) {
@@ -214,8 +214,8 @@ function readLine(prompt) {
 /**
  * Listen for keypress events on stdin. Returns a cleanup function.
  *
- * @param {Function} handler - Called with (str, key) on each keypress.
- * @return {Function} A function to call to stop listening.
+ * @param {(str: string, key: Object) => void} handler - Called with (str, key) on each keypress.
+ * @return {() => void} A function to call to stop listening.
  */
 function onKeypress(handler) {
 	if (!process.stdin.isTTY) {

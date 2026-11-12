@@ -43,9 +43,9 @@ const WEB_VITALS_DIST = 'dist/web-vitals.attribution.iife.js';
 /**
  * Throw `EBINMISSING` with the standard install hint unless `condition` holds.
  *
- * @param {*}      condition Truthy value required to proceed.
- * @param {string} message   Error message.
- * @param {Object} [details] Extra `RunnerError` details (merged with `install`).
+ * @param {unknown} condition Truthy value required to proceed.
+ * @param {string}  message   Error message.
+ * @param {Object}  [details] Extra `RunnerError` details (merged with `install`).
  * @return {void}
  * @throws {RunnerError} `EBINMISSING` when `condition` is falsy.
  */

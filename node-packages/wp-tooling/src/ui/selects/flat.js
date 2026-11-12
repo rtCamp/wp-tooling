@@ -21,8 +21,8 @@ const { CancelledError } = require('../errors');
 /**
  * Validate select choices input.
  *
- * @param {*}      choices - The received choices value.
- * @param {string} apiName - Public API name for error context.
+ * @param {unknown} choices - The received choices value.
+ * @param {string}  apiName - Public API name for error context.
  * @return {void}
  */
 function validateChoices(choices, apiName) {

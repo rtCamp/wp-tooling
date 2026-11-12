@@ -11,7 +11,7 @@ const LIGHTHOUSE_CFG = { categories: ['performance'] };
 /**
  * Run `fn` and return whatever it throws (or null).
  *
- * @param {Function} fn Function expected to throw.
+ * @param {() => unknown} fn Function expected to throw.
  * @return {Error|null} The thrown error, or null if it did not throw.
  */
 function grab(fn) {

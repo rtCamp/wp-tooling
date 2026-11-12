@@ -82,7 +82,7 @@ function resolveModuleFile(moduleName, relFile, options = {}) {
  *
  * @param {Object} [options]
  * @param {string} [options.cwd] Directory to resolve from.
- * @return {*} The loaded module, or `null` when not installed.
+ * @return {unknown} The loaded module, or `null` when not installed.
  */
 function requirePuppeteer(options = {}) {
 	const dir = resolveModuleDir('puppeteer', options);

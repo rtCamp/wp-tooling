@@ -309,8 +309,9 @@ Developer actions (run these yourself):
 
   npm install --save-dev \
     eslint@^10.0.0 \
-    @wordpress/eslint-plugin@^25.1.0 \
-    @rtcamp/eslint-config@^1.1.0
+    @wordpress/eslint-plugin@^28.0.0 \
+    @rtcamp/eslint-config@^2.0.0 \
+    eslint-plugin-jest@^29.0.0
 
 Scripts to add to composer.json:
 
@@ -326,8 +327,8 @@ Scripts to add to composer.json:
 Scripts to add to package.json:
 
   "scripts": {
-    "lint:js": "eslint 'src/**/*.js' 'assets/**/*.js'",
-    "lint:js:fix": "eslint 'src/**/*.js' 'assets/**/*.js' --fix"
+    "lint:js": "eslint --no-error-on-unmatched-pattern src assets",
+    "lint:js:fix": "eslint --no-error-on-unmatched-pattern src assets --fix"
   }
 
 Skipped: none.
