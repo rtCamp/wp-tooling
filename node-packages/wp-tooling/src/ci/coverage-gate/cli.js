@@ -7,7 +7,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const { takeValue, formatGithubLine } = require('../detect-changes');
+const {
+	parseFlags,
+	parseChoice,
+	emitAnnotations,
+	writeGithubFiles,
+} = require('../cli-support');
 const { GateError } = require('./errors');
 const { gitChangedLines, repoPrefix, resolveGateBase } = require('./diff');
 const { parseReport, inferFormat, REPORT_FORMATS } = require('./reports');
@@ -128,43 +133,7 @@ const USAGE = [
  * @return {Object} Option key → raw string, or `true` for boolean flags.
  */
 function parseArgs(argv) {
-	const opts = {};
-	for (let i = 0; i < argv.length; i++) {
-		const arg = argv[i];
-		if (Object.hasOwn(BOOLEAN_FLAGS, arg)) {
-			opts[BOOLEAN_FLAGS[arg]] = true;
-			continue;
-		}
-		if (!Object.hasOwn(VALUE_FLAGS, arg)) {
-			throw new Error(`unknown argument: ${arg}`);
-		}
-		const value = takeValue(argv, ++i, arg);
-		if (value !== '') {
-			opts[VALUE_FLAGS[arg]] = value;
-		}
-	}
-	return opts;
-}
-
-/**
- * Check a raw value against the allowed choices, or fall back to a default.
- *
- * @param {string|undefined} raw
- * @param {string[]}         choices
- * @param {string}           fallback
- * @param {string}           flag     Flag name, for the error message.
- * @return {string} The chosen value.
- */
-function parseChoice(raw, choices, fallback, flag) {
-	if (raw === undefined) {
-		return fallback;
-	}
-	if (!choices.includes(raw)) {
-		throw new Error(
-			`invalid ${flag} "${raw}" (expected one of: ${choices.join(', ')})`
-		);
-	}
-	return raw;
+	return parseFlags(argv, VALUE_FLAGS, BOOLEAN_FLAGS);
 }
 
 /**
@@ -263,61 +232,13 @@ function resolveConfig(opts, env) {
 }
 
 /**
- * Print workflow commands, or — under --dry-run — print them prefixed so the
- * runner does not act on them.
+ * Options for the shared `$GITHUB_*` file writer.
  *
- * @param {string[]} commands Workflow command lines.
- * @param {Object}   config   resolveConfig() result.
+ * @param {Object} config resolveConfig() result.
+ * @return {Object} `{ env, dryRun, command }`.
  */
-function emitAnnotations(commands, config) {
-	if (commands.length === 0) {
-		return;
-	}
-	const lines = config.dryRun
-		? commands.map((command) => `[dry-run] would emit: ${command}`)
-		: commands;
-	process.stdout.write(lines.join('\n') + '\n');
-}
-
-/**
- * Append to the file a GitHub Actions environment variable points at.
- *
- * @param {Object} env      Environment to read the path from.
- * @param {string} variable e.g. `GITHUB_OUTPUT`.
- * @param {string} content
- */
-function appendToEnvFile(env, variable, content) {
-	const dest = env[variable];
-	if (!dest) {
-		process.stderr.write(
-			`coverage-gate: --output github requested but $${variable} is unset; nothing written.\n`
-		);
-		return;
-	}
-	fs.appendFileSync(dest, content);
-}
-
-/**
- * Write step outputs and the job summary, or preview them under --dry-run.
- *
- * @param {Object} outputs Step outputs.
- * @param {string} summary Markdown summary.
- * @param {Object} config  resolveConfig() result.
- */
-function writeGithubFiles(outputs, summary, config) {
-	const outputLines =
-		Object.entries(outputs)
-			.map(([key, value]) => formatGithubLine(key, value))
-			.join('\n') + '\n';
-	if (config.dryRun) {
-		process.stdout.write(
-			`[dry-run] would append to $GITHUB_OUTPUT:\n${outputLines}` +
-				`[dry-run] would append to $GITHUB_STEP_SUMMARY:\n${summary}`
-		);
-		return;
-	}
-	appendToEnvFile(config.env, 'GITHUB_OUTPUT', outputLines);
-	appendToEnvFile(config.env, 'GITHUB_STEP_SUMMARY', summary);
+function githubFileOptions(config) {
+	return { env: config.env, dryRun: config.dryRun, command: 'coverage-gate' };
 }
 
 /**
@@ -331,11 +252,11 @@ function skipGate(config) {
 		process.stdout.write(`coverage-gate: ${NO_BASE_MESSAGE}\n`);
 		return 0;
 	}
-	emitAnnotations([annotation('notice', NO_BASE_MESSAGE)], config);
+	emitAnnotations([annotation('notice', NO_BASE_MESSAGE)], config.dryRun);
 	writeGithubFiles(
 		stepOutputs(EMPTY_RESULT),
 		formatSkipSummary(NO_BASE_MESSAGE),
-		config
+		githubFileOptions(config)
 	);
 	return 0;
 }
@@ -377,11 +298,11 @@ function publish(result, config) {
 			failureLevel: config.failureLevel,
 			unmeasuredPolicy: config.unmeasuredPolicy,
 		});
-		emitAnnotations(commands, config);
+		emitAnnotations(commands, config.dryRun);
 		writeGithubFiles(
 			stepOutputs(result),
 			formatSummary(result, config.threshold),
-			config
+			githubFileOptions(config)
 		);
 	}
 	process.stdout.write(formatText(result, config.threshold));
@@ -447,7 +368,10 @@ function failRun(err, config) {
 	}
 	const message = `coverage-gate: ${err.message}`;
 	if (config.github) {
-		emitAnnotations([annotation(config.failureLevel, message)], config);
+		emitAnnotations(
+			[annotation(config.failureLevel, message)],
+			config.dryRun
+		);
 	} else {
 		process.stderr.write(message + '\n');
 	}
