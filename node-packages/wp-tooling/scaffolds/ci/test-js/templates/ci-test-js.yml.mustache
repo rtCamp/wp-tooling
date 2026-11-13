@@ -18,6 +18,6 @@ permissions:
 jobs:
   test-js:
     uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-js.yml@{{wsw_ref}}
-    with:
-      node-version: "{{node_version}}"
+    with:{{#node_version}}
+      node-version: "{{node_version}}"{{/node_version}}
       enable-cache: {{enable_cache}}

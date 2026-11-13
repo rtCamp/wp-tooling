@@ -19,6 +19,6 @@ jobs:
   test-php:
     uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-php.yml@{{wsw_ref}}
     with:
-      php-version: "{{php_version}}"
-      node-version: "{{node_version}}"
+      php-version: "{{php_version}}"{{#node_version}}
+      node-version: "{{node_version}}"{{/node_version}}
       use-wp-env: {{use_wp_env}}
