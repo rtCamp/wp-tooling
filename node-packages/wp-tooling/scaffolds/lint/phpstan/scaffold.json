@@ -4,6 +4,13 @@
 	"name": "PHPStan setup",
 	"description": "Installs PHPStan with rtCamp's shared baseline (includes `vendor/rtcamp/wp-phpstan/phpstan.neon.dist` alongside szepeviktor/phpstan-wordpress) and adds composer analyse scripts.",
 	"source": "template",
+	"inputs": [
+		{
+			"key": "paths",
+			"description": "Files and directories holding your own PHP, comma-separated, e.g. `inc/, my-plugin.php`. PHPStan stops on one that doesn't exist.",
+			"required": true
+		}
+	],
 	"files": [
 		{
 			"src": "templates/phpstan.neon.dist.mustache",
