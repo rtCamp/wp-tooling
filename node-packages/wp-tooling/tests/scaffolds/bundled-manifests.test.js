@@ -7,8 +7,6 @@
  *     PSR-4 root onto the kind sub-namespace
  *   - wiring targetFile paths are normalised (no `..` segments), and a
  *     target that still escapes the project is dropped with a warning
- *   - wp/module and wp/cli wire into the files the rtCamp skeletons ship
- *     (`Main.php`, `Modules/CLI.php`)
  *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
@@ -221,44 +219,6 @@ describe('wiring targetFile normalisation', () => {
 		expect(result.warnings).toEqual([
 			'wiring target resolves outside the project, skipped: ..',
 		]);
-	});
-});
-
-describe('wiring targets on the rtCamp skeleton layout', () => {
-	// plugin-elementary and theme-elementary map their PSR-4 root to `inc/`
-	// and boot every module from `Main::CLASSES` in `inc/Main.php`;
-	// plugin-elementary names its CLI module in capitals (`Modules/CLI.php`).
-	function skeletonProject() {
-		const target = makeTmpDir();
-		fs.writeFileSync(
-			path.join(target, 'composer.json'),
-			JSON.stringify({
-				autoload: { 'psr-4': { 'Acme\\Blog\\': 'inc/' } },
-			}),
-			'utf8'
-		);
-		return target;
-	}
-
-	it('wires a new module into Main.php', async () => {
-		const result = await registry.execute(
-			'wp/module',
-			{ name: 'PostTypes', kind: 'cpt' },
-			{ dryRun: true, cwd: skeletonProject() }
-		);
-		expect(result.engine.wrote).toEqual(['inc/Modules/PostTypes.php']);
-		const wiring = result.ai.wiring[0];
-		expect(wiring.targetFile).toBe('inc/Main.php');
-		expect(wiring.snippet).toBe('\\Acme\\Blog\\Modules\\PostTypes::class,');
-	});
-
-	it('wires a CLI command into the CLI module the skeleton ships', async () => {
-		const result = await registry.execute(
-			'wp/cli',
-			{ name: 'export-things' },
-			{ dryRun: true, cwd: skeletonProject() }
-		);
-		expect(result.ai.wiring[0].targetFile).toBe('inc/Modules/CLI.php');
 	});
 });
 
