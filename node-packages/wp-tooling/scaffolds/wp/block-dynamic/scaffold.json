@@ -2,7 +2,7 @@
 	"slug": "block-dynamic",
 	"category": "wp",
 	"name": "Dynamic block",
-	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-primitives (handles registration and render), plus block.json + edit.js + index.js for the editor side.",
+	"description": "Adds a server-rendered Gutenberg block: one PHP class extending AbstractBlock from rtcamp/wp-primitives (handles registration and render), plus block.json + edit.jsx + index.js for the editor side.",
 	"source": "template",
 	"inputs": [
 		{
@@ -31,7 +31,7 @@
 		},
 		{
 			"key": "blocks_dir",
-			"description": "Source directory for block.json + edit.js + index.js (the inputs to @wordpress/scripts). Default 'src/blocks'.",
+			"description": "Source directory for block.json + edit.jsx + index.js (the inputs to @wordpress/scripts). Default 'src/blocks'.",
 			"default": "src/blocks"
 		},
 		{
@@ -85,6 +85,7 @@
 			"transform": "php-project-root"
 		}
 	],
+	"fail_if_exists": ["{{blocks_dir}}/{{slug}}"],
 	"files": [
 		{
 			"src": "templates/block-class.php.mustache",
@@ -99,8 +100,8 @@
 			"dest": "{{blocks_dir}}/{{slug}}/index.js"
 		},
 		{
-			"src": "templates/edit.js.mustache",
-			"dest": "{{blocks_dir}}/{{slug}}/edit.js"
+			"src": "templates/edit.jsx.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/edit.jsx"
 		}
 	],
 	"wiring": [
@@ -120,5 +121,10 @@
 	],
 	"composer_dependencies": {
 		"rtcamp/wp-primitives": "^2.0"
+	},
+	"npm_dev_dependencies": {
+		"@wordpress/block-editor": "^20.0.0",
+		"@wordpress/blocks": "^17.0.0",
+		"@wordpress/i18n": "^7.0.0"
 	}
 }

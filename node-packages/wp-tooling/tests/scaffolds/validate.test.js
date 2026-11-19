@@ -87,6 +87,15 @@ describe('validate files block', () => {
 		);
 	});
 
+	it('rejects a fail_if_exists that is not a list of paths', () => {
+		expect(validate({ ...baseValid(), fail_if_exists: 'a' })).toContain(
+			'fail_if_exists: must be an array'
+		);
+		expect(validate({ ...baseValid(), fail_if_exists: [''] })).toContain(
+			'fail_if_exists[0]: must be a non-empty string'
+		);
+	});
+
 	it('accepts empty files array (source: package case)', () => {
 		expect(
 			validate({

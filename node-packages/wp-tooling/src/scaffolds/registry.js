@@ -307,6 +307,19 @@ class ScaffoldRegistry {
 		const discovery = await loadDiscovery(cwd);
 		const resolved = resolveInputs(scaffold, inputs, discovery);
 
+		// Rerunning over existing output would add files beside the
+		// developer's own, such as a block's edit.jsx next to its edit.js.
+		for (const p of scaffold.fail_if_exists || []) {
+			const rel = render(p, resolved);
+			if (await entryExists(resolveInside(cwd, rel, 'check'))) {
+				throw new ScaffoldError(
+					'EEXISTS',
+					`${rel} already exists; nothing was written.`,
+					{ scaffold: makeId(scaffold), path: rel }
+				);
+			}
+		}
+
 		// Rendered before any write, so a bad placeholder throws before partial writes.
 		const scaffoldScripts = scaffold.scripts || {};
 		const renderedScripts = {
@@ -1282,6 +1295,11 @@ function inferPlaceholders(scaffold) {
 			seen.add(p);
 		}
 	}
+	for (const dest of scaffold.fail_if_exists || []) {
+		for (const p of collectPlaceholders(dest)) {
+			seen.add(p);
+		}
+	}
 	for (const w of scaffold.wiring || []) {
 		for (const p of collectPlaceholders(w.target_file)) {
 			seen.add(p);
@@ -1364,6 +1382,24 @@ async function pathExists(p) {
 		return true;
 	} catch {
 		return false;
+	}
+}
+
+/**
+ * Unlike {@link pathExists}, a dangling symlink counts as present.
+ *
+ * @param {string} p - Absolute path.
+ * @return {Promise<boolean>} Whether anything is at `p`.
+ */
+async function entryExists(p) {
+	try {
+		await fs.lstat(p);
+		return true;
+	} catch (err) {
+		if (err.code === 'ENOENT') {
+			return false;
+		}
+		throw err;
 	}
 }
 

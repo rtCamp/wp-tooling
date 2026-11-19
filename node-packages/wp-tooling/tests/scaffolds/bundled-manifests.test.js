@@ -102,7 +102,7 @@ describe('quoted display text', () => {
 				JSON.parse(fs.readFileSync(path.join(cwd, json), 'utf8')).title
 			).toBe(title);
 			const edit = result.engine.wrote.find((name) =>
-				name.endsWith('edit.js')
+				name.endsWith('edit.jsx')
 			);
 			expect(fs.readFileSync(path.join(cwd, edit), 'utf8')).toContain(
 				"Editor\\'s"
@@ -312,7 +312,7 @@ describe('wp/block-interactive', () => {
 			'inc/Blocks/FaqAccordion.php',
 			'src/blocks/faq-accordion/block.json',
 			'src/blocks/faq-accordion/index.js',
-			'src/blocks/faq-accordion/edit.js',
+			'src/blocks/faq-accordion/edit.jsx',
 			'src/blocks/faq-accordion/render.php',
 			'src/blocks/faq-accordion/view.js',
 		]);
@@ -323,6 +323,70 @@ describe('wp/block-interactive', () => {
 		expect(wiring.anchor).toBe('// scaffold:wp/block-dynamic:classes');
 		expect(wiring.snippet).toBe(
 			'\\Acme\\Blog\\Blocks\\FaqAccordion::class,'
+		);
+	});
+});
+
+describe.each(['wp/block-dynamic', 'wp/block-interactive'])('%s', (id) => {
+	const inputs = { slug: 'quote', title: 'Quote' };
+	const listFiles = (dir) => fs.readdirSync(dir, { recursive: true }).sort();
+
+	it('fails on a rerun and writes nothing', async () => {
+		const cwd = makeTmpDir();
+		await registry.execute(id, inputs, { cwd });
+		const before = listFiles(cwd);
+		await expect(
+			registry.execute(id, inputs, { cwd })
+		).rejects.toMatchObject({ code: 'EEXISTS', path: 'src/blocks/quote' });
+		expect(listFiles(cwd)).toEqual(before);
+	});
+
+	it('leaves a block with a customised edit.js untouched', async () => {
+		const cwd = makeTmpDir();
+		fs.mkdirSync(path.join(cwd, 'src/blocks/quote'), { recursive: true });
+		fs.writeFileSync(path.join(cwd, 'src/blocks/quote/edit.js'), 'custom');
+		await expect(
+			registry.execute(id, inputs, { cwd })
+		).rejects.toMatchObject({ code: 'EEXISTS' });
+		expect(listFiles(cwd)).toEqual([
+			'src',
+			'src/blocks',
+			'src/blocks/quote',
+			'src/blocks/quote/edit.js',
+		]);
+	});
+
+	it('fails on a dangling symlink at the block directory', async () => {
+		const cwd = makeTmpDir();
+		fs.mkdirSync(path.join(cwd, 'src/blocks'), { recursive: true });
+		fs.symlinkSync('missing', path.join(cwd, 'src/blocks/quote'));
+		await expect(
+			registry.execute(id, inputs, { cwd })
+		).rejects.toMatchObject({ code: 'EEXISTS' });
+		expect(listFiles(cwd)).toEqual([
+			'src',
+			'src/blocks',
+			'src/blocks/quote',
+		]);
+	});
+
+	it('suggests every package its templates import', async () => {
+		const templates = path.join(DEFAULTS_DIR, id, 'templates');
+		const imported = new Set();
+		for (const file of fs.readdirSync(templates)) {
+			const body = fs.readFileSync(path.join(templates, file), 'utf8');
+			for (const [, pkg] of body.matchAll(
+				/from '(@wordpress\/[^']+)'/g
+			)) {
+				imported.add(pkg);
+			}
+		}
+		const result = await registry.execute(id, inputs, {
+			cwd: makeTmpDir(),
+			dryRun: true,
+		});
+		expect(Object.keys(result.developer.install.npmDev).sort()).toEqual(
+			[...imported].sort()
 		);
 	});
 });

@@ -177,6 +177,9 @@ function validate(scaffold) {
 	if (scaffold.files !== undefined) {
 		errors.push(...validateFiles(scaffold.files));
 	}
+	if (scaffold.fail_if_exists !== undefined) {
+		errors.push(...validateFailIfExists(scaffold.fail_if_exists));
+	}
 	if (scaffold.inputs !== undefined) {
 		errors.push(...validateInputs(scaffold.inputs));
 	}
@@ -236,6 +239,19 @@ function validateFiles(files) {
 			}
 		}
 	}
+	return errors;
+}
+
+function validateFailIfExists(paths) {
+	if (!Array.isArray(paths)) {
+		return ['fail_if_exists: must be an array'];
+	}
+	const errors = [];
+	paths.forEach((p, i) => {
+		if (typeof p !== 'string' || p.length === 0) {
+			errors.push(`fail_if_exists[${i}]: must be a non-empty string`);
+		}
+	});
 	return errors;
 }
 

@@ -172,7 +172,7 @@ Frameworks per kind:
 | Kind | Framework |
 |---|---|
 | `wp/cpt`, `wp/taxonomy`, `wp/cron`, `wp/cli`, `wp/rest`, `wp/shortcode`, `wp/admin-page`, `wp/settings-page`, `wp/user-role`, `wp/registrable`, `wp-api/speculation`, `wp-api/block-bindings`, `wp-api/script-module` | PHPUnit |
-| `wp/block-dynamic` | Jest (edit.js) + PHPUnit (render method) |
+| `wp/block-dynamic` | Jest (edit.jsx) + PHPUnit (render method) |
 | `wp/block-interactive` | PHPUnit (registrar). The `view.js` store is not unit-tested: `@wordpress/interactivity` ships ESM only, which the `@wordpress/jest-preset-default` CJS setup cannot resolve. |
 | `ci/*` | actionlint + yaml-parse |
 | `utility/*` | none - no files written, so no stub to expand. Cover the calling code instead. |

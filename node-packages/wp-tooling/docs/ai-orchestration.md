@@ -53,6 +53,7 @@ The engine commits to the following on a successful run. Skills can rely on thes
 - Every path in `engine.skipped` was already present and was **not overwritten**.
 - Nothing in `ai.wiring` was applied. The engine never edits files outside `engine.wrote`. The whole `ai` block is by definition a plan; applying it is the caller's responsibility (with developer consent, §8).
 - `developer.install` (Composer and npm) describes what the developer should install. The engine never runs `composer require` or `npm install`.
+- A scaffold with `fail_if_exists` writes nothing when one of those paths already exists, and fails with `EEXISTS`.
 - `developer.secrets` is a verbatim passthrough of the scaffold manifest's `secrets[]` block. The engine never accepts secret **values** as inputs, never embeds values in any output field, never reads them from the environment, never logs them. Only `key`, `scope`, `description`, and `required` ever appear in the output.
 - The engine is idempotent under `scaffold.dryRun: true`: identical inputs produce identical output across runs.
 - The engine never reads or writes any path outside `--cwd`. This is enforced: a rendered `dest`, test path, or feature-owned path that resolves outside the target directory (e.g. via `..` in a path input or a third-party remote manifest) fails with `EWRITEFAIL` (`errno: "EOUTSIDE"`) before anything touches the filesystem.
@@ -152,6 +153,21 @@ A `scaffold.json` in the catalogue is malformed (invalid JSON or fails schema va
 ```
 
 **Skill response:** surface to the developer. Do not retry. Recommend filing a bug against the scaffold's home repo.
+
+### `EEXISTS`
+
+A path the scaffold's `fail_if_exists` lists is already there, typically from an earlier run. Nothing was written.
+
+```json
+{
+    "code": "EEXISTS",
+    "message": "src/blocks/faq already exists; nothing was written.",
+    "scaffold": "wp/block-dynamic",
+    "path": "src/blocks/faq"
+}
+```
+
+**Skill response:** ask the developer for another slug, or whether to edit the existing files instead. Do not delete them.
 
 ### `EWRITEFAIL`
 
