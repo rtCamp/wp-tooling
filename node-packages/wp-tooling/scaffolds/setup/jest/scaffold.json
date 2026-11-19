@@ -2,7 +2,7 @@
 	"slug": "jest",
 	"category": "setup",
 	"name": "Jest",
-	"description": "Adds jest.config.js extending @wordpress/jest-preset-default for WordPress JavaScript testing.",
+	"description": "Deprecated: use setup/vitest, since WordPress retired @wordpress/jest-preset-default. Adds jest.config.js extending that preset for WordPress JavaScript testing.",
 	"source": "template",
 	"files": [
 		{

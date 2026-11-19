@@ -1,0 +1,58 @@
+{
+	"slug": "vitest",
+	"category": "setup",
+	"name": "Vitest",
+	"description": "Adds vitest.config.mjs for WordPress JavaScript tests: tests run in Node, *.jsdom.test.* files in jsdom with React Testing Library, and coverage writes tests/logs/lcov.info.",
+	"source": "template",
+	"files": [
+		{
+			"src": "templates/vitest.config.mjs.mustache",
+			"dest": "vitest.config.mjs"
+		},
+		{
+			"src": "templates/setup-jsdom.js.mustache",
+			"dest": "{{tests_dir}}/setup-jsdom.js"
+		}
+	],
+	"inputs": [
+		{
+			"key": "source_dir",
+			"description": "Directory containing the JavaScript source, searched for tests and measured for coverage (relative to project root, no trailing slash, no glob characters such as { } , * ? [ ]). Default 'src'.",
+			"default": "src"
+		},
+		{
+			"key": "tests_dir",
+			"description": "Directory for tests that live outside the source, and for the jsdom setup file (relative to project root, no trailing slash, no glob characters such as { } , * ? [ ]). Default 'tests/js'.",
+			"default": "tests/js"
+		},
+		{
+			"key": "source_dir_js",
+			"description": "source_dir as a JavaScript string literal. Derived from source_dir.",
+			"discover_from": "input:source_dir",
+			"transform": "js-string"
+		},
+		{
+			"key": "tests_dir_js",
+			"description": "tests_dir as a JavaScript string literal. Derived from tests_dir.",
+			"discover_from": "input:tests_dir",
+			"transform": "js-string"
+		}
+	],
+	"npm_dev_dependencies": {
+		"vitest": "^5.1.0",
+		"vite": "^8.0.0",
+		"@vitest/coverage-v8": "^5.1.0",
+		"@vitejs/plugin-react": "^6.0.0",
+		"jsdom": "^31.0.0",
+		"@testing-library/dom": "^10.4.0",
+		"@testing-library/jest-dom": "^7.0.0",
+		"@testing-library/react": "^16.3.0"
+	},
+	"scripts": {
+		"npm": {
+			"test:js": "vitest run",
+			"test:js:watch": "vitest --watch",
+			"test:js:coverage": "vitest run --coverage"
+		}
+	}
+}
