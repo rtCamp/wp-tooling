@@ -21,13 +21,17 @@
  *     project, and wire the Composer repository rtcamp/wp-phpcs installs from;
  *     lint/phpcs/vip wires only the Composer plugin permission
  *   - setup/phpunit names the bootstrap's `@package` after the test namespace
+ *   - setup/vitest points its test globs, coverage and jsdom setup file at the
+ *     source and test directories, which it writes as escaped string literals
  */
 
 'use strict';
 
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const vm = require('vm');
 
 const { ScaffoldRegistry } = require('../../src/scaffolds/registry');
 
@@ -1016,5 +1020,64 @@ describe('setup/phpunit', () => {
 		expect(
 			fs.readFileSync(path.join(target, 'tests/bootstrap.php'), 'utf8')
 		).toContain(' * @package Acme\\Blog\\Tests\n');
+	});
+});
+
+describe('setup/vitest', () => {
+	it('points tests, coverage and the jsdom setup at the given directories', async () => {
+		const target = makeTmpDir();
+		const result = await registry.execute(
+			'setup/vitest',
+			{ source_dir: 'assets/src', tests_dir: 'assets/tests' },
+			{ cwd: target }
+		);
+
+		expect(result.engine.wrote).toEqual([
+			'vitest.config.mjs',
+			'assets/tests/setup-jsdom.js',
+		]);
+		const configPath = path.join(target, 'vitest.config.mjs');
+		const config = fs.readFileSync(configPath, 'utf8');
+		expect(config).toContain("const SOURCE_DIR = 'assets/src';\n");
+		expect(config).toContain("const TESTS_DIR = 'assets/tests';\n");
+		expect(config).toContain(
+			'const DIRS = `{${ SOURCE_DIR },${ TESTS_DIR }}`;'
+		);
+		expect(config).toContain('`${ DIRS }/**/__tests__/**/*.${ EXT }`,');
+		expect(config).toContain(
+			'const DOM_TESTS = `${ DIRS }/**/*.jsdom.test.${ EXT }`;'
+		);
+		expect(config).toContain(
+			'include: [ `${ SOURCE_DIR }/**/*.${ EXT }` ],'
+		);
+		expect(config).toContain(
+			'setupFiles: [ `./${ TESTS_DIR }/setup-jsdom.js` ],'
+		);
+		expect(() =>
+			execFileSync(process.execPath, ['--check', configPath])
+		).not.toThrow();
+	});
+
+	it('writes a directory with a quote in it as a valid string', async () => {
+		const target = makeTmpDir();
+		const result = await registry.execute(
+			'setup/vitest',
+			{ tests_dir: "tests/editor's" },
+			{ cwd: target }
+		);
+
+		expect(result.engine.wrote).toContain("tests/editor's/setup-jsdom.js");
+		const configPath = path.join(target, 'vitest.config.mjs');
+		expect(() =>
+			execFileSync(process.execPath, ['--check', configPath])
+		).not.toThrow();
+
+		const config = fs.readFileSync(configPath, 'utf8');
+		const declarations = config.match(/^const (SOURCE|TESTS)_DIR = .*$/gm);
+		expect(
+			vm.runInNewContext(
+				`${declarations.join('\n')}\nSOURCE_DIR + '|' + TESTS_DIR`
+			)
+		).toBe("src|tests/editor's");
 	});
 });

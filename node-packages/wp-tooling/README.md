@@ -60,14 +60,14 @@ npx wp-tooling <command> --help                      # options for any command
 
 ## Scaffolds
 
-46 scaffolds; the code scaffolds also generate their tests:
+47 scaffolds; the code scaffolds also generate their tests:
 
 | Group | Scaffolds |
 | --- | --- |
 | `wp/*` | admin page, dynamic and interactive blocks, WP-CLI command, custom post type, cron, module, registrable, REST controller, settings page, shortcode, taxonomy, user role |
 | `wp-api/*` | block bindings, script modules, speculative loading |
 | `utility/*` | wiring for the wp-primitives cache, feature selector, logger, timer and transients |
-| `setup/*` | Claude skills, EditorConfig, Jest, pa11y, performance, PHPUnit, PSR-4, Tailwind |
+| `setup/*` | Claude skills, EditorConfig, Jest (deprecated), pa11y, performance, PHPUnit, PSR-4, Tailwind, Vitest |
 | `lint/*` | ESLint, Stylelint, PHPCS (core, full and VIP), PHPStan, i18n |
 | `ci/*` | GitHub Actions for lint, tests, build, build artifacts, accessibility and WordPress.org deploys |
 

@@ -461,7 +461,7 @@ Phase A — Project setup:
 Phase B — Feature scaffolds:
   wp/cli (--name=optimize-images, --singleton=false)
 
-Skipped: lint/eslint, lint/stylelint, setup/jest, setup/pa11y (no JS/CSS, no a11y tests asked).
+Skipped: lint/eslint, lint/stylelint, setup/vitest, setup/pa11y (no JS/CSS, no a11y tests asked).
 ```
 
 **Final state after run:**
