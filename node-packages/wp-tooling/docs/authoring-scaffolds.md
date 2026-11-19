@@ -245,6 +245,7 @@ project may prefer.
 
 ## Tests, secrets, scripts
 
+- `fail_if_exists`: paths, rendered like `dest`, that must not exist yet. If one does, the engine writes nothing and fails with `EEXISTS`. The block scaffolds list their block directory, so a rerun cannot add files beside a developer's own.
 - `tests[]`: test stubs written alongside production output. Each entry has `src`, `dest`, `framework` (`phpunit`, `jest`, `playwright`, `pa11y`, `actionlint`, `yaml-parse`), and optional `command`.
 - `secrets[]`: declarations only — never values. Each entry has `key` (UPPER_SNAKE_CASE), `scope` (`github-actions`, `env`, `dotenv`), `description`, and optional `required`.
 - `scripts.npm` / `scripts.composer`: maps of `{ name: command }` the developer should add to their `package.json` / `composer.json`. The engine surfaces these in the report; nothing is auto-merged.

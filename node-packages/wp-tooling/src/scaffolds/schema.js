@@ -261,6 +261,12 @@ const SCAFFOLD_SCHEMA = {
 				'Files to render. Empty array is valid (used by `source: package`).',
 			items: FILE_ENTRY,
 		},
+		fail_if_exists: {
+			type: 'array',
+			description:
+				'Paths, rendered like `dest`, that must not exist yet. If one does, nothing is written and the run fails with EEXISTS.',
+			items: { type: 'string', minLength: 1 },
+		},
 		inputs: {
 			type: 'array',
 			description:
