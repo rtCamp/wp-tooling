@@ -17,13 +17,29 @@ It extends
 
 ## Install
 
-Requires Node.js 22.19+.
+Requires Node.js 22.19+ and Stylelint 17. `stylelint`, `@wordpress/stylelint-config` and `stylelint-scss` are peer dependencies. Projects on Stylelint 16 stay on `@rtcamp/stylelint-config` 1.x.
+
+With `@wordpress/scripts` 35 or later, which already depends on all three, install the config on its own:
 
 ```bash
-npm install --save-dev @rtcamp/stylelint-config stylelint @wordpress/stylelint-config stylelint-scss
+npm install --save-dev @rtcamp/stylelint-config
 ```
 
-`stylelint`, `@wordpress/stylelint-config` and `stylelint-scss` are peer dependencies.
+Without `@wordpress/scripts`, install the peers too:
+
+```bash
+npm install --save-dev @rtcamp/stylelint-config stylelint@^17 @wordpress/stylelint-config@^27 stylelint-scss@^7
+```
+
+### Upgrading from 1.x
+
+Run the install command above that fits the project. If npm reports `ERESOLVE`, uninstall 1.x and run the install command again:
+
+```bash
+npm uninstall @rtcamp/stylelint-config
+```
+
+If `package.json` also lists `stylelint`, `@wordpress/stylelint-config` or `stylelint-scss` at their Stylelint 16 versions, add them to that `npm uninstall` command.
 
 ## Usage
 
