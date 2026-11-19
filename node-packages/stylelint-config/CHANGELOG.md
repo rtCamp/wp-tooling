@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-20
+
+### Changed
+
+- **Breaking:** requires Stylelint 17 and Node.js 22.23.4 or later. The peer ranges are `stylelint` `^17.14.1`, `@wordpress/stylelint-config` `^25.0.0 || ^26.0.0 || ^27.0.0` and `stylelint-scss` `^7.2.0`, matching `@wordpress/scripts` 35 and later. See the README to upgrade from 1.x.
+
 ## [1.1.0] - 2026-10-01
 
 ### Changed
