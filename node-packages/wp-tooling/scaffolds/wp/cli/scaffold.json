@@ -60,10 +60,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/../Modules/Cli.php",
+			"target_file": "{{base_path}}/../Modules/CLI.php",
 			"anchor": "// scaffold:wp/cli:classes",
 			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
-			"description": "Add the command class to the Cli module. The module's register_hooks() should iterate get_classes() and call WP_CLI::add_command( $class::get_name(), $class::class ) when defined('WP_CLI'). If the Cli module does not exist yet, scaffold it first via `wp-tooling add wp/module --name=Cli --kind=cli`."
+			"description": "Add the command class to the `$commands` list in the CLI module's `get_commands()`; `register_commands()` passes each one to `WP_CLI::add_command()` as `[ $class, 'run' ]`. If the CLI module does not exist yet, create `Modules/CLI.php` on the shape of plugin-elementary's `inc/Modules/CLI.php`: a `ConditionallyRegistrable` that registers its commands on `init` when WP-CLI is running."
 		}
 	],
 	"tests": [

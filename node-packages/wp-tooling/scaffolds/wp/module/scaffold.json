@@ -54,10 +54,10 @@
 	],
 	"wiring": [
 		{
-			"target_file": "{{base_path}}/../Plugin.php",
+			"target_file": "{{base_path}}/../Main.php",
 			"anchor": "// scaffold:wp/module:modules",
 			"snippet_template": "\\{{namespace}}\\{{class}}::class,",
-			"description": "Add this module to the plugin's top-level Loader list so the framework instantiates it on boot. If Plugin.php does not yet declare a Loader, instantiate the generated module manually in your plugin bootstrap and call its register_hooks() method."
+			"description": "Add this module to the `CLASSES` list in `Main.php`; the framework's Loader instantiates each entry on boot. The rtCamp skeletons ship no anchor there: append after the last `::class` entry outside any `// wp:example:*` region."
 		}
 	],
 	"tests": [
