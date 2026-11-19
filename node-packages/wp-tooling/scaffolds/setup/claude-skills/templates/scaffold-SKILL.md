@@ -73,7 +73,7 @@ Files group by **kind**, never by feature. `<Root>` = project's autoload root (e
 | `wp/admin-page` | `includes/Admin/` | `<Root>\Admin` | `tests/Admin/` | `<Root>\Tests\Admin` | `<Root>\Modules\Admin` |
 | `wp/settings-page` | `includes/Settings/` | `<Root>\Settings` | `tests/Settings/` | `<Root>\Tests\Settings` | `<Root>\Modules\Settings` |
 | `wp/user-role` | `includes/Roles/` | `<Root>\Roles` | `tests/Roles/` | `<Root>\Tests\Roles` | `<Root>\Modules\Roles` |
-| `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\Cli` |
+| `wp/cli` | `includes/Cli/` | `<Root>\Cli` | `tests/Cli/` | `<Root>\Tests\Cli` | `<Root>\Modules\CLI` |
 | `wp/cron` | `includes/Cron/` | `<Root>\Cron` | `tests/Cron/` | `<Root>\Tests\Cron` | `<Root>\Modules\Cron` |
 | `wp/registrable` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |
 | `wp-api/speculation` | `includes/Services/` | `<Root>\Services` | `tests/Services/` | `<Root>\Tests\Services` | `<Root>\Modules\Services` |

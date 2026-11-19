@@ -420,8 +420,8 @@ class ScaffoldRegistry {
 		}
 
 		// `target_file` templates often build on a path input (e.g.
-		// `{{base_path}}/../Modules/Cli.php`); normalise so the caller gets
-		// `includes/Modules/Cli.php`, not a `..` segment to clean up.
+		// `{{base_path}}/../Modules/CLI.php`); normalise so the caller gets
+		// `includes/Modules/CLI.php`, not a `..` segment to clean up.
 		//
 		// The `../Modules/<Kind>.php` shape assumes `base_path` is a SIBLING of
 		// the Modules directory (the flat default, e.g. `includes/Cli`). When a
