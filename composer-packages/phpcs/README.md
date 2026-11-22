@@ -76,7 +76,7 @@ scan, `testVersion`, `minimum_wp_version`, global prefixes, text domain, and fil
     <file>./tests/</file>
 
     <config name="testVersion" value="8.2-" />
-    <config name="minimum_wp_version" value="6.5" />
+    <config name="minimum_wp_version" value="6.9" />
 
     <rule ref="rtCampWP" />
 

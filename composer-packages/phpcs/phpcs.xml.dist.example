@@ -10,17 +10,22 @@
 	     What to scan. List the project's PHP entry points and folders.
 	     ========================================================== -->
 	<file>./includes/</file>
-	<file>./src/</file>
 	<file>./tests/</file>
+	<file>./access-functions.php</file>
+	<file>./activation.php</file>
+	<file>./deactivation.php</file>
 	<file>./my-plugin.php</file>
 
-	<!-- Excluded from the paths above. -->
-	<exclude-pattern>*/build/*</exclude-pattern>
-	<exclude-pattern>*/node_modules/*</exclude-pattern>
-	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<!-- These are excluded from the above paths.-->
+	<exclude-pattern>**/build/**</exclude-pattern>
+	<exclude-pattern>**/node_modules/**</exclude-pattern>
+	<exclude-pattern>**/vendor/**</exclude-pattern>
+	<exclude-pattern>**/tests/_output/**</exclude-pattern>
 
 	<!-- ==========================================================
 	     How to scan (so these need not be passed on the CLI).
+	     Usage instructions: https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Usage
+	     Annotated ruleset: https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Annotated-ruleset.xml
 	     ========================================================== -->
 	<!-- Show sniff codes and progress. -->
 	<arg value="sp" />
@@ -30,18 +35,26 @@
 	<arg name="colors" />
 	<!-- Only lint PHP files. -->
 	<arg name="extensions" value="php" />
+
 	<!-- Cache results for faster re-runs. -->
-	<arg name="cache" value=".phpcs.cache" />
+	<arg name="cache" value="tests/_output/cache.json" />
 	<!-- Run files in parallel. -->
 	<arg name="parallel" value="20" />
+	<!-- Set severity to 1 to see everything that isn't turned off. -->
+	<arg name="severity" value="1" />
+
 
 	<!-- ==========================================================
 	     Project constraints — set these to match your project.
+	     https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards/wiki/Customizable-sniff-properties
 	     ========================================================== -->
-	<!-- Lowest PHP version you support (used by PHPCompatibilityWP). -->
+
+	<!-- Minimum PHP Version-->
 	<config name="testVersion" value="8.2-" />
-	<!-- Lowest WordPress version you support. -->
-	<config name="minimum_wp_version" value="6.5" />
+
+	<!-- Minimum WordPress Version -->
+	<config name="minimum_wp_version" value="6.9" />
+
 
 	<!-- ==========================================================
 	     The shared rtCamp WordPress standard.
@@ -50,7 +63,45 @@
 	     rtCampWP-Basic  — WPCS + VIP + Docs + PHP compatibility, no strict typing
 	                       (recommended when adopting on an existing codebase).
 	     ========================================================== -->
-	<rule ref="rtCampWP" />
+	<rule ref="rtCampWP">
+		<!-- Add any ruleset exclusions here, e.g.:
+		<exclude name="SlevomatCodingStandard.TypeHints.DeclareStrictTypes" />
+		-->
+	</rule>
+
+	<!-- Then, add your additional rulesets or rules. E.g:
+
+	<rule ref="SlevomatCodingStandard.ControlStructures.EarlyExit" />
+	-->
+
+	<!--
+		File naming. Pick the block that matches your project:
+		- Themes: enforce the theme file hierarchy.
+	-->
+	<!--
+	<rule ref="WordPress.Files.FileName">
+		<properties>
+			<property name="is_theme" value="true" />
+		</properties>
+	</rule>
+	-->
+	<!-- PSR-4 autoloaded plugins (PascalCase filenames): disable the rule. -->
+	<!--
+	<rule ref="WordPress.Files.FileName">
+		<severity>0</severity>
+	</rule>
+	-->
+
+	<!-- Relax noisy rules in test files (optional). -->
+	<rule ref="Generic.Files.OneObjectStructurePerFile.MultipleFound">
+		<exclude-pattern>**/tests/**</exclude-pattern>
+	</rule>
+	<rule ref="Generic.PHP.NoSilencedErrors">
+		<exclude-pattern>**/tests/**</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.Files.FileName.InvalidClassFileName">
+		<exclude-pattern>**/tests/**</exclude-pattern>
+	</rule>
 
 	<!-- ==========================================================
 	     Project-specific configuration.
@@ -74,30 +125,6 @@
 				<element value="my-project" />
 			</property>
 		</properties>
-	</rule>
-
-	<!-- File naming. Pick the line that matches your project:
-	     - Themes: enforce the theme file hierarchy. -->
-	<!--
-	<rule ref="WordPress.Files.FileName">
-		<properties>
-			<property name="is_theme" value="true" />
-		</properties>
-	</rule>
-	-->
-	<!--   - PSR-4 autoloaded plugins (PascalCase filenames): disable the rule. -->
-	<!--
-	<rule ref="WordPress.Files.FileName">
-		<severity>0</severity>
-	</rule>
-	-->
-
-	<!-- Relax noisy rules in test files (optional). -->
-	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
-		<exclude-pattern>tests/*</exclude-pattern>
-	</rule>
-	<rule ref="WordPress.Files.FileName.InvalidClassFileName">
-		<exclude-pattern>tests/*</exclude-pattern>
 	</rule>
 
 </ruleset>
