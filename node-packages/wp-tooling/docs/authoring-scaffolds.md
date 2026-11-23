@@ -126,7 +126,7 @@ The `inputs[]` array is the authoritative declaration. For each input the engine
 1. Explicit `--key=value` passed to `add`.
 2. `discover_from` (see below).
 3. `default`.
-4. Error `EMISSINGINPUT` if the field is `required: true`.
+4. Error `EMISSINGINPUT` if the field is `required: true` and the value is missing or blank. An empty `--key=` or an Enter at the prompt is not a value.
 5. Error `EINVALIDINPUT` if the resolved value falls outside a declared `enum`.
 
 An explicit value always wins over discovery, so AI/CLI callers are never overridden.

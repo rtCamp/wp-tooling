@@ -192,7 +192,7 @@ For lint and test setup scaffolds:
 
 ```bash
 npx wp-tooling add lint/phpcs/vip --non-interactive --json --cwd .
-npx wp-tooling add lint/phpstan    --non-interactive --json --cwd .
+npx wp-tooling add lint/phpstan    --non-interactive --json --cwd . --paths=includes
 npx wp-tooling add lint/eslint     --non-interactive --json --cwd .
 npx wp-tooling add setup/phpunit   --non-interactive --json --cwd . --source-dir=includes
 npx wp-tooling add setup/pa11y     --non-interactive --json --cwd . --base-url=http://localhost:8888

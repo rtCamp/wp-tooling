@@ -100,7 +100,7 @@ The requested `<category>/<slug>` is not in the merged catalogue.
 
 ### `EMISSINGINPUT`
 
-`--non-interactive` mode and one or more required inputs were not supplied (after the manifest's `default` was applied).
+`--non-interactive` mode and one or more required inputs were not supplied, or were blank (after the manifest's `default` was applied).
 
 ```json
 {

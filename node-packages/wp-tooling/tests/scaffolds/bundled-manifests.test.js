@@ -8,6 +8,8 @@
  *   - wiring targetFile paths are normalised (no `..` segments), and a
  *     target that still escapes the project is dropped with a warning
  *   - lint/i18n binds a supplied or discovered text domain, never a guessed one
+ *   - lint/phpstan analyses only the paths it is given, never guessed ones,
+ *     since PHPStan stops on a listed path that does not exist
  *   - wp-api/speculation renders into the registrable layout, reuses the
  *     registrable wiring anchor, follows a non-`includes/` PSR-4 root, and
  *     rejects an out-of-enum mode/eagerness
@@ -748,6 +750,37 @@ describe('lint/i18n ruleset', () => {
 		).rejects.toMatchObject({
 			code: 'EMISSINGINPUT',
 			missing: ['text_domain'],
+		});
+	});
+});
+
+describe('lint/phpstan paths', () => {
+	it('analyses exactly the supplied paths', async () => {
+		const target = makeTmpDir();
+		await registry.execute(
+			'lint/phpstan',
+			{ paths: 'inc/, src/, acme-blog.php' },
+			{ cwd: target }
+		);
+		const neon = fs.readFileSync(
+			path.join(target, 'phpstan.neon.dist'),
+			'utf8'
+		);
+		expect(neon).toContain('    paths: [inc/, src/, acme-blog.php]\n');
+	});
+
+	it('requires paths rather than guessing them', async () => {
+		// The bug this closes: the config always listed `src` and `includes`,
+		// and PHPStan stops on a path that does not exist.
+		await expect(
+			registry.execute(
+				'lint/phpstan',
+				{},
+				{ dryRun: true, cwd: makeTmpDir() }
+			)
+		).rejects.toMatchObject({
+			code: 'EMISSINGINPUT',
+			missing: ['paths'],
 		});
 	});
 });
