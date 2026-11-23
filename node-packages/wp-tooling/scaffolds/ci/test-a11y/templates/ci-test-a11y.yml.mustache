@@ -19,6 +19,6 @@ permissions:
 
 jobs:
   test-a11y:
-    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-a11y.yml@{{wsw_ref}}
+    uses: rtCamp/wp-shared-workflows/.github/workflows/ci-test-a11y.yml@{{wsw_ref}}{{#node_version}}
     with:
-      node-version: "{{node_version}}"
+      node-version: "{{node_version}}"{{/node_version}}

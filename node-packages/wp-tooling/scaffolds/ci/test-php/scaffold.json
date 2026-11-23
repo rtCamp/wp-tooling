@@ -2,7 +2,7 @@
 	"slug": "test-php",
 	"category": "ci",
 	"name": "CI: PHPUnit",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-php.yml. Runs PHPUnit with optional @wordpress/env for full integration tests. Stable (merged into release/v1.0.0).",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-test-php.yml. Runs PHPUnit with optional @wordpress/env for full integration tests. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{
@@ -17,8 +17,8 @@
 		},
 		{
 			"key": "node_version",
-			"description": "Node.js version (used only when use-wp-env is true).",
-			"default": "22"
+			"description": "Node.js version. Leave empty to use the project's .nvmrc, which the shared workflow reads.",
+			"default": ""
 		},
 		{
 			"key": "use_wp_env",

@@ -2,7 +2,7 @@
 	"slug": "artifact-gate",
 	"category": "ci",
 	"name": "CI: Block committed build artifacts",
-	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build-artifact-gate.yml. Fails the PR if build outputs (assets/build/ by default) are committed. Stable (merged into release/v1.0.0).",
+	"description": "GitHub Actions workflow that calls rtCamp/wp-shared-workflows ci-build-artifact-gate.yml. Fails the PR if build outputs (assets/build/ by default) are committed. Calls `@v1` by default.",
 	"source": "template",
 	"inputs": [
 		{
