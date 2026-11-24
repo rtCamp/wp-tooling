@@ -86,5 +86,19 @@ jobs:
       - name: Install the package standalone
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Validate the PHPCS rulesets against the PHPCS schema
+        if: matrix.package == 'phpcs'
+        uses: phpcsstandards/xmllint-validate@d0ee207a94a9539f5d14e78e3b13a81385252c88 # v2.0.1
+        with:
+          pattern: "composer-packages/phpcs/*/ruleset.xml"
+          xsd-file: "composer-packages/phpcs/vendor/squizlabs/php_codesniffer/phpcs.xsd"
+
+      - name: Validate the example consumer config against the PHPCS schema
+        if: matrix.package == 'phpcs'
+        uses: phpcsstandards/xmllint-validate@d0ee207a94a9539f5d14e78e3b13a81385252c88 # v2.0.1
+        with:
+          pattern: "composer-packages/phpcs/phpcs.xml.dist.example"
+          xsd-file: "composer-packages/phpcs/vendor/squizlabs/php_codesniffer/phpcs.xsd"
+
       - name: Test
         run: composer test

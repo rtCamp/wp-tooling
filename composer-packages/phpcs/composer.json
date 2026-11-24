@@ -24,10 +24,9 @@
     },
     "require": {
         "php": ">=8.2",
-        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
-        "wp-coding-standards/wpcs": "^3.2",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
         "automattic/vipwpcs": "^3.0",
-        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpcompatibility/phpcompatibility-wp": "^3.0.0-alpha",
         "slevomat/coding-standard": "~8.22.0"
     },
     "require-dev": {
@@ -39,7 +38,7 @@
         },
         "sort-packages": true
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "alpha",
     "prefer-stable": true,
     "scripts": {
         "test": "phpunit"
