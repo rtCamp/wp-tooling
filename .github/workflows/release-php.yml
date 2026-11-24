@@ -1,33 +1,18 @@
 name: Release Composer Packages
 
-# Splits a composer-packages/* package out to its standalone mirror repo so
-# Packagist can serve rtcamp/wp-phpcs and rtcamp/wp-phpstan from their own
-# repositories. Each package is versioned on its own: pushing the tag
-# rtcamp/wp-phpstan@2.0.0 splits composer-packages/phpstan alone and tags its
-# mirror v2.0.0, leaving the other mirror untouched.
-#
-# splitsh.json is the single source of truth for mirror repo -> subdirectory.
-# To add a package, add it there and list its deploy-key secret in the split
-# step's env below (secrets are referenced by name so the job only receives
-# the deploy keys, never the whole secrets context).
-#
-# Each mirror is pushed with its own SSH deploy key (repo secret
-# SPLIT_KEY_<NAME>, "Allow write access" required) rather than a PAT bound to
-# one human account. `git subtree split` output is deterministic, so releases
-# fast-forward and a diverged mirror fails loudly instead of being silently
-# rewritten.
+# Pushing a rtcamp/<package>@<version> tag splits that package into its mirror repo
+# and tags the mirror v<version> for Packagist. To add a package, add its mirror to
+# splitsh.json and its write-enabled deploy key as a SPLIT_KEY_<NAME> secret
+# (wp-phpcs -> SPLIT_KEY_PHPCS), listed in the split step's env.
 
 on:
   push:
     tags:
-      # <composer package name>@<version>. npm release tags start with "@"
-      # (@rtcamp/eslint-config@1.1.0), so they never match.
       - "rtcamp/*@*"
-  # Smoke-test the split without cutting a real release tag.
   workflow_dispatch:
     inputs:
       test_tag:
-        description: "Release-style tag naming the package to split (e.g. rtcamp/wp-phpstan@0.0.0-test pushes v0.0.0-test to the wp-phpstan mirror)"
+        description: "Tag to split, e.g. rtcamp/wp-phpstan@0.0.0-test (pushes v0.0.0-test to the wp-phpstan mirror)"
         required: true
         default: "rtcamp/wp-phpstan@0.0.0-test"
       force_push:
@@ -71,15 +56,10 @@ jobs:
         id: parse
         shell: bash
         env:
-          # workflow_dispatch runs from a branch, so the input has to win or the
-          # tag would be "main"; on a tag push ref_name *is* the tag.
           TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.test_tag || github.ref_name }}
         run: |
           set -euo pipefail
 
-          # The tag names one package: rtcamp/wp-phpstan@2.0.0 releases the
-          # wp-phpstan subtree and tags its mirror v2.0.0. This also turns away
-          # a dispatch whose test_tag was emptied or set to a branch name.
           release_re='^([a-z0-9._-]+)/([a-z0-9._-]+)@([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$'
           if [[ ! "$TAG" =~ $release_re ]]; then
             echo "::error::Refusing tag '$TAG': a release tag must look like <vendor>/<package>@<version>, for example rtcamp/wp-phpstan@2.0.0."
@@ -99,12 +79,7 @@ jobs:
             exit 1
           fi
 
-          # Accepts both the shorthand string form ("composer-packages/foo") and
-          # the object form ({ "prefixes": [{ "from": "..." }] }), and derives
-          # the deploy-key secret: wp-phpcs -> SPLIT_KEY_PHPCS. A "secret" key
-          # on the object form replaces the derived suffix; the gsub keeps a
-          # future wp-foo-bar from producing an invalid secret name. Only the
-          # subtree the tag names makes it into the matrix.
+          # An object entry's "secret" key overrides the derived SPLIT_KEY_ suffix.
           if ! matrix=$(jq -c --arg mirror "$mirror" '{
             include: [
               (.subtrees // {}) | to_entries[] | select(.key == $mirror) | {
@@ -137,9 +112,7 @@ jobs:
             exit 1
           fi
 
-          # The subtree is looked up by the package half alone, so compare the
-          # full name with the package's composer.json: a mistyped vendor fails
-          # here instead of releasing anyway.
+          # Verify the vendor too: splitsh.json keys only contain the package name.
           package_directory=$(jq -r '.include[0].package_directory' <<<"$matrix")
           actual_name=$(jq -r '.name // empty' "$package_directory/composer.json" 2>/dev/null || true)
           if [[ "$actual_name" != "$package_name" ]]; then

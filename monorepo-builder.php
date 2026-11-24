@@ -49,10 +49,7 @@ return static function (MBConfig $mbConfig): void {
         ],
     ]);
 
-    // Lockstep release pipeline: `monorepo-builder release` tags every package
-    // with one `v*` version, which .github/workflows/release-php.yml does not
-    // act on. Releases are one `rtcamp/<package>@<version>` tag per package
-    // (see AGENTS.md).
+    // Legacy lockstep release pipeline. Use per-package tags for Composer releases (see AGENTS.md).
     $mbConfig->workers([
         // Pin every package to depend on the same version of its siblings.
         SetCurrentMutualDependenciesReleaseWorker::class,
