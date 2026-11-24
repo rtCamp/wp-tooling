@@ -5,8 +5,7 @@ const path = require('node:path');
 
 const config = require('../index');
 
-// Stylelint 17 is ESM-only, which Jest's module loader can't import, so files
-// are linted through its CLI in a separate Node process.
+// Import via a separate node process since Stylelint 17 is ESM-only.
 const cli = path.join(
 	path.dirname(require.resolve('stylelint')),
 	'../bin/stylelint.mjs'
@@ -16,7 +15,7 @@ const cli = path.join(
  * Lint source code with this package's config.
  *
  * @param {string} code     - CSS or SCSS source.
- * @param {string} filename - Virtual file name; its extension picks the syntax.
+ * @param {string} filename - Virtual file name.
  * @return {string[]} The rules that reported a problem.
  */
 const lint = (code, filename) => {
