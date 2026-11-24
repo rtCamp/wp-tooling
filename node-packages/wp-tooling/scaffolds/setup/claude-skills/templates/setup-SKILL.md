@@ -112,7 +112,7 @@ Construct the plan in two phases: **project setup** and **feature scaffolds**.
 | JS present | `lint/eslint` | `eslint.config.js` exists |
 | CSS or SCSS present | `lint/stylelint` | `.stylelintrc.js` exists |
 | Developer wants PHP tests | `setup/phpunit` | `phpunit.xml.dist` exists |
-| Developer wants JS tests | `setup/jest` | `jest.config.js` exists |
+| Developer wants JS tests | `setup/vitest` | `vitest.config.*` or a Jest config exists |
 | Developer wants a11y tests | `setup/pa11y` | `.pa11yci.json` exists |
 
 #### Phase B: Feature scaffolds
@@ -352,7 +352,8 @@ Deduplicate packages. Sort alphabetically within each block. Pinned packages use
 | Scaffold ID | What it installs | When to apply |
 |---|---|---|
 | `setup/phpunit` | `phpunit.xml.dist`, `tests/bootstrap.php`, PHPUnit + polyfills + Brain Monkey | PHP plugin or theme with tests |
-| `setup/jest` | `jest.config.js`, `@wordpress/jest-preset-default` | JS blocks or scripts with unit tests |
+| `setup/vitest` | `vitest.config.mjs`, a jsdom setup file, Vitest + jsdom + React Testing Library | JS blocks or scripts with unit tests |
+| `setup/jest` | `jest.config.js`, `@wordpress/jest-preset-default` | Deprecated: use `setup/vitest` |
 | `setup/pa11y` | `.pa11yci.json`, `pa11y-ci` | Any project needing WCAG2AA accessibility coverage |
 
 ## Rules: never assume, always ask

@@ -1,0 +1,57 @@
+/**
+ * Vitest config for JavaScript unit tests.
+ *
+ * Scaffolded by `@rtcamp/wp-tooling`. Tests in SOURCE_DIR and TESTS_DIR run in
+ * Node; name a test *.jsdom.test.jsx to run it in jsdom with React Testing
+ * Library. `--coverage` writes tests/logs/lcov.info.
+ */
+import react from '@vitejs/plugin-react';
+import { configDefaults, defineConfig } from 'vitest/config';
+
+const SOURCE_DIR = {{source_dir_js}};
+const TESTS_DIR = {{tests_dir_js}};
+const DIRS = `{${ SOURCE_DIR },${ TESTS_DIR }}`;
+const EXT = '{js,jsx,ts,tsx}';
+const TESTS = [
+	`${ DIRS }/**/__tests__/**/*.${ EXT }`,
+	`${ DIRS }/**/test/*.${ EXT }`,
+	`${ DIRS }/**/?(*.)test.${ EXT }`,
+];
+const DOM_TESTS = `${ DIRS }/**/*.jsdom.test.${ EXT }`;
+
+// Vite parses JSX only in .jsx and .tsx files.
+export default defineConfig( {
+	plugins: [ react() ],
+	test: {
+		// Passes until the first test is added.
+		passWithNoTests: true,
+		restoreMocks: true,
+		// WordPress packages import JSON without the attribute Node requires.
+		server: { deps: { inline: [ /@wordpress\// ] } },
+		coverage: {
+			// Untested files report 0% instead of being left out.
+			include: [ `${ SOURCE_DIR }/**/*.${ EXT }` ],
+			reporter: [ 'lcov', 'text-summary' ],
+			reportsDirectory: 'tests/logs',
+		},
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'node',
+					include: TESTS,
+					exclude: [ ...configDefaults.exclude, DOM_TESTS ],
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: 'jsdom',
+					include: [ DOM_TESTS ],
+					environment: 'jsdom',
+					setupFiles: [ `./${ TESTS_DIR }/setup-jsdom.js` ],
+				},
+			},
+		],
+	},
+} );
