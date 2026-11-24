@@ -229,7 +229,7 @@ No outstanding developer actions.
 ```
 Files written:
   src/blocks/testimonial-grid/block.json
-  src/blocks/testimonial-grid/edit.js
+  src/blocks/testimonial-grid/edit.jsx
   src/blocks/testimonial-grid/render.php
   src/blocks/testimonial-grid/style.scss
 
@@ -241,7 +241,7 @@ Apply? [yes / different location / skip]
 
 **Developer:** yes.
 
-**AI enters the TDD loop (Jest for edit.js, PHPUnit for render.php):**
+**AI enters the TDD loop (Jest for edit.jsx, PHPUnit for render.php):**
 
 > The scaffold dropped two stubs. I'll expand both before implementing:
 >
@@ -294,7 +294,7 @@ composer lint:php       # 0 errors
 **Report:**
 
 ```
-Added src/blocks/testimonial-grid/ (block.json, edit.js, render.php, style.scss).
+Added src/blocks/testimonial-grid/ (block.json, edit.jsx, render.php, style.scss).
 Wired into includes/Blocks/Registry.php.
 Jest: 5 tests passing (src/blocks/testimonial-grid/edit.test.js).
 PHPUnit: 5 tests passing (tests/Blocks/TestimonialGridRenderTest.php).

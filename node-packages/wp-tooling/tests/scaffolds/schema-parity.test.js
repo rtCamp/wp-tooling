@@ -48,6 +48,7 @@ const everyKey = () => ({
 	wizard_step: null,
 	module_class: 'Inc\\Cli\\Command',
 	files: [{ src: 'a.mustache', dest: 'a.php', raw: false }],
+	fail_if_exists: ['a.php'],
 	inputs: [
 		{
 			key: 'mode',

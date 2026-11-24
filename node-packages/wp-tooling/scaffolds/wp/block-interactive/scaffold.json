@@ -79,6 +79,7 @@
 			"transform": "php-project-root"
 		}
 	],
+	"fail_if_exists": ["{{blocks_dir}}/{{slug}}"],
 	"files": [
 		{
 			"src": "templates/block-registrar.php.mustache",
@@ -93,8 +94,8 @@
 			"dest": "{{blocks_dir}}/{{slug}}/index.js"
 		},
 		{
-			"src": "templates/edit.js.mustache",
-			"dest": "{{blocks_dir}}/{{slug}}/edit.js"
+			"src": "templates/edit.jsx.mustache",
+			"dest": "{{blocks_dir}}/{{slug}}/edit.jsx"
 		},
 		{
 			"src": "templates/render.php.mustache",
@@ -124,9 +125,9 @@
 		"rtcamp/wp-primitives": "^2.0"
 	},
 	"npm_dev_dependencies": {
-		"@wordpress/block-editor": "^16.0.0",
-		"@wordpress/blocks": "^15.0.0",
-		"@wordpress/i18n": "^6.0.0",
-		"@wordpress/interactivity": "^6.0.0"
+		"@wordpress/block-editor": "^20.0.0",
+		"@wordpress/blocks": "^17.0.0",
+		"@wordpress/i18n": "^7.0.0",
+		"@wordpress/interactivity": "^8.0.0"
 	}
 }
