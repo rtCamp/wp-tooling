@@ -13,11 +13,7 @@ name: Split npm Packages
 #   - This repo is public, so `npm install` works anonymously — which a private
 #     registry could not offer at any visibility.
 #
-# No tags are pushed. npm records the resolved commit SHA in package-lock.json, so
-# installs are reproducible from a branch ref; the branch is only re-read when a
-# consumer regenerates its lock. Tags would additionally pin the *spec*, but they
-# must not start with "v" — release-php.yml triggers on `v*`, and tags share one
-# repo-wide namespace with it.
+# This workflow pushes branches only. npm lockfiles pin the resolved commit SHA.
 #
 # The branches are generated. Never commit to them by hand: the next run pushes a
 # fast-forward from the monorepo and a diverged branch fails the run instead of
