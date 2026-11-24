@@ -72,3 +72,26 @@ test('feature source symlinks must stay inside the feature assets directory', ()
 		fs.rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test('a symlinked cleanup.replace source cannot escape the project root', () => {
+	const root = makeRoot();
+	const outside = makeRoot('init-outside-');
+	try {
+		fs.symlinkSync(outside, path.join(root, 'linked'));
+		expect(() =>
+			validatePaths(
+				{
+					cleanup: {
+						replace: [
+							{ from: 'linked/README.md', to: 'README.md' },
+						],
+					},
+				},
+				root
+			)
+		).toThrow(/outside/);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});

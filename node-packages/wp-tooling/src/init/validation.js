@@ -3,7 +3,7 @@
 
 const path = require('path');
 const { resolveWithin, validateRelativePath } = require('./transform');
-const { resolveCleanupTargets } = require('./cleanup');
+const { resolveSetupCleanup } = require('./cleanup');
 const { validateName, validateVersion } = require('./identity');
 
 /**
@@ -117,7 +117,8 @@ const validatePaths = (config, root, identity) => {
 			);
 		}
 	};
-	resolveCleanupTargets(root, config.cleanup?.targets);
+	// Covers cleanup.targets as well as the first-setup replace/unset entries.
+	resolveSetupCleanup(root, config.cleanup);
 	check(config.featuresDir || 'bin/features');
 	for (const feature of config.features || []) {
 		for (const file of feature.apply?.files || []) {
