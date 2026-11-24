@@ -164,13 +164,13 @@ describe('wiring targetFile normalisation', () => {
 			{ dryRun: true, cwd: makeTmpDir() }
 		);
 		const target = result.ai.wiring[0].targetFile;
-		expect(target).toBe('includes/Modules/Cli.php');
+		expect(target).toBe('includes/Modules/CLI.php');
 		expect(target).not.toContain('..');
 	});
 
 	it('drops a wiring target that normalises outside the project', async () => {
 		const r = registry;
-		// `wp/cli` wires into `{{base_path}}/../Modules/Cli.php`. A single
+		// `wp/cli` wires into `{{base_path}}/../Modules/CLI.php`. A single
 		// path segment leaves nothing for the `..` to consume, so the target
 		// would escape the project the AI was pointed at.
 		const result = await r.execute(
@@ -180,7 +180,7 @@ describe('wiring targetFile normalisation', () => {
 		);
 		expect(result.ai.wiring).toEqual([]);
 		expect(result.warnings).toEqual([
-			'wiring target resolves outside the project, skipped: ../Modules/Cli.php',
+			'wiring target resolves outside the project, skipped: ../Modules/CLI.php',
 		]);
 	});
 

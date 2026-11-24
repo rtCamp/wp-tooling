@@ -283,7 +283,7 @@ At every level the skill **shows the developer the snippet, the target file, the
 
 ### Anchor restoration (optional, never automatic)
 
-When the skill detects that anchors are missing in a project that otherwise looks like rtCamp skeleton output (PSR-4 `Inc\\` namespace, `includes/` base path, `Plugin.php` bootstrap), it may offer **once per session**: "I notice your project does not have scaffold anchor comments. Restoring them lets future scaffold runs find insertion points instantly. Want me to add the anchors for the categories you have in use? [yes / no / not now]". Never restore anchors without explicit consent.
+When the skill detects that anchors are missing in a project that otherwise looks like rtCamp skeleton output (`inc/` PSR-4 root, kind modules under `inc/Modules/`, a `Main.php` bootstrap with a `CLASSES` list), it may offer **once per session**: "I notice your project does not have scaffold anchor comments. Restoring them lets future scaffold runs find insertion points instantly. Want me to add the anchors for the categories you have in use? [yes / no / not now]". Never restore anchors without explicit consent.
 
 ### Worked example A, canonical pattern with stripped anchor
 
