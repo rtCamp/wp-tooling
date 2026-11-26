@@ -9,6 +9,11 @@ const wpToolingConfig = require('@rtcamp/eslint-config/jest');
 module.exports = [
 	...wpToolingConfig,
 	{
+		// A fake WordPress project with deliberately outdated Interactivity API
+		// markup (ES modules, JSX) for the iapi-check tests: data, not code.
+		ignores: ['tests/ci/fixtures/iapi-check/**'],
+	},
+	{
 		plugins: { n: nPlugin },
 		languageOptions: {
 			ecmaVersion: 2023,

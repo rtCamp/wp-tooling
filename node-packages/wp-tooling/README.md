@@ -54,6 +54,7 @@ npx wp-tooling <command> --help                      # options for any command
 | `release:zip` | Build a `.distignore`-aware `dist/<slug>-<version>.zip` |
 | `detect-changes` | Bucket the files a change touches, so CI runs only the jobs it needs |
 | `coverage-gate` | Fail when too few of a pull request's changed lines are covered (Clover or LCOV) |
+| `iapi-check` | Find Interactivity API usages that WordPress 7.2 stops supporting: `data-wp-ignore`, two-hyphen unique IDs and negated functions |
 | `a11y` | Run pa11y-ci and report normalised accessibility violations |
 | `perf` | Collect Core Web Vitals and Lighthouse scores, plus optional server profiling |
 | `version-monitor` | Detect and apply WordPress, PHP and Node updates that Dependabot misses |
@@ -84,7 +85,7 @@ The same functionality is available from code:
 | `@rtcamp/wp-tooling/features` | Feature toggles |
 | `@rtcamp/wp-tooling/release` | Version bump, changelog and zip |
 | `@rtcamp/wp-tooling/hooks` | Git hook installer |
-| `@rtcamp/wp-tooling/ci` | `detectChanges`, `computeGate` and their parsers and errors |
+| `@rtcamp/wp-tooling/ci` | `detectChanges`, `computeGate`, `checkIapi` and their parsers and errors |
 | `@rtcamp/wp-tooling/a11y` | `runA11y` |
 | `@rtcamp/wp-tooling/perf` | Performance runner |
 | `@rtcamp/wp-tooling/version-monitor` | Detectors, updaters and reporters |

@@ -260,23 +260,31 @@ function escapeProperty(value) {
 /**
  * Build one GitHub workflow command, e.g. `::warning file=a.php,line=3::msg`.
  *
- * @param {string} level           `notice`, `warning` or `error`.
+ * @param {string} level            `notice`, `warning` or `error`.
  * @param {string} message
  * @param {Object} [location]
- * @param {string} [location.file] Path relative to the repo root. Control
- *                                 characters are made visible, so a name
- *                                 carrying terminal escapes can't restyle the
- *                                 log — at the cost of not attaching to it.
+ * @param {string} [location.file]  Path relative to the repo root. Control
+ *                                  characters are made visible, so a name
+ *                                  carrying terminal escapes can't restyle the
+ *                                  log, at the cost of not attaching to it.
  * @param {number} [location.line]
+ * @param {number} [location.col]   1-based column; only meaningful with `line`.
+ * @param {string} [location.title] Annotation title, shown above the message.
  * @return {string} The command line.
  */
-function annotation(level, message, { file, line } = {}) {
+function annotation(level, message, { file, line, col, title } = {}) {
 	const props = [];
 	if (file) {
 		props.push(`file=${escapeProperty(printable(file))}`);
 	}
 	if (line) {
 		props.push(`line=${line}`);
+	}
+	if (col) {
+		props.push(`col=${col}`);
+	}
+	if (title) {
+		props.push(`title=${escapeProperty(printable(title))}`);
 	}
 	const head = props.length > 0 ? `${level} ${props.join(',')}` : level;
 	return `::${head}::${escapeData(message)}`;
@@ -370,9 +378,13 @@ function stepOutputs(result) {
 module.exports = {
 	annotation,
 	buildAnnotations,
+	codeSpan,
+	escapeTableCell,
 	formatRanges,
 	formatSkipSummary,
 	formatSummary,
 	formatText,
+	plural,
+	printable,
 	stepOutputs,
 };
